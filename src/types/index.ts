@@ -76,6 +76,7 @@ export interface RescueTeam {
   missionsCount?: number;
   rescuedCount?: number;
   hoursActive?: number;
+  logoUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }

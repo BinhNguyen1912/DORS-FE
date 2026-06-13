@@ -9,13 +9,28 @@ export const rescueTeamApi = {
     teamType?: string;
     search?: string;
   }): Promise<PaginatedResponse<RescueTeam>> => {
-    // Return mock empty data as the backend endpoint is not yet implemented
+    const response = await api.get<any>('/rescue-teams', { params });
+    const resData = response.data?.data !== undefined ? response.data.data : response.data;
+    
+    // Map items or data arrays from the paginated backend response
+    const items = Array.isArray(resData?.items) 
+      ? resData.items 
+      : Array.isArray(resData?.data) 
+        ? resData.data 
+        : Array.isArray(resData) 
+          ? resData 
+          : [];
+          
+    const total = typeof resData?.total === 'number' 
+      ? resData.total 
+      : items.length;
+
     return {
       success: true,
-      data: [],
-      total: 0,
-      page: params?.page || 1,
-      limit: params?.limit || 10,
+      data: items,
+      total: total,
+      page: resData?.page || params?.page || 1,
+      limit: resData?.limit || params?.limit || 10,
     };
   },
 
