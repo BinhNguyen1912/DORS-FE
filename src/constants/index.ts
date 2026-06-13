@@ -1,0 +1,23 @@
+export const APP_NAME = 'Flood Relief System';
+
+export const ROUTES = {
+  HOME: '/',
+  AUTH: '/auth',
+  LOGIN: '/auth/login',
+  REGISTER: '/auth/register',
+  DASHBOARD: '/dashboard',
+  HOUSEHOLD: '/household',
+  HOUSEHOLD_LIST: '/household/list',
+  HOUSEHOLD_CREATE: '/household/create',
+  HOUSEHOLD_DETAIL: '/household/:id',
+  RESCUE_TEAM: '/rescue-team',
+  RESCUE_TEAM_LIST: '/rescue-team/list',
+  RESCUE_TEAM_CREATE: '/rescue-team/create',
+  RESCUE_TEAM_DETAIL: '/rescue-team/:id',
+  DISASTER: '/disaster',
+  DISASTER_LIST: '/disaster/list',
+  DISASTER_DETAIL: '/disaster/:id',
+  DONATION: '/donation',
+  DONATION_LIST: '/donation/list',
+  DONATION_CAMPAIGN: '/donation/campaign',
+} as const;
