@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Select from 'react-select';
 import { Loader2, Eye, EyeOff, User, Phone, Lock, MapPin, Info } from 'lucide-react';
 import { authApi, locationApi } from '../../apis';
-import { useAuthStore } from '../../stores';
+import { useAuthStore, toast } from '../../stores';
 import { ROUTES } from '../../constants';
 import { cn } from '../../lib/utils';
 import type { Province, AdministrativeUnit } from '../../types';
@@ -201,8 +201,10 @@ export default function RegisterPage() {
       setAuth(response.user, response.accessToken);
       localStorage.setItem('access_token', response.accessToken);
       localStorage.setItem('refresh_token', response.refreshToken);
+      toast.success('Đăng ký tài khoản thành công!');
       navigate(ROUTES.DASHBOARD);
     } catch (err: unknown) {
+      toast.api(err, 'Đăng ký không thành công');
       const errorResponse = err as { response?: { data?: { message?: string | string[] } } };
       const rawMessage = errorResponse.response?.data?.message;
       let finalMessage = 'Đăng ký tài khoản không thành công. Vui lòng thử lại.';

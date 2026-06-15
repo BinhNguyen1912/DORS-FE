@@ -8,6 +8,7 @@ export const rescueTeamApi = {
     status?: string;
     teamType?: string;
     search?: string;
+    provinceId?: number;
   }): Promise<PaginatedResponse<RescueTeam>> => {
     const response = await api.get<any>('/rescue-teams', { params });
     const resData = response.data?.data !== undefined ? response.data.data : response.data;
@@ -60,6 +61,14 @@ export const rescueTeamApi = {
     location: { lat: number; lng: number }
   ): Promise<void> => {
     await api.patch(`/rescue-teams/${id}/location`, location);
+  },
+
+  getSpecializations: async (params?: {
+    teamType?: string;
+    isActive?: boolean;
+  }): Promise<any[]> => {
+    const response = await api.get<any>('/team-specializations', { params });
+    return response.data?.data !== undefined ? response.data.data : response.data;
   },
 
   delete: async (id: number): Promise<void> => {

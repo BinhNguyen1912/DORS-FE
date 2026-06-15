@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Eye, EyeOff, User, Lock } from 'lucide-react';
 import { authApi } from '../../apis';
-import { useAuthStore } from '../../stores';
+import { useAuthStore, toast } from '../../stores';
 import { ROUTES } from '../../constants';
 import { cn } from '../../lib/utils';
 import { loginSchema, type LoginForm } from '../../schemas';
@@ -36,8 +36,10 @@ export default function LoginPage() {
       setAuth(response.user, response.accessToken);
       localStorage.setItem('access_token', response.accessToken);
       localStorage.setItem('refresh_token', response.refreshToken);
+      toast.success('Đăng nhập thành công!');
       navigate(ROUTES.DASHBOARD);
     } catch (err: unknown) {
+      toast.api(err, 'Đăng nhập không thành công');
       const errorResponse = err as { response?: { data?: { message?: string } } };
       setError(
         errorResponse.response?.data?.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại tài khoản và mật khẩu.'

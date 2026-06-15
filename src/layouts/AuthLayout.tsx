@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import ToastContainer from '../components/common/ToastContainer';
 
 export default function AuthLayout() {
   return (
@@ -14,6 +15,7 @@ export default function AuthLayout() {
       <div className="relative z-10 w-full max-w-xl flex flex-col items-center justify-center py-4">
         <Outlet />
       </div>
+      <ToastContainer />
     </div>
   );
 }

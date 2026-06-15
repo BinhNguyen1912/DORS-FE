@@ -1,55 +1,175 @@
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Home,
-  Users,
-  AlertTriangle,
-  Heart,
   LogOut,
   Menu,
-  X,
+  ChevronsLeft,
+  ChevronsRight,
+  PhoneCall,
+  LayoutDashboard,
+  Users,
+  Home,
+  AlertTriangle,
+  Heart,
+  Shield,
+  Plus,
 } from 'lucide-react';
-import { useState } from 'react';
-import { useAuthStore } from '../stores';
+import { useAuthStore, toast } from '../stores';
 import { ROUTES } from '../constants';
 import { cn } from '../lib/utils';
-
-const navItems = [
-  { label: 'Dashboard', href: ROUTES.DASHBOARD, icon: LayoutDashboard },
-  { label: 'Household', href: ROUTES.HOUSEHOLD_LIST, icon: Home },
-  { label: 'Rescue Teams', href: ROUTES.RESCUE_TEAM_LIST, icon: Users },
-  { label: 'Disasters', href: ROUTES.DISASTER_LIST, icon: AlertTriangle },
-  { label: 'Donations', href: ROUTES.DONATION_LIST, icon: Heart },
-];
+import { menuItems } from '../config/menu';
+import Header from '../components/common/Header';
+import ToastContainer from '../components/common/ToastContainer';
+import { authApi } from '../apis';
 
 export default function MainLayout() {
+  const [collapsed, setCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const sidebarRef = useRef<HTMLElement>(null);
+  
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
 
-  const handleLogout = () => {
-    logout();
-    navigate(ROUTES.LOGIN);
+  const handleLogout = async () => {
+    try {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        await authApi.logout(refreshToken);
+      }
+    } catch (err) {
+      console.error('Lỗi khi gọi API đăng xuất:', err);
+    } finally {
+      logout();
+      navigate(ROUTES.LOGIN);
+      toast.success('Đăng xuất thành công!');
+    }
   };
 
+  // Click outside sidebar effect to collapse (desktop) or close (mobile) the sidebar
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      
+      // Close mobile sidebar if clicked outside
+      if (sidebarOpen && sidebarRef.current && !sidebarRef.current.contains(target)) {
+        const mobileToggleBtn = document.querySelector('[data-mobile-toggle]');
+        if (mobileToggleBtn && mobileToggleBtn.contains(target)) {
+          return;
+        }
+        setSidebarOpen(false);
+      }
+
+      // Collapse desktop sidebar if expanded and clicked outside
+      if (!collapsed && sidebarRef.current && !sidebarRef.current.contains(target)) {
+        const toggleBtn = document.querySelector('[data-sidebar-toggle]');
+        if (toggleBtn && toggleBtn.contains(target)) {
+          return;
+        }
+        setCollapsed(true);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [collapsed, sidebarOpen]);
+
+  // Determine path headers information dynamically for global layout
+  const getHeaderInfo = (pathname: string) => {
+    if (pathname === ROUTES.DASHBOARD || pathname === '/') {
+      return {
+        title: 'Tổng quan hệ thống',
+        subtitle: 'Bảng điều khiển giám sát cứu hộ',
+        icon: <LayoutDashboard size={20} />,
+        showSearch: false,
+      };
+    }
+    if (pathname === ROUTES.RESCUE_TEAM_LIST) {
+      return {
+        title: 'Quản lý đội cứu hộ',
+        subtitle: 'Tổng quan',
+        icon: <Users size={20} />,
+        showSearch: true,
+        searchPlaceholder: 'Tìm kiếm đội, thành viên, khu vực...',
+      };
+    }
+    if (pathname === ROUTES.RESCUE_TEAM_CREATE) {
+      return {
+        title: 'Tạo đội cứu hộ',
+        subtitle: 'Thêm đội mới vào hệ thống',
+        icon: <Plus size={20} />,
+        showSearch: false,
+      };
+    }
+    if (pathname.startsWith('/rescue-team/')) {
+      return {
+        title: 'Chi tiết đội cứu hộ',
+        subtitle: 'Thông tin hồ sơ chi tiết',
+        icon: <Users size={20} />,
+        showSearch: false,
+      };
+    }
+    if (pathname === ROUTES.HOUSEHOLD_LIST) {
+      return {
+        title: 'Quản lý hộ dân',
+        subtitle: 'Danh sách các hộ gia đình trong vùng lũ',
+        icon: <Home size={20} />,
+        showSearch: true,
+        searchPlaceholder: 'Tìm kiếm hộ dân...',
+      };
+    }
+    if (pathname === ROUTES.DISASTER_LIST) {
+      return {
+        title: 'Tình hình thiên tai',
+        subtitle: 'Danh sách các điểm sạt lở, lũ lụt',
+        icon: <AlertTriangle size={20} />,
+        showSearch: true,
+        searchPlaceholder: 'Tìm kiếm điểm sự cố...',
+      };
+    }
+    if (pathname === ROUTES.DONATION_LIST) {
+      return {
+        title: 'Quản lý tài trợ & quyên góp',
+        subtitle: 'Danh sách nguồn lực quyên góp',
+        icon: <Heart size={20} />,
+        showSearch: true,
+        searchPlaceholder: 'Tìm kiếm khoản tài trợ...',
+      };
+    }
+
+    return {
+      title: 'Hệ thống cứu trợ thiên tai',
+      subtitle: 'Quản lý cứu hộ Việt Nam',
+      icon: <Shield size={20} />,
+      showSearch: false,
+    };
+  };
+
+  const headerInfo = getHeaderInfo(location.pathname);
+  const userRoleText = user?.role === 'SYSTEM_ADMIN' ? 'Quản trị viên' : 'Điều phối viên';
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-gray-950 flex">
+      {/* Mobile Top Bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-50 text-white">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+          data-mobile-toggle
+          className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
         >
-          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+          <Menu size={20} />
         </button>
-        <span className="font-semibold text-gray-900 dark:text-white">
-          Flood Relief
-        </span>
-        <div className="w-10" />
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse" />
+          <span className="font-bold text-xs uppercase tracking-wider">CỨU HỘ VIỆT NAM</span>
+        </div>
+        <div className="w-8" />
       </div>
 
-      {/* Sidebar Overlay */}
+      {/* Sidebar Overlay (Mobile) */}
       {sidebarOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black/50 z-40"
@@ -57,80 +177,184 @@ export default function MainLayout() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Collapsible Left Sidebar */}
       <aside
+        ref={sidebarRef}
         className={cn(
-          'fixed top-0 left-0 z-50 h-full w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          'fixed lg:sticky top-0 left-0 h-screen bg-[#0b1329] text-slate-350 border-r border-slate-900 flex flex-col z-40 transition-all duration-300 ease-in-out transform lg:translate-x-0',
+          collapsed ? 'w-16' : 'w-60',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            Flood Relief
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Emergency Response System
-          </p>
+        {/* Sidebar Header Logo */}
+        <div className={cn(
+          "h-16 border-b border-slate-850 flex items-center overflow-hidden transition-all duration-300",
+          collapsed ? "px-2 justify-center" : "px-4"
+        )}>
+          <div className="flex items-center w-full">
+            <div className={cn(
+              "flex items-center justify-center transition-all duration-300",
+              collapsed ? "h-9 w-9 mx-auto" : "h-13 w-full justify-start"
+            )}>
+              <img
+                src={collapsed 
+                  ? "https://pub-2c2241596f28433bb00bedb6391e5d78.r2.dev/assets/logo-focus.png"
+                  : "https://pub-2c2241596f28433bb00bedb6391e5d78.r2.dev/assets/logo.png"
+                }
+                alt="Cứu Hộ Việt Nam Logo"
+                className="h-full w-auto object-contain max-w-full"
+              />
+            </div>
+          </div>
         </div>
 
-        <nav className="p-4 space-y-1">
-          {navItems.map((item) => {
+        {/* Navigation links */}
+        <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto no-scrollbar">
+          {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.href;
 
             return (
               <Link
                 key={item.href}
-                to={item.href}
+                to={item.href === '#' ? '#' : item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                  'flex items-center rounded-xl transition-all font-semibold text-xs',
+                  collapsed
+                    ? 'justify-center p-2.5'
+                    : 'gap-2 px-2.5 py-2',
                   isActive
-                    ? 'bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-amber-600/10 text-amber-500 border-l-[3px] border-amber-500'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-850/60'
                 )}
+                title={collapsed ? item.label : undefined}
               >
-                <Icon size={20} />
-                <span className="font-medium">{item.label}</span>
+                <Icon size={18} className="flex-shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </Link>
             );
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
-                <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
-                  {user?.fullName?.charAt(0) || 'U'}
-                </span>
+        {/* Footer Area: Emergency and User details */}
+        <div className={cn(
+          "border-t border-slate-850 space-y-3 flex-shrink-0",
+          collapsed ? "p-2" : "p-3"
+        )}>
+          {/* Emergency helpline card */}
+          {collapsed ? (
+            <div className="flex justify-center">
+              <a
+                href="tel:1900123114"
+                className="w-10 h-10 rounded-xl bg-orange-600/10 hover:bg-orange-600/20 text-orange-500 flex items-center justify-center transition-all"
+                title="Hỗ trợ khẩn cấp 24/7: 1900 123 114"
+              >
+                <PhoneCall size={16} />
+              </a>
+            </div>
+          ) : (
+            <div className="bg-[#121b34] p-2.5 rounded-xl border border-orange-500/10 flex items-center gap-2.5">
+              <div className="p-2 bg-orange-600/10 text-orange-500 rounded-lg flex-shrink-0">
+                <PhoneCall size={15} />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {user?.fullName || 'User'}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {user?.role || 'User'}
-                </p>
+              <div className="text-left overflow-hidden">
+                <p className="text-[8px] text-gray-500 font-bold uppercase leading-none mb-1">Hỗ trợ khẩn cấp 24/7</p>
+                <a href="tel:1900123114" className="text-xs font-extrabold text-orange-500 leading-none hover:underline block truncate">
+                  1900 123 114
+                </a>
               </div>
             </div>
+          )}
+
+          {/* User profile & collapse toggle */}
+          <div className="space-y-2">
+            <div className={cn(
+              "flex items-center justify-between gap-2.5",
+              collapsed && "justify-center"
+            )}>
+              <div className="flex items-center gap-2 overflow-hidden flex-1 justify-start">
+                <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-white flex-shrink-0">
+                  {user?.fullName?.split(' ').pop()?.charAt(0) || 'A'}
+                </div>
+                {!collapsed && (
+                  <div className="text-left overflow-hidden flex-1">
+                    <p className="text-xs font-bold text-white truncate">
+                      {user?.fullName || 'Nguyễn Văn A'}
+                    </p>
+                    <p className="text-[9px] text-slate-500 font-semibold truncate mt-0.5">
+                      {userRoleText}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {!collapsed && (
+                <button
+                  onClick={handleLogout}
+                  className="p-1.5 hover:bg-slate-850 rounded-lg text-slate-500 hover:text-white transition-all flex-shrink-0"
+                  title="Đăng xuất"
+                >
+                  <LogOut size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Sidebar toggle button at bottom */}
             <button
-              onClick={handleLogout}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-              title="Logout"
+              onClick={() => setCollapsed(!collapsed)}
+              className={cn(
+                "hidden lg:flex items-center text-slate-500 hover:text-white rounded-lg hover:bg-slate-850/60 transition-all font-semibold text-xs text-left w-full",
+                collapsed ? "justify-center p-2" : "gap-2 px-2.5 py-1.5"
+              )}
             >
-              <LogOut size={20} />
+              {collapsed ? (
+                <ChevronsRight size={16} />
+              ) : (
+                <>
+                  <ChevronsLeft size={16} />
+                  <span>Thu gọn</span>
+                </>
+              )}
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="lg:ml-64 pt-16 lg:pt-0 min-h-screen">
-        <div className="p-4 lg:p-8">
-          <Outlet />
+      {/* Right Content Area */}
+      <main
+        className={cn(
+          'flex-1 min-h-screen pt-14 lg:pt-0 transition-all duration-300 ease-in-out flex flex-col'
+        )}
+      >
+        {/* Global Header */}
+        <Header
+          title={headerInfo.title}
+          sidebarCollapsed={collapsed}
+          onToggleSidebar={() => setCollapsed(!collapsed)}
+          searchPlaceholder={headerInfo.searchPlaceholder || "Tìm kiếm tổng hợp..."}
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          showSearch={headerInfo.showSearch}
+        />
+        
+        {/* Outlet with shared search state context */}
+        <div className="pt-2.5 pb-4 px-4 lg:pt-3 lg:pb-5 lg:px-5 flex-1 flex flex-col relative overflow-hidden">
+          {/* Watermark Background Layer to handle the checkerboard image */}
+          <div 
+            className={cn(
+              "fixed top-0 bottom-0 right-0 pointer-events-none bg-[url('https://pub-2c2241596f28433bb00bedb6391e5d78.r2.dev/assets/bg-main.png')] bg-no-repeat bg-[position:right_-300px_top_-300px] bg-[size:850px_850px] opacity-[0.12] mix-blend-multiply dark:mix-blend-screen dark:opacity-[0.18] transition-all duration-300 z-0",
+              collapsed ? "lg:left-16 left-0" : "lg:left-60 left-0"
+            )}
+          />
+          <div className="flex-1 flex flex-col z-10">
+            <Outlet context={{ searchQuery, setSearchQuery }} />
+          </div>
         </div>
       </main>
+      <ToastContainer />
     </div>
   );
 }
+
+

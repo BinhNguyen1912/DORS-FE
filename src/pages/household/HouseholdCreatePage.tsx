@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { householdApi } from '../../apis';
 import { ROUTES } from '../../constants';
 import { cn } from '../../lib/utils';
+import { toast } from '../../stores';
 
 const householdSchema = z.object({
   residentId: z.number(),
@@ -65,8 +66,10 @@ export default function HouseholdCreatePage() {
     setIsLoading(true);
     try {
       await householdApi.create(data);
+      toast.success('Tạo thông tin hộ dân thành công!');
       navigate(ROUTES.HOUSEHOLD_LIST);
     } catch (err: any) {
+      toast.api(err, 'Lỗi khi tạo thông tin hộ dân');
       setError(err.response?.data?.message || 'Failed to create household');
     } finally {
       setIsLoading(false);

@@ -8,21 +8,21 @@ import { ROUTES } from '../constants';
  */
 export const FEATURE_FLAGS: Record<string, boolean> = {
   [ROUTES.DASHBOARD]: true,
-  
+
   // Households module
   [ROUTES.HOUSEHOLD_LIST]: false,
   [ROUTES.HOUSEHOLD_CREATE]: false,
   [ROUTES.HOUSEHOLD_DETAIL]: false,
-  
+
   // Rescue Teams module
-  [ROUTES.RESCUE_TEAM_LIST]: false,
-  [ROUTES.RESCUE_TEAM_CREATE]: false,
-  [ROUTES.RESCUE_TEAM_DETAIL]: false,
-  
+  [ROUTES.RESCUE_TEAM_LIST]: true,
+  [ROUTES.RESCUE_TEAM_CREATE]: true,
+  [ROUTES.RESCUE_TEAM_DETAIL]: true,
+
   // Disasters module
   [ROUTES.DISASTER_LIST]: false,
   [ROUTES.DISASTER_DETAIL]: false,
-  
+
   // Donations module
   [ROUTES.DONATION_LIST]: false,
   [ROUTES.DONATION_CAMPAIGN]: false,

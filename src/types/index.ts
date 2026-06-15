@@ -5,6 +5,8 @@ export interface User {
   fullName: string;
   phone?: string;
   role: string;
+  provinceId?: number;
+  adminUnitId?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,12 +68,16 @@ export interface HouseholdProfile {
 export interface RescueTeam {
   id: number;
   name: string;
-  leaderId: number;
+  leaderId?: number;
   leaderName: string;
   leaderPhone: string;
-  teamType: 'PROFESSIONAL' | 'VOLUNTEER_SPONTANEOUS';
+  teamType: string;
   status: 'ACTIVE' | 'INACTIVE' | 'ON_DUTY' | 'OFF_DUTY';
+  provinceId?: number;
+  adminUnitId?: number;
+  maxCapacity?: number;
   location?: any;
+  baseLocation?: any;
   specializationIds?: number[];
   missionsCount?: number;
   rescuedCount?: number;
