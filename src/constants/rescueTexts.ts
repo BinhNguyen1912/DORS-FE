@@ -1,0 +1,58 @@
+export const RESCUE_TEXTS = {
+  TITLE_LIST: 'Danh sách đội cứu hộ',
+  TITLE_DETAIL: 'Chi tiết đội cứu hộ',
+  BREADCRUMB_HOME: 'Trang chủ',
+  BREADCRUMB_TEAM: 'Đội cứu hộ',
+  BREADCRUMB_DETAIL: 'Chi tiết đội',
+  
+  SEARCH_PLACEHOLDER: 'Tìm kiếm đội cứu hộ...',
+  SELECT_TYPE_ALL: 'Tất cả loại đội',
+  SELECT_STATUS_ALL: 'Tất cả trạng thái',
+  SELECT_AREA_ALL: 'Tất cả khu vực',
+
+  COL_CODE: 'Mã đội',
+  COL_NAME: 'Tên đội',
+  COL_TYPE: 'Loại đội',
+  COL_AREA: 'Khu vực phụ trách',
+  COL_MEMBERS: 'Thành viên',
+  COL_STATUS: 'Trạng thái',
+  COL_MISSIONS: 'Nhiệm vụ',
+  COL_ACTIONS: 'Thao tác',
+
+  BTN_ADD_TEAM: 'Thêm đội cứu hộ',
+  BTN_EDIT: 'Chỉnh sửa',
+  BTN_CANCEL: 'Hủy',
+  BTN_DELETE: 'Xóa',
+  BTN_SAVE: 'Lưu & Tạo Đội',
+  BTN_VIEW_DETAIL: 'Xem chi tiết',
+
+  CONFIRM_DELETE_TITLE: 'Xác nhận xóa đội cứu hộ',
+  CONFIRM_DELETE_MSG: 'Bạn có chắc chắn muốn xóa đội cứu hộ này? Hành động này không thể hoàn tác.',
+
+  TAB_OVERVIEW: 'Tổng quan',
+  TAB_MEMBERS: 'Thành viên',
+  TAB_MISSIONS: 'Nhiệm vụ',
+  TAB_EQUIPMENT: 'Trạng thiết bị',
+  TAB_STATS: 'Thống kê',
+  TAB_HISTORY: 'Lịch sử',
+  TAB_SHIFT: 'Ca trực',
+
+  STATS_MISSIONS_RUNNING: 'Nhiệm vụ đang thực hiện',
+  STATS_EFFICIENCY: 'Hiệu suất',
+  STATS_COMPLETED: 'Đã hoàn thành',
+  STATS_RESCUED: 'Người đã cứu',
+  STATS_HOURS: 'Giờ hoạt động',
+  
+  DETAIL_BASIC_INFO: 'Thông tin cơ bản',
+  DETAIL_FOUNDING_DATE: 'Ngày thành lập',
+  DETAIL_LEADER: 'Trưởng đội',
+  DETAIL_PHONE: 'Số điện thoại',
+  DETAIL_EMAIL: 'Email',
+  DETAIL_MAX_CAPACITY: 'Sức chứa tối đa',
+  
+  DETAIL_LOCATION_INFO: 'Khu vực & vị trí',
+  DETAIL_BASE_LOCATION: 'Vị trí đóng quân',
+  DETAIL_CURRENT_LOCATION: 'Vị trí hiện tại',
+  DETAIL_COVERAGE_AREA: 'Diện tích phụ trách',
+  DETAIL_COVERAGE_RADIUS: 'Phạm vi hoạt động',
+} as const;

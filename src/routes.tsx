@@ -18,8 +18,10 @@ import HouseholdListPage from './pages/household/HouseholdListPage';
 import HouseholdCreatePage from './pages/household/HouseholdCreatePage';
 import HouseholdDetailPage from './pages/household/HouseholdDetailPage';
 import RescueTeamListPage from './pages/rescue-team/RescueTeamListPage';
+import RescueTeamDashboardPage from './pages/rescue-team/RescueTeamDashboardPage';
 import RescueTeamCreatePage from './pages/rescue-team/RescueTeamCreatePage';
 import RescueTeamDetailPage from './pages/rescue-team/RescueTeamDetailPage';
+import TeamSpecializationListPage from './pages/rescue-team/TeamSpecializationListPage';
 import DisasterListPage from './pages/disaster/DisasterListPage';
 import DisasterDetailPage from './pages/disaster/DisasterDetailPage';
 import DonationListPage from './pages/donation/DonationListPage';
@@ -124,6 +126,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: ROUTES.RESCUE_TEAM_DASHBOARD,
+        element: (
+          <FeatureGuard route={ROUTES.RESCUE_TEAM_DASHBOARD}>
+            <RescueTeamDashboardPage />
+          </FeatureGuard>
+        ),
+      },
+      {
         path: ROUTES.RESCUE_TEAM_CREATE,
         element: (
           <FeatureGuard route={ROUTES.RESCUE_TEAM_CREATE}>
@@ -136,6 +146,14 @@ export const router = createBrowserRouter([
         element: (
           <FeatureGuard route={ROUTES.RESCUE_TEAM_DETAIL}>
             <RescueTeamDetailPage />
+          </FeatureGuard>
+        ),
+      },
+      {
+        path: ROUTES.TEAM_SPECIALIZATION_LIST,
+        element: (
+          <FeatureGuard route={ROUTES.TEAM_SPECIALIZATION_LIST}>
+            <TeamSpecializationListPage />
           </FeatureGuard>
         ),
       },

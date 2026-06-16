@@ -36,8 +36,8 @@ export const rescueTeamApi = {
   },
 
   getById: async (id: number): Promise<RescueTeam> => {
-    const response = await api.get<{ data: RescueTeam }>(`/rescue-teams/${id}`);
-    return response.data.data;
+    const response = await api.get<any>(`/rescue-teams/${id}`);
+    return response.data?.data !== undefined ? response.data.data : response.data;
   },
 
   create: async (data: Partial<RescueTeam>): Promise<RescueTeam> => {
@@ -71,7 +71,36 @@ export const rescueTeamApi = {
     return response.data?.data !== undefined ? response.data.data : response.data;
   },
 
+  getRecentSosRequests: async (params?: {
+    provinceId?: number;
+    limit?: number;
+  }): Promise<any[]> => {
+    const response = await api.get<any>('/sos-requests', { params });
+    const resData = response.data?.data !== undefined ? response.data.data : response.data;
+    return Array.isArray(resData?.items)
+      ? resData.items
+      : Array.isArray(resData?.data)
+        ? resData.data
+        : Array.isArray(resData)
+          ? resData
+          : [];
+  },
+
   delete: async (id: number): Promise<void> => {
     await api.delete(`/rescue-teams/${id}`);
+  },
+
+  createSpecialization: async (data: any): Promise<any> => {
+    const response = await api.post<any>('/team-specializations', data);
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
+
+  updateSpecialization: async (id: number, data: any): Promise<any> => {
+    const response = await api.patch<any>(`/team-specializations/${id}`, data);
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
+
+  deleteSpecialization: async (id: number): Promise<void> => {
+    await api.delete(`/team-specializations/${id}`);
   },
 };

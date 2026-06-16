@@ -16,8 +16,10 @@ export const FEATURE_FLAGS: Record<string, boolean> = {
 
   // Rescue Teams module
   [ROUTES.RESCUE_TEAM_LIST]: true,
+  [ROUTES.RESCUE_TEAM_DASHBOARD]: true,
   [ROUTES.RESCUE_TEAM_CREATE]: true,
   [ROUTES.RESCUE_TEAM_DETAIL]: true,
+  [ROUTES.TEAM_SPECIALIZATION_LIST]: true,
 
   // Disasters module
   [ROUTES.DISASTER_LIST]: false,

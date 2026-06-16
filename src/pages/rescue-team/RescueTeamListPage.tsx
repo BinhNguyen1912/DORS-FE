@@ -7,25 +7,17 @@ import {
   Edit,
   Trash2,
   Users,
-  Shield,
-  Briefcase,
-  Compass,
-  Filter,
-  Layers,
-  ZoomIn,
-  ZoomOut,
-  CheckCircle2,
-  Clock,
-  Activity,
-  Heart,
-  MoreVertical,
-  Wrench,
-  UserCheck,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import { rescueTeamApi } from '../../apis';
 import { ROUTES } from '../../constants';
+import { RESCUE_TEXTS } from '../../constants/rescueTexts';
 import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
+import ConfirmDeleteModal from '../../components/common/ConfirmDeleteModal';
 
 // Types mapping and colors matching the screenshot
 const teamTypeLabels: Record<string, string> = {
@@ -35,79 +27,58 @@ const teamTypeLabels: Record<string, string> = {
   QUAN_SU: 'Quân sự',
   TINH_NGUYEN: 'Tình nguyện',
   TONG_HOP: 'Tổng hợp',
-  PROFESSIONAL: 'PCCC', // Fallback
-  VOLUNTEER_SPONTANEOUS: 'Tình nguyện', // Fallback
+  PROFESSIONAL: 'PCCC',
+  VOLUNTEER_SPONTANEOUS: 'Tình nguyện',
 };
 
-const teamTypeColors: Record<string, { bg: string; text: string; dot: string }> = {
-  PCCC: { bg: 'bg-red-50 text-red-700 border-red-150', text: 'text-red-700', dot: 'bg-red-500' },
-  Y_TE: { bg: 'bg-green-50 text-green-700 border-green-150', text: 'text-green-700', dot: 'bg-green-500' },
-  DAN_PHONG: { bg: 'bg-blue-50 text-blue-700 border-blue-150', text: 'text-blue-700', dot: 'bg-blue-500' },
-  QUAN_SU: { bg: 'bg-slate-100 text-slate-700 border-slate-200', text: 'text-slate-700', dot: 'bg-slate-500' },
-  TINH_NGUYEN: { bg: 'bg-purple-50 text-purple-700 border-purple-150', text: 'text-purple-700', dot: 'bg-purple-500' },
-  TONG_HOP: { bg: 'bg-indigo-50 text-indigo-700 border-indigo-150', text: 'text-indigo-700', dot: 'bg-indigo-500' },
-  PROFESSIONAL: { bg: 'bg-red-50 text-red-700 border-red-150', text: 'text-red-700', dot: 'bg-red-500' },
-  VOLUNTEER_SPONTANEOUS: { bg: 'bg-purple-50 text-purple-700 border-purple-150', text: 'text-purple-700', dot: 'bg-purple-500' },
+const teamTypeColors: Record<string, { bg: string; text: string }> = {
+  PCCC: { bg: 'bg-red-500/10 text-red-500 border border-red-500/20', text: 'text-red-500' },
+  Y_TE: { bg: 'bg-green-500/10 text-green-500 border border-green-500/20', text: 'text-green-500' },
+  DAN_PHONG: { bg: 'bg-blue-500/10 text-blue-500 border border-blue-500/20', text: 'text-blue-500' },
+  QUAN_SU: { bg: 'bg-slate-500/10 text-slate-400 border border-slate-500/20', text: 'text-slate-400' },
+  TINH_NGUYEN: { bg: 'bg-purple-500/10 text-purple-500 border border-purple-500/20', text: 'text-purple-500' },
+  TONG_HOP: { bg: 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20', text: 'text-indigo-500' },
 };
 
-// Map display statuses
 const statusLabels: Record<string, string> = {
-  ACTIVE: 'Sẵn sàng',
-  ON_DUTY: 'Đang làm nhiệm vụ',
+  AVAILABLE: 'Sẵn sàng',
+  BUSY: 'Đang làm nhiệm vụ',
   OFF_DUTY: 'Ngoại tuyến',
-  INACTIVE: 'Ngoại tuyến',
+  STANDBY: 'Dự phòng',
 };
 
 const statusColors: Record<string, string> = {
-  ACTIVE: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400',
-  ON_DUTY: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400',
-  OFF_DUTY: 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400',
-  INACTIVE: 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400',
+  AVAILABLE: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
+  BUSY: 'bg-amber-500/10 text-amber-500 border border-amber-500/20',
+  OFF_DUTY: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
+  STANDBY: 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20',
 };
 
-// Interface for unified view
 interface UnifiedRescueTeam {
   id: number;
+  code: string;
   name: string;
   leaderName: string;
   leaderPhone: string;
   teamType: string;
-  status: 'ACTIVE' | 'ON_DUTY' | 'OFF_DUTY' | 'INACTIVE';
+  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY';
   address: string;
   memberCount: string;
   activeMissions: number;
   logoUrl?: string | null;
-  isDb?: boolean;
 }
-
-// Visual mock teams removed, querying from DB only
-
-// Interactive map markers coordinates around Da Nang
-interface MapMarker {
-  id: string;
-  name: string;
-  teamsCount: number;
-  status: 'ACTIVE' | 'ON_DUTY' | 'MOVING' | 'OFF_DUTY';
-  x: number;
-  y: number;
-  label: string;
-}
-
-const mapMarkers: MapMarker[] = [
-  { id: 'm1', name: 'Đà Nẵng Trung tâm', teamsCount: 12, status: 'ACTIVE', x: 280, y: 160, label: '12' },
-  { id: 'm2', name: 'Sơn Trà', teamsCount: 12, status: 'MOVING', x: 380, y: 120, label: '12' },
-  { id: 'm3', name: 'Hòa Vang Bắc', teamsCount: 5, status: 'ON_DUTY', x: 195, y: 195, label: '5' },
-  { id: 'm4', name: 'Đại Lộc', teamsCount: 8, status: 'MOVING', x: 260, y: 240, label: '8' },
-  { id: 'm5', name: 'Điện Bàn', teamsCount: 3, status: 'ACTIVE', x: 340, y: 255, label: '3' },
-  { id: 'm6', name: 'Hòa Vang Nam', teamsCount: 3, status: 'ACTIVE', x: 190, y: 275, label: '3' },
-];
 
 export default function RescueTeamListPage() {
   const { searchQuery, setSearchQuery } = useOutletContext<{ searchQuery: string; setSearchQuery: (val: string) => void }>();
   const [statusFilter, setStatusFilter] = useState('');
   const [teamTypeFilter, setTeamTypeFilter] = useState('');
-  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
-  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+  
+  // Modal delete state
+  const [deleteTeamId, setDeleteTeamId] = useState<number | null>(null);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -124,29 +95,32 @@ export default function RescueTeamListPage() {
     mutationFn: (id: number) => rescueTeamApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rescue-teams'] });
-      setActiveMenuId(null);
+      setDeleteTeamId(null);
       toast.success('Xóa đội cứu hộ thành công!');
     },
     onError: (err: any) => {
+      setDeleteTeamId(null);
       toast.api(err, 'Lỗi khi xóa đội cứu hộ');
     },
   });
 
-  const handleDelete = (id: number) => {
-    if (confirm('Bạn có chắc chắn muốn xóa đội cứu hộ này?')) {
-      deleteMutation.mutate(id);
+  const handleConfirmDelete = () => {
+    if (deleteTeamId) {
+      deleteMutation.mutate(deleteTeamId);
     }
   };
 
-  // Merge database teams with mock teams
+  // Map database teams with specific properties
   const allTeams = useMemo(() => {
     const dbTeamsMapped: UnifiedRescueTeam[] = (dbData?.data || []).map((team) => {
-      // Map backend status/type to dashboard format
       const statusMap: Record<string, string> = {
-        ACTIVE: 'ACTIVE',
-        ON_DUTY: 'ON_DUTY',
+        AVAILABLE: 'AVAILABLE',
+        BUSY: 'BUSY',
         OFF_DUTY: 'OFF_DUTY',
-        INACTIVE: 'INACTIVE',
+        STANDBY: 'STANDBY',
+        ACTIVE: 'AVAILABLE',
+        ON_DUTY: 'BUSY',
+        INACTIVE: 'OFF_DUTY',
       };
 
       const typeMap: Record<string, string> = {
@@ -170,18 +144,22 @@ export default function RescueTeamListPage() {
         address = (team as any).province.name;
       }
 
+      // Generate a code suffix based on type and ID
+      const teamTypeCode = typeMap[team.teamType] || 'TH';
+      const code = `${teamTypeCode}-${String(team.id).padStart(4, '0')}`;
+
       return {
         id: team.id,
+        code,
         name: team.name,
         leaderName,
         leaderPhone,
         teamType: typeMap[team.teamType] || 'TONG_HOP',
-        status: (statusMap[team.status] || 'ACTIVE') as any,
+        status: (statusMap[team.status] || 'AVAILABLE') as any,
         address,
-        memberCount: team.maxCapacity ? `0/${team.maxCapacity}` : '15/20',
+        memberCount: team.maxCapacity ? `12/${team.maxCapacity}` : '15/20', // mockup current vs max
         activeMissions: team.missionsCount || 0,
         logoUrl: team.logoUrl,
-        isDb: true,
       };
     });
 
@@ -194,7 +172,8 @@ export default function RescueTeamListPage() {
       const matchesSearch =
         team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         team.leaderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        team.address.toLowerCase().includes(searchQuery.toLowerCase());
+        team.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        team.code.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus = !statusFilter || team.status === statusFilter;
       const matchesType = !teamTypeFilter || team.teamType === teamTypeFilter;
@@ -203,835 +182,297 @@ export default function RescueTeamListPage() {
     });
   }, [allTeams, searchQuery, statusFilter, teamTypeFilter]);
 
-  // Summary counts
-  const stats = useMemo(() => {
-    const total = 128 + (dbData?.total || 0);
-    const active = 96 + (dbData?.data || []).filter(t => t.status === 'ACTIVE' || t.status === 'ON_DUTY').length;
-    const onDuty = 24 + (dbData?.data || []).filter(t => t.status === 'ON_DUTY').length;
-    const ready = 48 + (dbData?.data || []).filter(t => t.status === 'ACTIVE').length;
+  // Calculate paginated slice
+  const paginatedTeams = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredTeams.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredTeams, currentPage]);
 
-    return { total, active, onDuty, ready };
-  }, [dbData]);
+  const totalPages = Math.max(1, Math.ceil(filteredTeams.length / itemsPerPage));
+
+  // Reset page when filter changes
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, teamTypeFilter]);
 
   return (
     <div className="space-y-4">
-      {/* Top 4 Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Tổng số đội */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl flex-shrink-0">
-            <Users size={22} />
-          </div>
-          <div className="space-y-0.5 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 truncate">
-              Tổng số đội
-            </p>
-            <p className="text-2xl font-extrabold text-gray-950 dark:text-white leading-none">
-              {stats.total}
-            </p>
-            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 truncate">
-              <span>+5 đội mới</span>
-              <span className="text-gray-400 dark:text-gray-500 font-normal">so với tuần trước</span>
-            </p>
+      {/* Top Header & Breadcrumbs & Add Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-gray-100 dark:border-gray-800">
+        <div className="text-left">
+          <h1 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight mb-0.5">{RESCUE_TEXTS.TITLE_LIST}</h1>
+          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
+            <span>{RESCUE_TEXTS.BREADCRUMB_HOME}</span>
+            <span>&gt;</span>
+            <span>{RESCUE_TEXTS.BREADCRUMB_TEAM}</span>
+            <span>&gt;</span>
+            <span className="text-amber-500 font-semibold">Danh sách</span>
           </div>
         </div>
-
-        {/* Card 2: Đang hoạt động */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
-          <div className="p-2.5 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-xl flex-shrink-0">
-            <Activity size={22} />
-          </div>
-          <div className="space-y-0.5 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 truncate">
-              Đang hoạt động
-            </p>
-            <p className="text-2xl font-extrabold text-gray-950 dark:text-white leading-none">
-              {stats.active}
-            </p>
-            <p className="text-[10px] text-green-600 dark:text-green-400 font-semibold flex items-center gap-1 truncate">
-              <span>{Math.round((stats.active / stats.total) * 1000) / 10}%</span>
-              <span className="text-gray-400 dark:text-gray-500 font-normal">tổng số đội</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3: Đang làm nhiệm vụ */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
-          <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl flex-shrink-0">
-            <Briefcase size={22} />
-          </div>
-          <div className="space-y-0.5 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 truncate">
-              Đang làm nhiệm vụ
-            </p>
-            <p className="text-2xl font-extrabold text-gray-950 dark:text-white leading-none">
-              {stats.onDuty}
-            </p>
-            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 truncate">
-              <span>{Math.round((stats.onDuty / stats.total) * 1000) / 10}%</span>
-              <span className="text-gray-400 dark:text-gray-500 font-normal">tổng số đội</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4: Sẵn sàng */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
-          <div className="p-2.5 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 rounded-xl flex-shrink-0">
-            <UserCheck size={22} />
-          </div>
-          <div className="space-y-0.5 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 truncate">
-              Sẵn sàng
-            </p>
-            <p className="text-2xl font-extrabold text-gray-950 dark:text-white leading-none">
-              {stats.ready}
-            </p>
-            <p className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1 truncate">
-              <span>{Math.round((stats.ready / stats.total) * 1000) / 10}%</span>
-              <span className="text-gray-400 dark:text-gray-500 font-normal">tổng số đội</span>
-            </p>
-          </div>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Link
+            to={ROUTES.TEAM_SPECIALIZATION_LIST}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 font-bold text-xs rounded-xl shadow-sm transition-all"
+          >
+            Quản lý Chuyên môn
+          </Link>
+          <Link
+            to={ROUTES.RESCUE_TEAM_CREATE}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all"
+          >
+            <Plus size={14} />
+            {RESCUE_TEXTS.BTN_ADD_TEAM}
+          </Link>
         </div>
       </div>
 
-      {/* Middle Grid: Map (Left) & Team List (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left Column: Interactive Map */}
-        <div className="lg:col-span-7 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping" />
-              Vị trí đội cứu hộ (Real-time)
-            </h2>
-            <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline">
-              Xem toàn bản đồ &gt;
-            </button>
-          </div>
+      {/* Filter Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-150 dark:border-gray-750 shadow-sm">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder={RESCUE_TEXTS.SEARCH_PLACEHOLDER}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium"
+          />
+        </div>
 
-          {/* SVG Map Container */}
-          <div className="relative flex-1 min-h-[360px] bg-sky-50/50 dark:bg-gray-950 rounded-xl overflow-hidden border border-gray-150 dark:border-gray-700">
-            {/* Map Controls */}
-            <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Lọc">
-                <Filter size={16} />
-              </button>
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Lớp bản đồ">
-                <Layers size={16} />
-              </button>
-            </div>
+        <div>
+          <select
+            value={teamTypeFilter}
+            onChange={(e) => setTeamTypeFilter(e.target.value)}
+            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
+          >
+            <option value="">{RESCUE_TEXTS.SELECT_TYPE_ALL}</option>
+            <option value="PCCC">PCCC</option>
+            <option value="Y_TE">Y tế</option>
+            <option value="DAN_PHONG">Dân phòng</option>
+            <option value="QUAN_SU">Quân sự</option>
+            <option value="TINH_NGUYEN">Tình nguyện</option>
+          </select>
+        </div>
 
-            <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Phóng to">
-                <ZoomIn size={16} />
-              </button>
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Thu nhỏ">
-                <ZoomOut size={16} />
-              </button>
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Định vị">
-                <Compass size={16} />
-              </button>
-            </div>
+        <div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
+          >
+            <option value="">{RESCUE_TEXTS.SELECT_STATUS_ALL}</option>
+            <option value="AVAILABLE">Sẵn sàng</option>
+            <option value="BUSY">Đang làm nhiệm vụ</option>
+            <option value="STANDBY">Dự phòng</option>
+            <option value="OFF_DUTY">Ngoại tuyến</option>
+          </select>
+        </div>
 
-            {/* Custom SVG Coastline & Land Map of Da Nang */}
-            <svg viewBox="0 0 500 350" className="w-full h-full select-none" xmlns="http://www.w3.org/2000/svg">
-              {/* Landmass of Da Nang & Quang Nam */}
-              <path
-                d="M 0,350 L 0,140 Q 60,130 90,160 Q 120,190 160,150 Q 210,100 250,120 Q 280,140 290,100 Q 305,65 330,80 Q 360,105 320,140 Q 300,165 330,220 T 400,350 Z"
-                fill="#f8fafc"
-                stroke="#e2e8f0"
-                strokeWidth="2.5"
-                className="dark:fill-gray-900 dark:stroke-gray-800"
-              />
+        <div>
+          <select
+            disabled
+            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-slate-100/50 dark:bg-gray-900/50 text-gray-400 focus:outline-none cursor-not-allowed font-semibold"
+          >
+            <option value="">{RESCUE_TEXTS.SELECT_AREA_ALL}</option>
+          </select>
+        </div>
+      </div>
 
-              {/* Vịnh Đà Nẵng (Bay Water Highlight) */}
-              <path
-                d="M 160,150 Q 210,100 250,120 Q 280,140 290,100 Q 305,65 330,80 L 250,30 Q 150,50 160,150 Z"
-                fill="#f0f9ff"
-                opacity="0.6"
-                className="dark:fill-sky-950/20"
-              />
+      {/* Main Table view */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-750 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-xs">
+            <thead>
+              <tr className="border-b border-gray-150 dark:border-gray-750 text-gray-500 dark:text-gray-400 font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
+                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_CODE}</th>
+                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_NAME}</th>
+                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_TYPE}</th>
+                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_AREA}</th>
+                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_MEMBERS}</th>
+                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_STATUS}</th>
+                <th className="py-3.5 px-4 text-center">{RESCUE_TEXTS.COL_MISSIONS}</th>
+                <th className="py-3.5 px-4 text-center w-28">{RESCUE_TEXTS.COL_ACTIONS}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-750/50 text-gray-700 dark:text-gray-300">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center text-gray-400">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                      <p className="font-semibold text-xs">Đang tải danh sách đội cứu hộ...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedTeams.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center text-gray-400 font-semibold">
+                    Không tìm thấy đội cứu hộ nào phù hợp
+                  </td>
+                </tr>
+              ) : (
+                paginatedTeams.map((team) => {
+                  const typeStyle = teamTypeColors[team.teamType] || teamTypeColors.TONG_HOP;
+                  const statusColor = statusColors[team.status] || statusColors.ACTIVE;
 
-              {/* Major Roads / Highways lines */}
-              <path d="M 0,220 Q 150,230 250,225 T 400,240" fill="none" stroke="#fed7aa" strokeWidth="2" strokeDasharray="3 3" />
-              <path d="M 180,150 Q 220,280 260,350" fill="none" stroke="#fed7aa" strokeWidth="1.5" strokeDasharray="4 2" />
-
-              {/* Region Labels */}
-              <text x="320" y="85" className="fill-blue-500/80 font-bold text-[10px] tracking-wide dark:fill-blue-400/80">Vịnh Đà Nẵng</text>
-              <text x="325" y="155" className="fill-gray-700 font-extrabold text-[12px] dark:fill-gray-300">Đà Nẵng</text>
-              <text x="260" y="275" className="fill-gray-400 font-semibold text-[9px] dark:fill-gray-500">Đại Lộc</text>
-              <text x="345" y="295" className="fill-gray-400 font-semibold text-[9px] dark:fill-gray-500">Điện Bàn</text>
-              <text x="130" y="220" className="fill-gray-400 font-semibold text-[9px] dark:fill-gray-500">Hòa Vang</text>
-
-              <text x="410" y="60" className="fill-blue-400/60 font-semibold text-[10px] italic dark:fill-blue-500/40">Biển Đông</text>
-
-              {/* Interactive SVG Markers representing team clusters */}
-              {mapMarkers.map((marker) => {
-                const isSelected = selectedMarkerId === marker.id;
-
-                // Color mapping for marker categories
-                const markerColors = {
-                  ACTIVE: { fill: 'fill-green-500', stroke: 'stroke-green-500', bg: 'bg-green-500' },
-                  ON_DUTY: { fill: 'fill-red-500', stroke: 'stroke-red-500', bg: 'bg-red-500' },
-                  MOVING: { fill: 'fill-blue-500', stroke: 'stroke-blue-500', bg: 'bg-blue-500' },
-                  OFF_DUTY: { fill: 'fill-slate-500', stroke: 'stroke-slate-500', bg: 'bg-slate-500' },
-                };
-
-                const colors = markerColors[marker.status];
-
-                return (
-                  <g
-                    key={marker.id}
-                    className="cursor-pointer transition-all"
-                    onClick={() => {
-                      setSelectedMarkerId(isSelected ? null : marker.id);
-                      // Set search/filter based on selected area or trigger view
-                    }}
-                  >
-                    {/* Pulsing visual outer ring */}
-                    <circle
-                      cx={marker.x}
-                      cy={marker.y}
-                      r={isSelected ? 18 : 12}
-                      className={cn(colors.fill, 'opacity-20 animate-pulse transition-all')}
-                    />
-
-                    {/* Marker solid center */}
-                    <circle
-                      cx={marker.x}
-                      cy={marker.y}
-                      r={isSelected ? 12 : 9}
-                      className={cn(colors.fill, 'stroke-white transition-all')}
-                      strokeWidth="1.5"
-                    />
-
-                    {/* Quantity Label inside circle */}
-                    <text
-                      x={marker.x}
-                      y={marker.y + 3}
-                      textAnchor="middle"
-                      className="fill-white font-extrabold text-[9px] select-none"
+                  return (
+                    <tr
+                      key={team.id}
+                      className="group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors"
                     >
-                      {marker.label}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
+                      {/* Code */}
+                      <td className="py-4 px-4 font-mono font-bold text-gray-500 dark:text-gray-400">
+                        {team.code}
+                      </td>
 
-            {/* Custom Tooltip on selecting marker */}
-            {selectedMarkerId && (() => {
-              const marker = mapMarkers.find((m) => m.id === selectedMarkerId);
-              if (!marker) return null;
-              return (
-                <div
-                  className="absolute bg-white dark:bg-gray-800 p-3 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 max-w-[200px] z-20 pointer-events-auto"
-                  style={{
-                    left: `${(marker.x / 500) * 100}%`,
-                    top: `${(marker.y / 350) * 100 - 15}%`,
-                    transform: 'translate(-50%, -100%)',
-                  }}
-                >
-                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-x-8 border-x-transparent border-t-8 border-t-white dark:border-t-gray-800" />
-                  <p className="text-xs font-bold text-gray-900 dark:text-white mb-1">
-                    {marker.name}
-                  </p>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold mb-1">
-                    Tổng số đội: {marker.teamsCount}
-                  </p>
-                  <span className={cn(
-                    'px-2 py-0.5 text-[9px] font-bold rounded-full border inline-block',
-                    marker.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-200' :
-                      marker.status === 'ON_DUTY' ? 'bg-red-50 text-red-700 border-red-200' :
-                        'bg-blue-50 text-blue-700 border-blue-200'
-                  )}>
-                    {marker.status === 'ACTIVE' ? 'Sẵn sàng' :
-                      marker.status === 'ON_DUTY' ? 'Cứu hộ khẩn cấp' : 'Đang di chuyển'}
-                  </span>
-                </div>
-              );
-            })()}
-          </div>
+                      {/* Name */}
+                      <td className="py-4 px-4 font-bold text-gray-900 dark:text-white max-w-[200px] truncate">
+                        {team.name}
+                      </td>
 
-          {/* Map bottom legend row */}
-          <div className="flex flex-wrap items-center justify-center gap-6 mt-4 pt-3 border-t border-gray-150 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-green-500 rounded-full" />
-              <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Sẵn sàng</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
-              <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Đang làm nhiệm vụ</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
-              <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Đang di chuyển</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-slate-500 rounded-full" />
-              <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Ngoại tuyến</span>
-            </div>
-          </div>
+                      {/* Team Type Badge */}
+                      <td className="py-4 px-4">
+                        <span className={cn(
+                          'px-2 py-0.5 text-[10px] font-bold rounded-lg uppercase tracking-wide',
+                          typeStyle.bg
+                        )}>
+                          {teamTypeLabels[team.teamType] || team.teamType}
+                        </span>
+                      </td>
+
+                      {/* Area of Duty */}
+                      <td className="py-4 px-4 text-gray-500 dark:text-gray-400 font-semibold">
+                        {team.address}
+                      </td>
+
+                      {/* Members */}
+                      <td className="py-4 px-4 text-gray-600 dark:text-gray-300 font-bold flex items-center gap-1.5 mt-2">
+                        <Users size={12} className="text-gray-400" />
+                        {team.memberCount}
+                      </td>
+
+                      {/* Status Badge */}
+                      <td className="py-4 px-4">
+                        <span className={cn(
+                          'px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase',
+                          statusColor
+                        )}>
+                          {statusLabels[team.status] || team.status}
+                        </span>
+                      </td>
+
+                      {/* Active Missions */}
+                      <td className="py-4 px-4 text-center font-bold text-gray-800 dark:text-slate-200">
+                        {team.activeMissions}
+                      </td>
+
+                      {/* Actions - Hover triggers transition to show button icons directly */}
+                      <td className="py-4 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                          {/* View detail & edit now go to detail page */}
+                          <button
+                            onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
+                            title={RESCUE_TEXTS.BTN_VIEW_DETAIL}
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 text-blue-500 hover:text-blue-600 rounded-lg transition-all"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          
+                          <button
+                            onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
+                            title={RESCUE_TEXTS.BTN_EDIT}
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 text-amber-500 hover:text-amber-600 rounded-lg transition-all"
+                          >
+                            <Edit size={14} />
+                          </button>
+
+                          <button
+                            onClick={() => setDeleteTeamId(team.id)}
+                            title={RESCUE_TEXTS.BTN_DELETE}
+                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 hover:text-red-600 rounded-lg transition-all"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Right Column: Rescue Teams List */}
-        <div className="lg:col-span-5 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">
-              Danh sách đội cứu hộ
-            </h2>
-            <div className="flex items-center gap-2">
-              <Link
-                to={ROUTES.RESCUE_TEAM_CREATE}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm hover:shadow transition-all"
-              >
-                <Plus size={14} />
-                Tạo đội
-              </Link>
+        {/* Pagination & Count footer */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-gray-100 dark:border-gray-750 select-none bg-slate-50/50 dark:bg-gray-900/20">
+          <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold">
+            Hiển thị <span className="text-gray-900 dark:text-white">{paginatedTeams.length}</span> trên <span className="text-gray-900 dark:text-white">{filteredTeams.length}</span> kết quả
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {/* First Page */}
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 dark:text-gray-405 dark:hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 transition-all shadow-sm"
+            >
+              <ChevronsLeft size={14} />
+            </button>
+
+            {/* Prev Page */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 dark:text-gray-405 dark:hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 transition-all shadow-sm"
+            >
+              <ChevronLeft size={14} />
+            </button>
+
+            {/* Page Numbers */}
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
               <button
-                onClick={() => {
-                  setStatusFilter('');
-                  setTeamTypeFilter('');
-                  setSearchQuery('');
-                }}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  'w-7 h-7 rounded-lg text-xs font-bold transition-all border',
+                  currentPage === page
+                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                    : 'bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 border-gray-250 dark:border-gray-700 dark:text-gray-400'
+                )}
               >
-                Xem tất cả
+                {page}
               </button>
-            </div>
-          </div>
+            ))}
 
-          {/* Quick Filters Row */}
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            {/* Next Page */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 dark:text-gray-405 dark:hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 transition-all shadow-sm"
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="ACTIVE">Sẵn sàng</option>
-              <option value="ON_DUTY">Đang làm nhiệm vụ</option>
-              <option value="INACTIVE">Ngoại tuyến</option>
-            </select>
+              <ChevronRight size={14} />
+            </button>
 
-            <select
-              value={teamTypeFilter}
-              onChange={(e) => setTeamTypeFilter(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            {/* Last Page */}
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 dark:text-gray-405 dark:hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 transition-all shadow-sm"
             >
-              <option value="">Tất cả phân loại</option>
-              <option value="PCCC">PCCC</option>
-              <option value="Y_TE">Y tế</option>
-              <option value="DAN_PHONG">Dân phòng</option>
-              <option value="QUAN_SU">Quân sự</option>
-              <option value="TINH_NGUYEN">Tình nguyện</option>
-            </select>
-          </div>
-
-          {/* Scrollable list of Teams */}
-          <div className="space-y-3.5 overflow-y-auto max-h-[420px] pr-1 flex-1">
-            {isLoading && filteredTeams.length === 0 ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-3 text-gray-400 dark:text-gray-500">
-                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs font-medium">Đang tải danh sách đội cứu hộ...</p>
-              </div>
-            ) : filteredTeams.length === 0 ? (
-              <div className="py-16 text-center text-xs font-semibold text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
-                Không tìm thấy đội cứu hộ nào phù hợp
-              </div>
-            ) : (
-              filteredTeams.map((team) => {
-                const typeStyle = teamTypeColors[team.teamType] || teamTypeColors.TONG_HOP;
-                const statusColor = statusColors[team.status] || statusColors.ACTIVE;
-
-                return (
-                  <div
-                    key={`${team.isDb ? 'db' : 'mock'}-${team.id}`}
-                    className="group relative bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750 hover:border-gray-300 dark:hover:border-gray-600 p-3 rounded-xl transition-all shadow-sm hover:shadow flex items-start justify-between gap-3 text-left"
-                  >
-                    {/* Left: Avatar Logo & details */}
-                    <div className="flex gap-3 text-left">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-50 dark:bg-gray-800 border border-gray-150 dark:border-gray-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-all">
-                        {team.logoUrl ? (
-                          <img
-                            src={team.logoUrl}
-                            alt={team.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // Fallback on load error
-                              (e.target as HTMLImageElement).src = 'https://pub-2c2241596f28433bb00bedb6391e5d78.r2.dev/assets/default-team.png';
-                            }}
-                          />
-                        ) : (
-                          <Shield className="w-5 h-5 text-gray-400" />
-                        )}
-                      </div>
-
-                      <div className="space-y-0.5 text-left">
-                        <div className="flex items-center flex-wrap gap-1.5 justify-start text-left">
-                          <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
-                            {team.name}
-                          </h4>
-                          <span className={cn(
-                            'px-1.5 py-0.2 text-[8px] font-bold rounded-full uppercase border',
-                            typeStyle.bg
-                          )}>
-                            {teamTypeLabels[team.teamType] || team.teamType}
-                          </span>
-                        </div>
-
-                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold text-left">
-                          {team.address}
-                        </p>
-
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 pt-1 text-[10px] font-semibold text-gray-600 dark:text-gray-400 justify-start text-left">
-                          <span className="flex items-center gap-1">
-                            <Users size={11} className="text-gray-400" />
-                            {team.memberCount} thành viên
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Briefcase size={11} className="text-gray-400" />
-                            {team.activeMissions} nhiệm vụ
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Status badge & Actions */}
-                    <div className="flex flex-col items-end gap-2.5 justify-between h-full min-h-[44px] flex-shrink-0">
-                      <span className={cn(
-                        'px-2 py-0.5 text-[9px] font-extrabold rounded-lg border',
-                        statusColor
-                      )}>
-                        {statusLabels[team.status] || team.status}
-                      </span>
-
-                      {/* Dropdown Menu actions */}
-                      <div className="relative">
-                        <button
-                          onClick={() => setActiveMenuId(activeMenuId === team.id ? null : team.id)}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-all"
-                        >
-                          <MoreVertical size={16} />
-                        </button>
-
-                        {activeMenuId === team.id && (
-                          <div className="absolute right-0 bottom-full mb-1 bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-700 rounded-xl shadow-lg py-1.5 min-w-[120px] z-30">
-                            <button
-                              onClick={() => {
-                                if (team.isDb) {
-                                  navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)));
-                                } else {
-                                  alert('Đây là đội cứu hộ mẫu trực quan.');
-                                }
-                                setActiveMenuId(null);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1.5"
-                            >
-                              <Eye size={14} />
-                              Xem chi tiết
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                if (team.isDb) {
-                                  // Navigating to detail page edit could also work
-                                  alert('Chức năng sửa thông tin được kích hoạt trên trang chi tiết.');
-                                } else {
-                                  alert('Đây là đội cứu hộ mẫu trực quan.');
-                                }
-                                setActiveMenuId(null);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1.5"
-                            >
-                              <Edit size={14} />
-                              Chỉnh sửa
-                            </button>
-
-                            {team.isDb && (
-                              <button
-                                onClick={() => handleDelete(team.id)}
-                                className="w-full text-left px-3 py-1.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-1.5 border-t border-gray-100 dark:border-gray-750"
-                              >
-                                <Trash2 size={14} />
-                                Xóa đội
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Grid: Stats Dashboard & Donut (Left) & Recent Tasks (Right) */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        {/* Left Side: Performance Metrics & Donut Chart */}
-        <div className="xl:col-span-6 space-y-6">
-          {/* Activity Metrics (30 days) */}
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                Thống kê hoạt động (30 ngày qua)
-              </h2>
-              <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
-                Xem chi tiết
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Box 1: Nhiệm vụ */}
-              <div className="bg-slate-50/50 dark:bg-gray-900 border border-gray-100 dark:border-gray-750 p-4 rounded-xl flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-lg">
-                  <CheckCircle2 size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase leading-none mb-1">Nhiệm vụ đã hoàn thành</p>
-                  <p className="text-lg font-extrabold text-gray-900 dark:text-white">156</p>
-                  <p className="text-[10px] text-green-600 dark:text-green-400 font-bold leading-none mt-0.5">+22% <span className="text-gray-400 font-normal">so với 30 ngày trước</span></p>
-                </div>
-              </div>
-
-              {/* Box 2: Người được cứu */}
-              <div className="bg-slate-50/50 dark:bg-gray-900 border border-gray-100 dark:border-gray-750 p-4 rounded-xl flex items-center gap-3">
-                <div className="p-2.5 bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 rounded-lg">
-                  <Heart size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase leading-none mb-1">Người đã cứu</p>
-                  <p className="text-lg font-extrabold text-gray-900 dark:text-white">1,248</p>
-                  <p className="text-[10px] text-green-600 dark:text-green-400 font-bold leading-none mt-0.5">+18% <span className="text-gray-400 font-normal">so với 30 ngày trước</span></p>
-                </div>
-              </div>
-
-              {/* Box 3: Giờ hoạt động */}
-              <div className="bg-slate-50/50 dark:bg-gray-900 border border-gray-100 dark:border-gray-750 p-4 rounded-xl flex items-center gap-3">
-                <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-lg">
-                  <Clock size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase leading-none mb-1">Giờ hoạt động</p>
-                  <p className="text-lg font-extrabold text-gray-900 dark:text-white">2,856</p>
-                  <p className="text-[10px] text-green-600 dark:text-green-400 font-bold leading-none mt-0.5">+15% <span className="text-gray-400 font-normal">so với 30 ngày trước</span></p>
-                </div>
-              </div>
-
-              {/* Box 4: Thiết bị */}
-              <div className="bg-slate-50/50 dark:bg-gray-900 border border-gray-100 dark:border-gray-750 p-4 rounded-xl flex items-center gap-3">
-                <div className="p-2.5 bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 rounded-lg">
-                  <Wrench size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase leading-none mb-1">Thiết bị đã sử dụng</p>
-                  <p className="text-lg font-extrabold text-gray-900 dark:text-white">342</p>
-                  <p className="text-[10px] text-green-600 dark:text-green-400 font-bold leading-none mt-0.5">+10% <span className="text-gray-400 font-normal">so với 30 ngày trước</span></p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Classification Donut Chart */}
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4">
-              Phân loại đội cứu hộ
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-6">
-              {/* Donut SVG Rendering */}
-              <div className="relative flex justify-center">
-                <svg width="180" height="180" viewBox="0 0 100 100">
-                  {/* Concentric slices using strokeDasharray/strokeDashoffset */}
-                  {/* Base Circle background */}
-                  <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" strokeWidth="11" className="dark:stroke-gray-700" />
-
-                  {/* PCCC slice: 19.5% -> length = 49.0, offset = 0. color: Red */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="#ef4444"
-                    strokeWidth="11"
-                    strokeDasharray="251.3"
-                    strokeDashoffset="0"
-                    transform="rotate(-90 50 50)"
-                  />
-                  {/* Y tế slice: 14.1% -> length = 35.4, offset = -49.0. color: Green */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="#10b981"
-                    strokeWidth="11"
-                    strokeDasharray="251.3"
-                    strokeDashoffset="-49.0"
-                    transform="rotate(-90 50 50)"
-                  />
-                  {/* Dân phòng slice: 25.0% -> length = 62.8, offset = -84.4. color: Blue */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="#3b82f6"
-                    strokeWidth="11"
-                    strokeDasharray="251.3"
-                    strokeDashoffset="-84.4"
-                    transform="rotate(-90 50 50)"
-                  />
-                  {/* Quân sự slice: 11.7% -> length = 29.4, offset = -147.2. color: Slate */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="#64748b"
-                    strokeWidth="11"
-                    strokeDasharray="251.3"
-                    strokeDashoffset="-147.2"
-                    transform="rotate(-90 50 50)"
-                  />
-                  {/* Tình nguyện slice: 21.9% -> length = 55.0, offset = -176.6. color: Purple */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="#8b5cf6"
-                    strokeWidth="11"
-                    strokeDasharray="251.3"
-                    strokeDashoffset="-176.6"
-                    transform="rotate(-90 50 50)"
-                  />
-                  {/* Others/Misc slice: 7.8% -> length = 19.7, offset = -231.6. color: Gray */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="transparent"
-                    stroke="#cbd5e1"
-                    strokeWidth="11"
-                    strokeDasharray="251.3"
-                    strokeDashoffset="-231.6"
-                    transform="rotate(-90 50 50)"
-                    className="dark:stroke-gray-600"
-                  />
-                </svg>
-
-                {/* Donut Center text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-                  <span className="text-2xl font-extrabold text-gray-950 dark:text-white leading-none">128</span>
-                  <span className="text-[10px] text-gray-500 font-bold dark:text-gray-400 mt-1 uppercase leading-none">Tổng số đội</span>
-                </div>
-              </div>
-
-              {/* Legends detail list */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">PCCC</span>
-                  </div>
-                  <span className="text-xs font-bold text-gray-900 dark:text-white">25 đội (19.5%)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Y tế</span>
-                  </div>
-                  <span className="text-xs font-bold text-gray-900 dark:text-white">18 đội (14.1%)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Dân phòng</span>
-                  </div>
-                  <span className="text-xs font-bold text-gray-900 dark:text-white">32 đội (25.0%)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-500" />
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Quân sự</span>
-                  </div>
-                  <span className="text-xs font-bold text-gray-900 dark:text-white">15 đội (11.7%)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Tình nguyện</span>
-                  </div>
-                  <span className="text-xs font-bold text-gray-900 dark:text-white">28 đội (21.9%)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Recent Emergency Tasks */}
-        <div className="xl:col-span-6 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">
-              Nhiệm vụ gần đây
-            </h2>
-            <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
-              Xem tất cả
+              <ChevronsRight size={14} />
             </button>
           </div>
-
-          {/* Tasks List */}
-          <div className="space-y-4 flex-1">
-            {/* Task item 1 */}
-            <div className="flex items-start justify-between gap-3 border-b border-gray-100 dark:border-gray-750 pb-3.5">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
-                  <Compass size={18} />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase leading-none block">CH-2024-0892</span>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
-                    Sạt lở đất tại Hòa Bắc, Hòa Vang
-                  </h4>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold flex items-center gap-1.5">
-                    <span>Hòa Bắc, Hòa Vang</span>
-                    <span className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
-                    <span className="flex items-center gap-1">
-                      <Shield size={10} /> Đội Dân phòng Hòa Bắc
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                <span className="text-[10px] font-semibold text-gray-400">10 phút trước</span>
-                <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-amber-50 text-amber-700 border border-amber-200 uppercase">
-                  Đang thực hiện
-                </span>
-              </div>
-            </div>
-
-            {/* Task item 2 */}
-            <div className="flex items-start justify-between gap-3 border-b border-gray-100 dark:border-gray-750 pb-3.5">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center flex-shrink-0">
-                  <Activity size={18} />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase leading-none block">CH-2024-0891</span>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
-                    Cứu người mắc kẹt trong lũ
-                  </h4>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold flex items-center gap-1.5">
-                    <span>Phương Điện Dương, Điện Bàn</span>
-                    <span className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
-                    <span className="flex items-center gap-1">
-                      <Shield size={10} /> Đội PCCC Đà Nẵng 01
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                <span className="text-[10px] font-semibold text-gray-400">25 phút trước</span>
-                <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-amber-50 text-amber-700 border border-amber-200 uppercase">
-                  Đang thực hiện
-                </span>
-              </div>
-            </div>
-
-            {/* Task item 3 */}
-            <div className="flex items-start justify-between gap-3 border-b border-gray-100 dark:border-gray-750 pb-3.5">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center justify-center flex-shrink-0">
-                  <Heart size={18} />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase leading-none block">CH-2024-0890</span>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
-                    Hỗ trợ y tế cho người bị thương
-                  </h4>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold flex items-center gap-1.5">
-                    <span>Phường Hải Châu, Hải Châu</span>
-                    <span className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
-                    <span className="flex items-center gap-1">
-                      <Shield size={10} /> Đội Y tế Đà Nẵng 02
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                <span className="text-[10px] font-semibold text-gray-400">1 giờ trước</span>
-                <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-green-50 text-green-700 border border-green-200 uppercase">
-                  Hoàn thành
-                </span>
-              </div>
-            </div>
-
-            {/* Task item 4 */}
-            <div className="flex items-start justify-between gap-3 border-b border-gray-100 dark:border-gray-750 pb-3.5">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle2 size={18} />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase leading-none block">CH-2024-0889</span>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
-                    Cứu hộ thuyền bị lật
-                  </h4>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold flex items-center gap-1.5">
-                    <span>Cửa Đại, Hội An</span>
-                    <span className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
-                    <span className="flex items-center gap-1">
-                      <Shield size={10} /> Đội Tình nguyện Hội An
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                <span className="text-[10px] font-semibold text-gray-400">2 giờ trước</span>
-                <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-green-50 text-green-700 border border-green-200 uppercase">
-                  Hoàn thành
-                </span>
-              </div>
-            </div>
-
-            {/* Task item 5 */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center flex-shrink-0">
-                  <Shield size={18} />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase leading-none block">CH-2024-0888</span>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-tight">
-                    Di dời dân khỏi vùng nguy hiểm
-                  </h4>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold flex items-center gap-1.5">
-                    <span>Phường Hòa Hiệp, Liên Chiểu</span>
-                    <span className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
-                    <span className="flex items-center gap-1">
-                      <Shield size={10} /> Đội Quân sự Liên Chiểu
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                <span className="text-[10px] font-semibold text-gray-400">3 giờ trước</span>
-                <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-full bg-green-50 text-green-700 border border-green-200 uppercase">
-                  Hoàn thành
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteTeamId !== null}
+        onClose={() => setDeleteTeamId(null)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deleteMutation.isPending}
+        title={RESCUE_TEXTS.CONFIRM_DELETE_TITLE}
+        message={RESCUE_TEXTS.CONFIRM_DELETE_MSG}
+      />
     </div>
   );
 }

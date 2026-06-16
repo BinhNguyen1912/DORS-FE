@@ -20,7 +20,7 @@ export interface MenuItem {
 export const menuItems: MenuItem[] = [
   { label: 'Tổng quan', href: ROUTES.DASHBOARD, icon: LayoutDashboard },
   { label: 'Bản đồ cứu hộ', href: ROUTES.DISASTER_LIST, icon: Map }, // Currently using disaster list as placeholder
-  { label: 'Đội cứu hộ', href: ROUTES.RESCUE_TEAM_LIST, icon: Users },
+  { label: 'Đội cứu hộ', href: ROUTES.RESCUE_TEAM_DASHBOARD, icon: Users },
   { label: 'Nhiệm vụ', href: '#/missions', icon: Briefcase },
   { label: 'Yêu cầu trợ giúp', href: '#/help-requests', icon: AlertTriangle },
   { label: 'Nhân lực & Tình nguyện', href: '#/volunteer', icon: UserCheck },

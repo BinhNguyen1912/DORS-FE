@@ -96,6 +96,14 @@ export default function MainLayout() {
         searchPlaceholder: 'Tìm kiếm đội, thành viên, khu vực...',
       };
     }
+    if (pathname === ROUTES.RESCUE_TEAM_DASHBOARD) {
+      return {
+        title: 'Bản đồ giám sát đội cứu hộ',
+        subtitle: 'Giám sát vị trí thời gian thực',
+        icon: <Users size={20} />,
+        showSearch: false,
+      };
+    }
     if (pathname === ROUTES.RESCUE_TEAM_CREATE) {
       return {
         title: 'Tạo đội cứu hộ',
