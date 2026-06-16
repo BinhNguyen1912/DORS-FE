@@ -26,6 +26,9 @@ import DisasterListPage from './pages/disaster/DisasterListPage';
 import DisasterDetailPage from './pages/disaster/DisasterDetailPage';
 import DonationListPage from './pages/donation/DonationListPage';
 import DonationCampaignPage from './pages/donation/DonationCampaignPage';
+import UserListPage from './pages/categories/UserListPage';
+import RoleListPage from './pages/categories/RoleListPage';
+
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -188,6 +191,14 @@ export const router = createBrowserRouter([
             <DonationCampaignPage />
           </FeatureGuard>
         ),
+      },
+      {
+        path: ROUTES.USER_LIST,
+        element: <UserListPage />,
+      },
+      {
+        path: ROUTES.ROLE_LIST,
+        element: <RoleListPage />,
       },
     ],
   },

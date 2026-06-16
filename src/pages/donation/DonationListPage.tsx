@@ -5,7 +5,7 @@ import { donationApi } from '../../apis';
 import { cn } from '../../lib/utils';
 
 const statusColors = {
-  PENDING: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  PENDING: 'bg-yellow-100 text-yellow-750 dark:bg-yellow-900/30 dark:text-yellow-400',
   APPROVED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   REJECTED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   DELIVERED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -18,18 +18,20 @@ const typeIcons = {
 };
 
 export default function DonationListPage() {
+  const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [type, setType] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['donations', page, status, type],
+    queryKey: ['donations', page, status, type, searchQuery],
     queryFn: () =>
       donationApi.getAll({
         page,
         limit: 10,
         status: status || undefined,
         type: type || undefined,
+        search: searchQuery || undefined,
       }),
   });
 
@@ -71,7 +73,9 @@ export default function DonationListPage() {
             <input
               type="text"
               placeholder="Search donations..."
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500"
             />
           </div>
           <select

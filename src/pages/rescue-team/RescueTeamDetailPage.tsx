@@ -2,28 +2,23 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft,
   Edit,
   MapPin,
   Phone,
-  Users,
-  Clock,
   Shield,
-  Heart,
-  TrendingUp,
   Sliders,
-  Calendar,
   AlertCircle,
-  Mail,
-  UserCheck,
   Save,
+  Trash2,
+  Search,
 } from 'lucide-react';
-import { rescueTeamApi, locationApi } from '../../apis';
+import { rescueTeamApi, locationApi, rescueTeamMemberApi, userApi } from '../../apis';
 import { ROUTES } from '../../constants';
 import { RESCUE_TEXTS } from '../../constants/rescueTexts';
 import { cn } from '../../lib/utils';
-import type { Province, AdministrativeUnit } from '../../types';
+import type { Province, AdministrativeUnit, RescueTeamMember, User } from '../../types';
 import { toast } from '../../stores';
+import ConfirmDeleteModal from '../../components/common/ConfirmDeleteModal';
 
 const statusColors = {
   AVAILABLE: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
@@ -85,6 +80,122 @@ export default function RescueTeamDetailPage() {
     queryFn: () => rescueTeamApi.getById(Number(id)),
     enabled: !!id,
   });
+
+  const { data: membersResponse, isLoading: isLoadingMembers } = useQuery({
+    queryKey: ['rescue-team-members', id],
+    queryFn: () => rescueTeamMemberApi.getMembers(Number(id)),
+    enabled: !!id,
+  });
+  const members = membersResponse?.data || [];
+
+  // Add Member form/modal states
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [memberType, setMemberType] = useState<'user' | 'citizen'>('user');
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [citizenName, setCitizenName] = useState('');
+  const [citizenPhone, setCitizenPhone] = useState('');
+  const [roleInTeam, setRoleInTeam] = useState<'LEADER' | 'DEPUTY_LEADER' | 'MEMBER'>('MEMBER');
+  const [memberSpecIds, setMemberSpecIds] = useState<number[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [searchedUsers, setSearchedUsers] = useState<User[]>([]);
+  const [isUserSearchLoading, setIsUserSearchLoading] = useState(false);
+  
+  // Delete/Role change loading states
+  const [deleteMemberId, setDeleteMemberId] = useState<number | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+
+  // Search users
+  const handleSearchUsers = async () => {
+    if (!userSearchQuery.trim()) return;
+    setIsUserSearchLoading(true);
+    try {
+      const res = await userApi.search(userSearchQuery);
+      setSearchedUsers(res);
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi tìm kiếm người dùng');
+    } finally {
+      setIsUserSearchLoading(false);
+    }
+  };
+
+  // Load initial list of users
+  useEffect(() => {
+    if (isAddMemberOpen && memberType === 'user') {
+      userApi.getAll({ page: 1, limit: 100 }).then(res => {
+        setSearchedUsers(res.data);
+      }).catch(console.error);
+    }
+  }, [isAddMemberOpen, memberType]);
+
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (memberType === 'user' && !selectedUserId) {
+      toast.error('Vui lòng chọn một người dùng hệ thống');
+      return;
+    }
+    if (memberType === 'citizen' && !citizenName.trim()) {
+      toast.error('Vui lòng nhập tên công dân');
+      return;
+    }
+
+    setIsAddLoading(true);
+    try {
+      await rescueTeamMemberApi.addMember(Number(id), {
+        userId: memberType === 'user' ? Number(selectedUserId) : undefined,
+        citizenName: memberType === 'citizen' ? citizenName : undefined,
+        citizenPhone: memberType === 'citizen' ? citizenPhone : undefined,
+        roleInTeam,
+        specializationIds: memberSpecIds,
+      });
+      queryClient.invalidateQueries({ queryKey: ['rescue-team', id] });
+      queryClient.invalidateQueries({ queryKey: ['rescue-team-members', id] });
+      toast.success('Thêm thành viên thành công!');
+      setIsAddMemberOpen(false);
+      // Reset form
+      setSelectedUserId(null);
+      setCitizenName('');
+      setCitizenPhone('');
+      setRoleInTeam('MEMBER');
+      setMemberSpecIds([]);
+      setUserSearchQuery('');
+    } catch (err: any) {
+      toast.api(err, 'Lỗi khi thêm thành viên');
+    } finally {
+      setIsAddLoading(false);
+    }
+  };
+
+  const handleUpdateMemberRole = async (memberId: number, newRole: 'LEADER' | 'DEPUTY_LEADER' | 'MEMBER') => {
+    setIsActionLoading(true);
+    try {
+      await rescueTeamMemberApi.updateMemberRole(Number(id), memberId, newRole);
+      queryClient.invalidateQueries({ queryKey: ['rescue-team', id] });
+      queryClient.invalidateQueries({ queryKey: ['rescue-team-members', id] });
+      toast.success('Cập nhật vai trò thành viên thành công!');
+    } catch (err: any) {
+      toast.api(err, 'Lỗi khi cập nhật vai trò');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async () => {
+    if (!deleteMemberId) return;
+    setIsActionLoading(true);
+    try {
+      await rescueTeamMemberApi.removeMember(Number(id), deleteMemberId);
+      queryClient.invalidateQueries({ queryKey: ['rescue-team', id] });
+      queryClient.invalidateQueries({ queryKey: ['rescue-team-members', id] });
+      toast.success('Xóa thành viên khỏi đội thành công!');
+      setDeleteMemberId(null);
+    } catch (err: any) {
+      toast.api(err, 'Lỗi khi xóa thành viên');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
   // Populate edit fields when team loads
   useEffect(() => {
@@ -169,7 +280,7 @@ export default function RescueTeamDetailPage() {
 
   if (!team) {
     return (
-      <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700 p-8 max-w-md mx-auto mt-12">
+      <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl border border-slate-100 dark:border-gray-700 p-8 max-w-md mx-auto mt-12">
         <AlertCircle className="mx-auto text-red-500 mb-3" size={36} />
         <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Không tìm thấy thông tin đội cứu hộ</p>
         <Link
@@ -199,7 +310,7 @@ export default function RescueTeamDetailPage() {
   return (
     <div className="space-y-4 text-left">
       {/* Top Header & Breadcrumbs & Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-gray-100 dark:border-gray-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-slate-100 dark:border-gray-800">
         <div>
           <h1 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight mb-0.5">{RESCUE_TEXTS.TITLE_DETAIL}</h1>
           <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
@@ -214,7 +325,7 @@ export default function RescueTeamDetailPage() {
         <div className="flex items-center gap-2">
           <Link
             to={ROUTES.RESCUE_TEAM_LIST}
-            className="px-4 py-2 border border-gray-250 dark:border-gray-650 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold text-xs shadow-sm transition-all"
+            className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold text-xs shadow-sm transition-all"
           >
             Quay lại
           </Link>
@@ -235,7 +346,7 @@ export default function RescueTeamDetailPage() {
         {/* Left Side: Summary Card & Tab Contents */}
         <div className="lg:col-span-8 space-y-4 flex flex-col">
           {isEditing ? (
-            <form onSubmit={handleSave} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-150 dark:border-gray-750 shadow-sm space-y-4 text-left">
+            <form onSubmit={handleSave} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-slate-100 dark:border-slate-700/60 shadow-sm space-y-4 text-left">
               <h2 className="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider mb-2">Chỉnh sửa thông tin đội</h2>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -247,7 +358,7 @@ export default function RescueTeamDetailPage() {
                     required
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
                   />
                 </div>
 
@@ -257,7 +368,7 @@ export default function RescueTeamDetailPage() {
                   <select
                     value={editTeamType}
                     onChange={(e) => setEditTeamType(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
                   >
                     <option value="PCCC">PCCC</option>
                     <option value="Y_TE">Y tế</option>
@@ -274,7 +385,7 @@ export default function RescueTeamDetailPage() {
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
                   >
                     <option value="AVAILABLE">Sẵn sàng</option>
                     <option value="BUSY">Đang làm nhiệm vụ</option>
@@ -291,7 +402,7 @@ export default function RescueTeamDetailPage() {
                     required
                     value={editMaxCapacity}
                     onChange={(e) => setEditMaxCapacity(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
                   />
                 </div>
 
@@ -301,7 +412,7 @@ export default function RescueTeamDetailPage() {
                   <select
                     value={editProvinceId}
                     onChange={(e) => setEditProvinceId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
                   >
                     <option value="">-- Chọn Tỉnh / Thành phố --</option>
                     {provinces.map((p) => (
@@ -316,7 +427,7 @@ export default function RescueTeamDetailPage() {
                   <select
                     value={editAdminUnitId}
                     onChange={(e) => setEditAdminUnitId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
                   >
                     <option value="">-- Chọn Quận / Huyện / Phường / Xã --</option>
                     {wards.map((w) => (
@@ -334,7 +445,7 @@ export default function RescueTeamDetailPage() {
                     value={editLatitude}
                     onChange={(e) => setEditLatitude(e.target.value)}
                     placeholder="Ví dụ: 16.0678"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
                   />
                 </div>
 
@@ -347,13 +458,13 @@ export default function RescueTeamDetailPage() {
                     value={editLongitude}
                     onChange={(e) => setEditLongitude(e.target.value)}
                     placeholder="Ví dụ: 108.2208"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
                   />
                 </div>
               </div>
 
               {/* Chuyên môn */}
-              <div className="space-y-1.5 text-left relative pt-2 border-t border-gray-150 dark:border-gray-700">
+              <div className="space-y-1.5 text-left relative pt-2 border-t border-slate-100 dark:border-gray-700">
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
                   Chuyên môn sở hữu (Chọn nhiều)
                 </label>
@@ -361,7 +472,7 @@ export default function RescueTeamDetailPage() {
                 {/* Combo box trigger */}
                 <div
                   onClick={() => setIsSpecDropdownOpen(!isSpecDropdownOpen)}
-                  className="w-full min-h-[38px] px-3.5 py-2 rounded-xl text-xs border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-955 dark:text-white focus:outline-none cursor-pointer flex flex-wrap gap-1.5 items-center justify-between shadow-sm hover:border-gray-300 dark:hover:border-gray-600 transition-all"
+                  className="w-full min-h-[38px] px-3.5 py-2 rounded-xl text-xs border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-955 dark:text-white focus:outline-none cursor-pointer flex flex-wrap gap-1.5 items-center justify-between shadow-sm hover:border-gray-300 dark:hover:border-gray-600 transition-all"
                 >
                   {editSpecializationIds.length === 0 ? (
                     <span className="text-gray-400 font-medium">-- Chọn chuyên môn của đội --</span>
@@ -398,14 +509,14 @@ export default function RescueTeamDetailPage() {
                     {/* Backdrop to close */}
                     <div className="fixed inset-0 z-10" onClick={() => { setIsSpecDropdownOpen(false); setSpecSearch(''); }} />
                     
-                    <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-750 rounded-xl shadow-lg p-2.5 z-20 space-y-2 max-h-60 overflow-y-auto">
+                    <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-gray-800 border border-slate-100 dark:border-slate-700/60 rounded-xl shadow-lg p-2.5 z-20 space-y-2 max-h-60 overflow-y-auto">
                       {/* Search input */}
                       <input
                         type="text"
                         placeholder="Tìm nhanh chuyên môn..."
                         value={specSearch}
                         onChange={(e) => setSpecSearch(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-gray-250 dark:border-gray-650 bg-slate-50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
+                        className="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
                         onClick={(e) => e.stopPropagation()}
                       />
                       
@@ -453,11 +564,11 @@ export default function RescueTeamDetailPage() {
               </div>
 
               {/* Buttons */}
-              <div className="flex justify-end gap-2 pt-4 border-t border-gray-150 dark:border-gray-700">
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-gray-700">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 border border-gray-250 dark:border-gray-650 text-gray-750 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold text-xs shadow-sm transition-all"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-gray-750 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold text-xs shadow-sm transition-all"
                 >
                   Hủy
                 </button>
@@ -475,7 +586,7 @@ export default function RescueTeamDetailPage() {
           ) : (
             <>
               {/* Main Info Card */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-150 dark:border-gray-750 shadow-sm text-gray-750 dark:text-gray-300">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-slate-100 dark:border-slate-700/60 shadow-sm text-gray-750 dark:text-gray-300">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0">
@@ -505,7 +616,7 @@ export default function RescueTeamDetailPage() {
                 </div>
 
                 {/* Quick Metrics grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-gray-150 dark:border-gray-700">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-slate-100 dark:border-gray-700">
                   <div className="space-y-1">
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">{RESCUE_TEXTS.DETAIL_COVERAGE_AREA}</p>
                     <p className="text-sm font-bold text-gray-900 dark:text-white">P. Hòa Cường, Q. Hải Châu</p>
@@ -547,13 +658,13 @@ export default function RescueTeamDetailPage() {
               </div>
 
               {/* Tabs Content Router */}
-              <div className="flex-1 bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-150 dark:border-gray-750 shadow-sm min-h-[320px]">
+              <div className="flex-1 bg-white dark:bg-gray-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm min-h-[320px]">
                 {activeTab === 'overview' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Basic info box */}
                     <div className="space-y-4">
                       <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">{RESCUE_TEXTS.DETAIL_BASIC_INFO}</h3>
-                      <div className="divide-y divide-gray-100 dark:divide-gray-700 text-xs">
+                      <div className="divide-y divide-slate-100 dark:divide-gray-700 text-xs">
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.COL_TYPE}</span>
                           <span className="font-bold text-gray-900 dark:text-white">{typeLabel}</span>
@@ -564,11 +675,15 @@ export default function RescueTeamDetailPage() {
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_LEADER}</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{team.leaderName}</span>
+                          <span className="font-bold text-gray-900 dark:text-white">
+                            {team.leader?.fullName || team.leaderCitizenName || 'Chưa có đội trưởng'}
+                          </span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_PHONE}</span>
-                          <span className="font-bold text-gray-950 dark:text-white">{team.leaderPhone}</span>
+                          <span className="font-bold text-gray-950 dark:text-white">
+                            {team.leader?.phone || team.leaderPhone || 'Chưa có'}
+                          </span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_EMAIL}</span>
@@ -584,7 +699,7 @@ export default function RescueTeamDetailPage() {
                     {/* Location / Area info box */}
                     <div className="space-y-4">
                       <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">{RESCUE_TEXTS.DETAIL_LOCATION_INFO}</h3>
-                      <div className="divide-y divide-gray-100 dark:divide-gray-700 text-xs">
+                      <div className="divide-y divide-slate-100 dark:divide-gray-700 text-xs">
                         <div className="py-2.5 flex flex-col gap-1">
                           <span className="text-gray-500 font-semibold flex items-center gap-1.5">
                             <MapPin size={12} className="text-amber-500" />
@@ -617,47 +732,310 @@ export default function RescueTeamDetailPage() {
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Danh sách thành viên đội</h3>
                       <button 
-                        onClick={() => alert('Chức năng thêm thành viên đang kết nối...')}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white rounded-xl text-[10px] font-bold shadow-sm"
+                        onClick={() => setIsAddMemberOpen(true)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-bold shadow-sm transition-colors"
                       >
                         + Thêm thành viên
                       </button>
                     </div>
 
-                    <div className="divide-y divide-gray-100 dark:divide-gray-700 text-xs">
-                      <div className="py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 font-bold flex items-center justify-center text-gray-700 dark:text-white">B</div>
-                          <div>
-                            <p className="font-bold text-gray-900 dark:text-white">{team.leaderName}</p>
-                            <p className="text-[10px] text-gray-400">Trưởng đội</p>
-                          </div>
+                    <div className="divide-y divide-slate-100 dark:divide-gray-700 text-xs">
+                      {isLoadingMembers ? (
+                        <div className="py-12 text-center text-gray-400">
+                          <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                          <p className="font-semibold text-xs">Đang tải danh sách thành viên...</p>
                         </div>
-                        <span className="px-2 py-0.5 text-[9px] bg-emerald-500/10 text-emerald-500 rounded-full font-bold">Hoạt động</span>
-                      </div>
-                      
-                      <div className="py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 font-bold flex items-center justify-center text-gray-700 dark:text-white">H</div>
-                          <div>
-                            <p className="font-bold text-gray-900 dark:text-white">Trần Văn Hoàng</p>
-                            <p className="text-[10px] text-gray-400">Phó đội trưởng</p>
-                          </div>
+                      ) : members.length === 0 ? (
+                        <div className="py-12 text-center text-gray-400 font-semibold">
+                          Đội chưa có thành viên nào. Bấm "+ Thêm thành viên" để thêm.
                         </div>
-                        <span className="px-2 py-0.5 text-[9px] bg-emerald-500/10 text-emerald-500 rounded-full font-bold">Hoạt động</span>
-                      </div>
+                      ) : (
+                        members.map((member: RescueTeamMember) => {
+                          const name = member.user?.fullName || member.citizenName || 'Chưa rõ';
+                          const phone = member.user?.phone || member.citizenPhone || 'Chưa rõ';
+                          const roleLabel = member.roleInTeam === 'LEADER'
+                            ? 'Trưởng đội'
+                            : member.roleInTeam === 'DEPUTY_LEADER'
+                              ? 'Phó đội trưởng'
+                              : 'Thành viên';
+                          
+                          const roleBadgeColor = member.roleInTeam === 'LEADER'
+                            ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                            : member.roleInTeam === 'DEPUTY_LEADER'
+                              ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                              : 'bg-blue-500/10 text-blue-500 border border-blue-500/20';
 
-                      <div className="py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 font-bold flex items-center justify-center text-gray-700 dark:text-white">K</div>
-                          <div>
-                            <p className="font-bold text-gray-900 dark:text-white">Nguyễn Minh Khánh</p>
-                            <p className="text-[10px] text-gray-400">Cứu hộ viên chuyên nghiệp</p>
-                          </div>
-                        </div>
-                        <span className="px-2 py-0.5 text-[9px] bg-gray-500/10 text-gray-400 rounded-full font-bold">Ngoại tuyến</span>
-                      </div>
+                          return (
+                            <div key={member.id} className="py-3.5 flex items-center justify-between group hover:bg-slate-50/30 dark:hover:bg-gray-750/30 px-3 rounded-xl transition-all text-left">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-700 font-bold flex items-center justify-center text-gray-700 dark:text-white uppercase select-none flex-shrink-0">
+                                  {name.charAt(0)}
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center flex-wrap gap-2">
+                                    <p className="font-bold text-gray-900 dark:text-white">{name}</p>
+                                    <span className={cn('px-2 py-0.5 text-[9px] font-bold rounded-lg uppercase tracking-wider', roleBadgeColor)}>
+                                      {roleLabel}
+                                    </span>
+                                    {member.userId && (
+                                      <span className="px-1.5 py-0.5 text-[8px] bg-slate-100 dark:bg-slate-800 text-gray-500 rounded font-semibold border border-gray-200 dark:border-gray-700">
+                                        Tài khoản hệ thống
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 flex items-center gap-1.5 font-semibold">
+                                    <Phone size={10} className="text-gray-400" />
+                                    {phone}
+                                  </p>
+                                  {member.specializationIds?.length > 0 && (
+                                    <div className="pt-1.5 flex flex-wrap gap-1">
+                                      {member.specializationIds.map(specId => {
+                                        const spec = specializations.find(s => s.id === specId);
+                                        return spec ? (
+                                          <span key={specId} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 font-bold rounded-lg border border-indigo-100 dark:border-indigo-900/30 text-[9px] inline-block">
+                                            {spec.name}
+                                          </span>
+                                        ) : null;
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <select
+                                  disabled={isActionLoading}
+                                  value={member.roleInTeam}
+                                  onChange={(e) => handleUpdateMemberRole(member.id, e.target.value as any)}
+                                  className="px-2 py-1 text-[10px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                                >
+                                  <option value="MEMBER">Thành viên</option>
+                                  <option value="DEPUTY_LEADER">Phó đội</option>
+                                  <option value="LEADER">Trưởng đội</option>
+                                </select>
+                                
+                                <button
+                                  disabled={isActionLoading}
+                                  onClick={() => setDeleteMemberId(member.id)}
+                                  className="p-1.5 text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-955/20 rounded-lg transition-all"
+                                  title="Xóa khỏi đội"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
+
+                    {/* Add Member Modal */}
+                    {isAddMemberOpen && (
+                      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg border border-slate-100 dark:border-slate-700/60 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-left text-slate-700 dark:text-slate-300">
+                          <div className="p-5 border-b border-slate-100 dark:border-slate-700/60">
+                            <h3 className="text-sm font-extrabold text-gray-900 dark:text-white mb-0">Thêm thành viên mới</h3>
+                          </div>
+                          
+                          <form onSubmit={handleAddMember}>
+                            <div className="p-5 space-y-4 text-xs max-h-[65vh] overflow-y-auto">
+                              {/* Member Type Selection */}
+                              <div className="space-y-1.5">
+                                <label className="block font-bold text-gray-700 dark:text-gray-300">Hình thức đăng ký</label>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setMemberType('user')}
+                                    className={cn(
+                                      'flex-1 py-2 text-xs font-bold rounded-xl border transition-all',
+                                      memberType === 'user'
+                                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                        : 'bg-slate-50/50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-750'
+                                    )}
+                                  >
+                                    Tài khoản hệ thống
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMemberType('citizen')}
+                                    className={cn(
+                                      'flex-1 py-2 text-xs font-bold rounded-xl border transition-all',
+                                      memberType === 'citizen'
+                                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                        : 'bg-slate-50/50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-750'
+                                    )}
+                                  >
+                                    Đăng ký công dân tự do
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Search & Select System User */}
+                              {memberType === 'user' && (
+                                <div className="space-y-3 p-3 bg-slate-50/50 dark:bg-gray-900/30 border border-slate-100 dark:border-gray-700 rounded-xl">
+                                  <div className="space-y-1.5">
+                                    <label className="block font-bold text-gray-700 dark:text-gray-300">Tìm kiếm tài khoản</label>
+                                    <div className="flex gap-2">
+                                      <div className="relative flex-1">
+                                        <input
+                                          type="text"
+                                          value={userSearchQuery}
+                                          onChange={e => setUserSearchQuery(e.target.value)}
+                                          placeholder="Tên, email, số điện thoại..."
+                                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none"
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              handleSearchUsers();
+                                            }
+                                          }}
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={handleSearchUsers}
+                                        disabled={isUserSearchLoading}
+                                        className="px-3 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                                      >
+                                        {isUserSearchLoading ? (
+                                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                          <Search size={14} />
+                                        )}
+                                        Tìm
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    <label className="block font-bold text-gray-700 dark:text-gray-300">Chọn người dùng *</label>
+                                    <select
+                                      value={selectedUserId || ''}
+                                      onChange={e => setSelectedUserId(Number(e.target.value) || null)}
+                                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-850 text-gray-950 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                                    >
+                                      <option value="">-- Chọn thành viên hệ thống --</option>
+                                      {searchedUsers.map(u => (
+                                        <option key={u.id} value={u.id}>
+                                          {u.fullName} ({u.email || u.phone || u.username})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Manual Citizen Registration Fields */}
+                              {memberType === 'citizen' && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-slate-50/50 dark:bg-gray-900/30 border border-slate-100 dark:border-gray-700 rounded-xl">
+                                  <div className="space-y-1.5">
+                                    <label className="block font-bold text-gray-700 dark:text-gray-300">Tên công dân *</label>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={citizenName}
+                                      onChange={e => setCitizenName(e.target.value)}
+                                      placeholder="Ví dụ: Nguyễn Văn A"
+                                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="block font-bold text-gray-700 dark:text-gray-300">Số điện thoại</label>
+                                    <input
+                                      type="tel"
+                                      value={citizenPhone}
+                                      onChange={e => setCitizenPhone(e.target.value)}
+                                      placeholder="Ví dụ: 0905123456"
+                                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Role selection */}
+                              <div className="space-y-1.5">
+                                <label className="block font-bold text-gray-700 dark:text-gray-300">Vị trí trong đội *</label>
+                                <select
+                                  value={roleInTeam}
+                                  onChange={e => setRoleInTeam(e.target.value as any)}
+                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                                >
+                                  <option value="MEMBER">Thành viên</option>
+                                  <option value="DEPUTY_LEADER">Phó đội trưởng</option>
+                                  <option value="LEADER">Trưởng đội (Captain)</option>
+                                </select>
+                                {roleInTeam === 'LEADER' && (
+                                  <div className="p-2.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-xl text-[10px] font-bold leading-normal">
+                                    ⚠️ Lưu ý: Khi gán vai trò này, Trưởng đội hiện tại của đội cứu hộ (nếu có) sẽ tự động chuyển thành thành viên bình thường. Vị trí Đội trưởng trên trang tổng quan cũng sẽ thay đổi theo.
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Member Specialization checklist */}
+                              <div className="space-y-1.5">
+                                <label className="block font-bold text-gray-700 dark:text-gray-300">Chuyên môn sở hữu</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-slate-100 dark:border-gray-700 rounded-xl bg-slate-50/50 dark:bg-gray-900/30">
+                                  {specializations.length === 0 ? (
+                                    <p className="text-[10px] text-gray-400 py-2 col-span-2 text-center">Không có chuyên môn khả dụng</p>
+                                  ) : (
+                                    specializations.map(spec => {
+                                      const isSelected = memberSpecIds.includes(spec.id);
+                                      return (
+                                        <label key={spec.id} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-100 dark:hover:bg-gray-750 rounded-lg cursor-pointer transition-all select-none font-medium text-[11px]">
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => {
+                                              if (isSelected) {
+                                                setMemberSpecIds(memberSpecIds.filter(id => id !== spec.id));
+                                              } else {
+                                                setMemberSpecIds([...memberSpecIds, spec.id]);
+                                              }
+                                            }}
+                                            className="w-3.5 h-3.5 rounded text-amber-500 border-gray-300 focus:ring-amber-550"
+                                          />
+                                          <span className="truncate text-[10px]">{spec.name}</span>
+                                        </label>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-4 bg-slate-50/50 dark:bg-gray-900/30 border-t border-slate-100 dark:border-slate-700/60 flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setIsAddMemberOpen(false)}
+                                className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-gray-750 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold transition-all"
+                              >
+                                Hủy
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={isAddLoading}
+                                className="flex items-center gap-1.5 px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 text-white font-bold rounded-xl shadow-sm transition-all"
+                              >
+                                {isAddLoading && (
+                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                )}
+                                Thêm thành viên
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Delete Member Confirmation */}
+                    <ConfirmDeleteModal
+                      isOpen={deleteMemberId !== null}
+                      onClose={() => setDeleteMemberId(null)}
+                      onConfirm={handleRemoveMember}
+                      isLoading={isActionLoading}
+                      title="Xóa thành viên khỏi đội"
+                      message="Bạn có chắc chắn muốn xóa thành viên này ra khỏi đội cứu hộ? Thao tác này sẽ không thể khôi phục lại."
+                    />
                   </div>
                 )}
 
@@ -665,7 +1043,7 @@ export default function RescueTeamDetailPage() {
                   <div className="space-y-4">
                     <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Lịch sử nhiệm vụ cứu hộ</h3>
                     <div className="space-y-3">
-                      <div className="p-3 border border-gray-150 dark:border-gray-750 rounded-xl text-xs flex justify-between items-start">
+                      <div className="p-3 border border-slate-100 dark:border-slate-700/60 rounded-xl text-xs flex justify-between items-start">
                         <div className="space-y-1">
                           <span className="text-[9px] font-bold text-blue-500 uppercase">SOS-#1023</span>
                           <p className="font-bold text-gray-950 dark:text-white">Sơ tán dân vùng ngập úng</p>
@@ -674,7 +1052,7 @@ export default function RescueTeamDetailPage() {
                         <span className="px-2 py-0.5 text-[9px] bg-amber-500/10 text-amber-500 rounded-full font-bold">Đang làm nhiệm vụ</span>
                       </div>
 
-                      <div className="p-3 border border-gray-150 dark:border-gray-750 rounded-xl text-xs flex justify-between items-start">
+                      <div className="p-3 border border-slate-100 dark:border-slate-700/60 rounded-xl text-xs flex justify-between items-start">
                         <div className="space-y-1">
                           <span className="text-[9px] font-bold text-blue-500 uppercase">SOS-#0912</span>
                           <p className="font-bold text-gray-950 dark:text-white">Cứu nạn người bị sập đổ công trình</p>
@@ -702,14 +1080,14 @@ export default function RescueTeamDetailPage() {
         {/* Right Side: Map & Performance Metrics */}
         <div className="lg:col-span-4 space-y-4">
           {/* Map Location Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-150 dark:border-gray-750 shadow-sm flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700/60 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xs font-bold text-gray-950 dark:text-white uppercase tracking-wider">Vị trí hiện tại</h3>
               <span className="text-[10px] text-blue-500 font-bold hover:underline cursor-pointer">Xem trên bản đồ</span>
             </div>
 
             {/* SVG Interactive Map representation of Da Nang location */}
-            <div className="aspect-video bg-sky-50/50 dark:bg-gray-950 rounded-xl border border-gray-150 dark:border-gray-700 relative overflow-hidden flex items-center justify-center">
+            <div className="aspect-video bg-sky-50/50 dark:bg-gray-950 rounded-xl border border-slate-100 dark:border-gray-700 relative overflow-hidden flex items-center justify-center">
               <svg viewBox="0 0 200 120" className="w-full h-full select-none" xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M 10,100 Q 50,70 100,80 T 190,100 Z"
@@ -722,7 +1100,7 @@ export default function RescueTeamDetailPage() {
                 <circle cx="100" cy="80" r="10" className="fill-red-500 opacity-20 animate-ping" />
                 <circle cx="100" cy="80" r="5" className="fill-red-650 stroke-white" strokeWidth="1" />
               </svg>
-              <div className="absolute bottom-2 left-2 right-2 bg-white/95 dark:bg-gray-900/95 p-2 rounded-lg border border-gray-100 dark:border-gray-700 text-left">
+              <div className="absolute bottom-2 left-2 right-2 bg-white/95 dark:bg-gray-900/95 p-2 rounded-lg border border-slate-100 dark:border-gray-700 text-left">
                 <p className="text-[8px] font-bold text-gray-500 uppercase leading-none mb-1">Cập nhật lúc</p>
                 <p className="text-[10px] font-bold text-gray-900 dark:text-white leading-none">2 phút trước</p>
               </div>
@@ -730,7 +1108,7 @@ export default function RescueTeamDetailPage() {
           </div>
 
           {/* Performance statistics circular charts */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-150 dark:border-gray-750 shadow-sm text-left">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700/60 shadow-sm text-left">
             <h3 className="text-xs font-bold text-gray-950 dark:text-white uppercase tracking-wider mb-4">Hiệu suất hoạt động</h3>
 
             <div className="flex flex-col items-center gap-6">
@@ -757,7 +1135,7 @@ export default function RescueTeamDetailPage() {
               </div>
 
               {/* Legends statistics table detail */}
-              <div className="w-full space-y-2.5 divide-y divide-gray-100 dark:divide-gray-700/50">
+              <div className="w-full space-y-2.5 divide-y divide-slate-100 dark:divide-gray-700/50">
                 <div className="flex items-center justify-between pt-2.5">
                   <span className="text-xs text-gray-500 font-semibold">{RESCUE_TEXTS.TAB_MISSIONS}</span>
                   <span className="text-xs font-bold text-gray-900 dark:text-white">156</span>

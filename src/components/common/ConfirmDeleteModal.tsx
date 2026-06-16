@@ -28,7 +28,7 @@ export default function ConfirmDeleteModal({
       />
       
       {/* Modal Box */}
-      <div className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-sm w-full p-6 shadow-xl border border-gray-100 dark:border-gray-700 text-left transform transition-all scale-100">
+      <div className="relative bg-white dark:bg-gray-800 rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 dark:border-gray-700 text-left transform transition-all scale-100">
         <div className="flex items-start gap-4">
           <div className="p-2.5 bg-red-50 dark:bg-red-950/30 text-red-500 rounded-xl flex-shrink-0">
             <AlertTriangle size={22} />
@@ -49,7 +49,7 @@ export default function ConfirmDeleteModal({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2 border border-gray-250 dark:border-gray-650 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold text-xs shadow-sm transition-all"
+            className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold text-xs shadow-sm transition-all"
           >
             Hủy
           </button>

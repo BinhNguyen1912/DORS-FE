@@ -13,6 +13,8 @@ import {
   Heart,
   Shield,
   Plus,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuthStore, toast } from '../stores';
 import { ROUTES } from '../constants';
@@ -31,6 +33,18 @@ export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
+  // Clear search query on path change
+  useEffect(() => {
+    setSearchQuery('');
+  }, [location.pathname]);
+
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
+    'Danh mục': true,
+  });
+  const toggleMenu = (label: string) => {
+    setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] }));
+  };
 
   const handleLogout = async () => {
     try {
@@ -147,6 +161,24 @@ export default function MainLayout() {
         searchPlaceholder: 'Tìm kiếm khoản tài trợ...',
       };
     }
+    if (pathname === ROUTES.USER_LIST) {
+      return {
+        title: 'Quản lý Thành Viên (User)',
+        subtitle: 'Danh mục người dùng hệ thống',
+        icon: <Users size={20} />,
+        showSearch: true,
+        searchPlaceholder: 'Tìm kiếm người dùng...',
+      };
+    }
+    if (pathname === ROUTES.ROLE_LIST) {
+      return {
+        title: 'Quản lý Chức danh (Role)',
+        subtitle: 'Danh mục vai trò & phân quyền hệ thống',
+        icon: <Shield size={20} />,
+        showSearch: true,
+        searchPlaceholder: 'Tìm kiếm vai trò...',
+      };
+    }
 
     return {
       title: 'Hệ thống cứu trợ thiên tai',
@@ -220,7 +252,68 @@ export default function MainLayout() {
         <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto no-scrollbar">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.href;
+            const hasChildren = !!item.children;
+            const isExpanded = !!expandedMenus[item.label];
+            const hasActiveChild = hasChildren && item.children!.some(child => location.pathname === child.href);
+            const isActive = location.pathname === item.href || hasActiveChild;
+
+            if (hasChildren) {
+              return (
+                <div key={item.label} className="space-y-1">
+                  <button
+                    onClick={() => {
+                      if (collapsed) {
+                        setCollapsed(false);
+                        setExpandedMenus(prev => ({ ...prev, [item.label]: true }));
+                      } else {
+                        toggleMenu(item.label);
+                      }
+                    }}
+                    className={cn(
+                      'w-full flex items-center justify-between rounded-xl transition-all font-semibold text-xs',
+                      collapsed
+                        ? 'justify-center p-2.5'
+                        : 'px-2.5 py-2',
+                      isActive
+                        ? 'bg-amber-600/10 text-amber-500'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-850/60'
+                    )}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon size={18} className="flex-shrink-0" />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </div>
+                    {!collapsed && (
+                      isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                    )}
+                  </button>
+                  
+                  {isExpanded && !collapsed && (
+                    <div className="pl-6 space-y-1 mt-1 border-l border-slate-850 ml-4">
+                      {item.children!.map((child) => {
+                        const isChildActive = location.pathname === child.href;
+                        return (
+                          <Link
+                            key={child.href}
+                            to={child.href}
+                            onClick={() => setSidebarOpen(false)}
+                            className={cn(
+                              'flex items-center rounded-lg px-3 py-1.5 font-semibold text-[11px] transition-all',
+                              isChildActive
+                                ? 'text-amber-505 font-bold bg-amber-600/5'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-850/40'
+                            )}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
             return (
               <Link
@@ -340,10 +433,9 @@ export default function MainLayout() {
           title={headerInfo.title}
           sidebarCollapsed={collapsed}
           onToggleSidebar={() => setCollapsed(!collapsed)}
-          searchPlaceholder={headerInfo.searchPlaceholder || "Tìm kiếm tổng hợp..."}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
-          showSearch={headerInfo.showSearch}
+          showSearch={true}
         />
         
         {/* Outlet with shared search state context */}

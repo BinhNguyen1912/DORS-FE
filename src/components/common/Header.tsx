@@ -5,7 +5,6 @@ interface HeaderProps {
   title: string;
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
-  searchPlaceholder?: string;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   showSearch?: boolean;
@@ -22,7 +21,6 @@ export default function Header({
   title,
   sidebarCollapsed = false,
   onToggleSidebar,
-  searchPlaceholder = 'Tìm kiếm tổng hợp...',
   searchValue = '',
   onSearchChange,
   showSearch = true,
@@ -33,8 +31,8 @@ export default function Header({
 
   return (
     <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 bg-white dark:bg-gray-800 py-3 px-6 flex-shrink-0 shadow-sm z-10">
-      {/* Title Area & Sidebar Toggle */}
-      <div className="flex items-center gap-2.5 text-left py-1">
+      {/* Title Area, Sidebar Toggle & Search Bar */}
+      <div className="flex flex-wrap items-center gap-3 md:gap-4 text-left py-1 flex-1">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
@@ -45,32 +43,31 @@ export default function Header({
             {sidebarCollapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
           </button>
         )}
-        <div className="text-base font-extrabold text-gray-900 dark:text-white leading-none">
+        <div className="text-base font-extrabold text-gray-900 dark:text-white leading-none flex-shrink-0">
           {title}
         </div>
-      </div>
 
-      {/* Actions: Search, Notifications & Profile */}
-      <div className="flex flex-wrap items-center gap-4 xl:justify-end flex-1">
-        {/* Search Bar (conditional) */}
         {showSearch && onSearchChange && (
-          <div className="relative flex-1 max-w-md min-w-[260px]">
+          <div className="relative w-full sm:w-64 md:w-80 ml-2">
             <Search
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-              size={18}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-450 dark:text-gray-550"
+              size={14}
             />
             <input
               type="text"
-              placeholder={searchPlaceholder}
+              placeholder="Tìm kiếm tổng hợp"
               value={searchValue}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all"
+              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-semibold placeholder-gray-400"
             />
           </div>
         )}
+      </div>
 
+      {/* Actions: Notifications & Profile */}
+      <div className="flex items-center gap-4 xl:justify-end flex-shrink-0">
         {/* Notification Bell */}
-        <button className="relative p-2.5 bg-gray-50 hover:bg-gray-150 dark:bg-gray-900 dark:hover:bg-gray-950 rounded-xl text-gray-600 dark:text-gray-400 border border-gray-100 dark:border-gray-700 transition-all">
+        <button className="relative p-2.5 bg-gray-50 hover:bg-gray-150 dark:bg-gray-900 dark:hover:bg-gray-950 rounded-xl text-gray-600 dark:text-gray-400 border border-slate-100 dark:border-gray-700 transition-all">
           <Bell size={20} />
           <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-[10px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900">
             12

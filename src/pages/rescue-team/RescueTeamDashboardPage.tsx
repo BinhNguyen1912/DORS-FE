@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link, useNavigate, useOutletContext } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -109,7 +109,7 @@ const mapMarkers: MapMarker[] = [
 ];
 
 export default function RescueTeamDashboardPage() {
-  const { searchQuery, setSearchQuery } = useOutletContext<{ searchQuery: string; setSearchQuery: (val: string) => void }>();
+  const [searchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [teamTypeFilter, setTeamTypeFilter] = useState('');
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
@@ -281,7 +281,7 @@ export default function RescueTeamDashboardPage() {
       {/* Top 4 Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Tổng số đội */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
           <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl flex-shrink-0">
             <Users size={22} />
           </div>
@@ -300,7 +300,7 @@ export default function RescueTeamDashboardPage() {
         </div>
 
         {/* Card 2: Đang hoạt động */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
           <div className="p-2.5 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-xl flex-shrink-0">
             <Activity size={22} />
           </div>
@@ -319,7 +319,7 @@ export default function RescueTeamDashboardPage() {
         </div>
 
         {/* Card 3: Đang làm nhiệm vụ */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
           <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl flex-shrink-0">
             <Briefcase size={22} />
           </div>
@@ -338,7 +338,7 @@ export default function RescueTeamDashboardPage() {
         </div>
 
         {/* Card 4: Sẵn sàng */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700 flex items-center gap-3.5 text-left">
           <div className="p-2.5 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 rounded-xl flex-shrink-0">
             <UserCheck size={22} />
           </div>
@@ -360,7 +360,7 @@ export default function RescueTeamDashboardPage() {
       {/* Middle Grid: Map (Left) & Team List (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left Column: Interactive Map */}
-        <div className="lg:col-span-7 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+        <div className="lg:col-span-7 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700 flex flex-col h-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping" />
@@ -372,25 +372,25 @@ export default function RescueTeamDashboardPage() {
           </div>
 
           {/* SVG Map Container */}
-          <div className="relative flex-1 min-h-[360px] bg-sky-50/50 dark:bg-gray-950 rounded-xl overflow-hidden border border-gray-150 dark:border-gray-700">
+          <div className="relative flex-1 min-h-[360px] bg-sky-50/50 dark:bg-gray-950 rounded-xl overflow-hidden border border-slate-100 dark:border-gray-700">
             {/* Map Controls */}
             <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Lọc">
+              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-slate-100 dark:border-gray-700 transition-all" title="Lọc">
                 <Filter size={16} />
               </button>
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Lớp bản đồ">
+              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-slate-100 dark:border-gray-700 transition-all" title="Lớp bản đồ">
                 <Layers size={16} />
               </button>
             </div>
 
             <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Phóng to">
+              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-slate-100 dark:border-gray-700 transition-all" title="Phóng to">
                 <ZoomIn size={16} />
               </button>
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Thu nhỏ">
+              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-slate-100 dark:border-gray-700 transition-all" title="Thu nhỏ">
                 <ZoomOut size={16} />
               </button>
-              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 transition-all" title="Định vị">
+              <button className="p-2 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg shadow-sm border border-slate-100 dark:border-gray-700 transition-all" title="Định vị">
                 <Compass size={16} />
               </button>
             </div>
@@ -489,7 +489,7 @@ export default function RescueTeamDashboardPage() {
               if (!marker) return null;
               return (
                 <div
-                  className="absolute bg-white dark:bg-gray-800 p-3 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 max-w-[200px] z-20 pointer-events-auto"
+                  className="absolute bg-white dark:bg-gray-800 p-3 rounded-xl shadow-lg border border-slate-100 dark:border-gray-700 max-w-[200px] z-20 pointer-events-auto"
                   style={{
                     left: `${(marker.x / 500) * 100}%`,
                     top: `${(marker.y / 350) * 100 - 15}%`,
@@ -505,12 +505,12 @@ export default function RescueTeamDashboardPage() {
                   </p>
                   <span className={cn(
                     'px-2 py-0.5 text-[9px] font-bold rounded-full border inline-block',
-                    (marker.status === 'AVAILABLE' || marker.status === 'ACTIVE') ? 'bg-green-50 text-green-700 border-green-200' :
-                      (marker.status === 'BUSY' || marker.status === 'ON_DUTY') ? 'bg-red-50 text-red-700 border-red-200' :
+                    ((marker.status as string) === 'AVAILABLE' || (marker.status as string) === 'ACTIVE') ? 'bg-green-50 text-green-700 border-green-200' :
+                      ((marker.status as string) === 'BUSY' || (marker.status as string) === 'ON_DUTY') ? 'bg-red-50 text-red-700 border-red-200' :
                         'bg-blue-50 text-blue-700 border-blue-200'
                   )}>
-                    {(marker.status === 'AVAILABLE' || marker.status === 'ACTIVE') ? 'Sẵn sàng' :
-                      (marker.status === 'BUSY' || marker.status === 'ON_DUTY') ? 'Cứu hộ khẩn cấp' : 'Đang di chuyển'}
+                    {((marker.status as string) === 'AVAILABLE' || (marker.status as string) === 'ACTIVE') ? 'Sẵn sàng' :
+                      ((marker.status as string) === 'BUSY' || (marker.status as string) === 'ON_DUTY') ? 'Cứu hộ khẩn cấp' : 'Đang di chuyển'}
                   </span>
                 </div>
               );
@@ -518,7 +518,7 @@ export default function RescueTeamDashboardPage() {
           </div>
 
           {/* Map bottom legend row */}
-          <div className="flex flex-wrap items-center justify-center gap-6 mt-4 pt-3 border-t border-gray-150 dark:border-gray-700">
+          <div className="flex flex-wrap items-center justify-center gap-6 mt-4 pt-3 border-t border-slate-100 dark:border-gray-700">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 bg-green-500 rounded-full" />
               <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Sẵn sàng</span>
@@ -539,7 +539,7 @@ export default function RescueTeamDashboardPage() {
         </div>
 
         {/* Right Column: Rescue Teams List */}
-        <div className="lg:col-span-5 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+        <div className="lg:col-span-5 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700 flex flex-col h-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-gray-900 dark:text-white">
               Danh sách đội cứu hộ
@@ -566,7 +566,7 @@ export default function RescueTeamDashboardPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Tất cả trạng thái</option>
               <option value="AVAILABLE">Sẵn sàng</option>
@@ -578,7 +578,7 @@ export default function RescueTeamDashboardPage() {
             <select
               value={teamTypeFilter}
               onChange={(e) => setTeamTypeFilter(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Tất cả phân loại</option>
               <option value="PCCC">PCCC</option>
@@ -615,11 +615,11 @@ export default function RescueTeamDashboardPage() {
                         alert('Đây là đội cứu hộ mẫu trực quan.');
                       }
                     }}
-                    className="group relative bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750 hover:border-gray-300 dark:hover:border-gray-600 p-3 rounded-xl transition-all shadow-sm hover:shadow flex items-start justify-between gap-3 text-left cursor-pointer"
+                    className="group relative bg-white dark:bg-gray-900 border border-slate-100 dark:border-slate-700/60 hover:border-gray-300 dark:hover:border-gray-600 p-3 rounded-xl transition-all shadow-sm hover:shadow flex items-start justify-between gap-3 text-left cursor-pointer"
                   >
                     {/* Left: Avatar Logo & details */}
                     <div className="flex gap-3 text-left">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-50 dark:bg-gray-800 border border-gray-150 dark:border-gray-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-all">
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-50 dark:bg-gray-800 border border-slate-100 dark:border-gray-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-all">
                         {team.logoUrl ? (
                           <img
                             src={team.logoUrl}
@@ -687,7 +687,7 @@ export default function RescueTeamDashboardPage() {
                         </button>
 
                         {activeMenuId === team.id && (
-                          <div className="absolute right-0 bottom-full mb-1 bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-700 rounded-xl shadow-lg py-1.5 min-w-[120px] z-30">
+                          <div className="absolute right-0 bottom-full mb-1 bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 rounded-xl shadow-lg py-1.5 min-w-[120px] z-30">
                             <button
                               onClick={() => {
                                 if (team.isDb) {
@@ -722,7 +722,7 @@ export default function RescueTeamDashboardPage() {
                             {team.isDb && (
                               <button
                                 onClick={() => handleDelete(team.id)}
-                                className="w-full text-left px-3 py-1.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-1.5 border-t border-gray-100 dark:border-gray-750"
+                                className="w-full text-left px-3 py-1.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-1.5 border-t border-slate-100 dark:border-slate-700/60"
                               >
                                 <Trash2 size={14} />
                                 Xóa đội
@@ -745,7 +745,7 @@ export default function RescueTeamDashboardPage() {
         {/* Left Side: Performance Metrics & Donut Chart */}
         <div className="xl:col-span-6 space-y-6">
           {/* Activity Metrics (30 days) */}
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-gray-900 dark:text-white">
                 Thống kê hoạt động (30 ngày qua)
@@ -757,7 +757,7 @@ export default function RescueTeamDashboardPage() {
 
             <div className="grid grid-cols-2 gap-4">
               {/* Box 1: Nhiệm vụ */}
-              <div className="bg-slate-50/50 dark:bg-gray-900 border border-gray-100 dark:border-gray-750 p-4 rounded-xl flex items-center gap-3">
+              <div className="bg-slate-50/50 dark:bg-gray-900 border border-slate-100 dark:border-slate-700/60 p-4 rounded-xl flex items-center gap-3">
                 <div className="p-2.5 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-lg">
                   <CheckCircle2 size={20} />
                 </div>
@@ -769,7 +769,7 @@ export default function RescueTeamDashboardPage() {
               </div>
 
               {/* Box 2: Người được cứu */}
-              <div className="bg-slate-50/50 dark:bg-gray-900 border border-gray-100 dark:border-gray-750 p-4 rounded-xl flex items-center gap-3">
+              <div className="bg-slate-50/50 dark:bg-gray-900 border border-slate-100 dark:border-slate-700/60 p-4 rounded-xl flex items-center gap-3">
                 <div className="p-2.5 bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 rounded-lg">
                   <Heart size={20} />
                 </div>
@@ -781,7 +781,7 @@ export default function RescueTeamDashboardPage() {
               </div>
 
               {/* Box 3: Giờ hoạt động */}
-              <div className="bg-slate-50/50 dark:bg-gray-900 border border-gray-100 dark:border-gray-750 p-4 rounded-xl flex items-center gap-3">
+              <div className="bg-slate-50/50 dark:bg-gray-900 border border-slate-100 dark:border-slate-700/60 p-4 rounded-xl flex items-center gap-3">
                 <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-lg">
                   <Clock size={20} />
                 </div>
@@ -793,7 +793,7 @@ export default function RescueTeamDashboardPage() {
               </div>
 
               {/* Box 4: Thiết bị */}
-              <div className="bg-slate-50/50 dark:bg-gray-900 border border-gray-100 dark:border-gray-750 p-4 rounded-xl flex items-center gap-3">
+              <div className="bg-slate-50/50 dark:bg-gray-900 border border-slate-100 dark:border-slate-700/60 p-4 rounded-xl flex items-center gap-3">
                 <div className="p-2.5 bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 rounded-lg">
                   <Wrench size={20} />
                 </div>
@@ -807,7 +807,7 @@ export default function RescueTeamDashboardPage() {
           </div>
 
           {/* Classification Donut Chart */}
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700">
             <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4">
               Phân loại đội cứu hộ
             </h2>
@@ -944,7 +944,7 @@ export default function RescueTeamDashboardPage() {
         </div>
 
         {/* Right Side: Recent Emergency Tasks */}
-        <div className="xl:col-span-6 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+        <div className="xl:col-span-6 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700 flex flex-col h-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-gray-900 dark:text-white">
               Nhiệm vụ gần đây (SOS)
@@ -969,7 +969,7 @@ export default function RescueTeamDashboardPage() {
               recentSosData.map((sos: any) => {
                 const isResolved = sos.status === 'RESOLVED' || sos.status === 'COMPLETED';
                 return (
-                  <div key={sos.id} className="flex items-start justify-between gap-3 border-b border-gray-100 dark:border-gray-750 pb-3.5 last:border-b-0 last:pb-0">
+                  <div key={sos.id} className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-700/60 pb-3.5 last:border-b-0 last:pb-0">
                     <div className="flex gap-3">
                       <div className={cn(
                         "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",

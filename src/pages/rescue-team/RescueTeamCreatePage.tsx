@@ -74,7 +74,6 @@ export default function RescueTeamCreatePage() {
 
   const provinceIdStr = watch('provinceId');
   const provinceId = provinceIdStr ? Number(provinceIdStr) : undefined;
-  const teamType = watch('teamType');
   const selectedSpecs = watch('specializationIds') || [];
 
   // Pre-populate province from user profile when provinces are loaded
@@ -194,7 +193,7 @@ export default function RescueTeamCreatePage() {
       <div className="flex items-center">
         <Link
           to={ROUTES.RESCUE_TEAM_LIST}
-          className="p-1.5 rounded-xl bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white border border-gray-200 dark:border-gray-750 shadow-sm transition-all flex items-center gap-1.5 text-xs font-bold"
+          className="p-1.5 rounded-xl bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white border border-gray-200 dark:border-slate-700/60 shadow-sm transition-all flex items-center gap-1.5 text-xs font-bold"
         >
           <ArrowLeft size={14} />
           <span>Quay lại</span>
@@ -210,7 +209,7 @@ export default function RescueTeamCreatePage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {/* Basic Information Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 space-y-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-100 dark:border-gray-700 space-y-4">
 
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -340,7 +339,7 @@ export default function RescueTeamCreatePage() {
         </div>
 
         {/* Location Coordinates Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-gray-100 dark:border-gray-700 space-y-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-100 dark:border-gray-700 space-y-4">
 
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -375,7 +374,7 @@ export default function RescueTeamCreatePage() {
         </div>
 
         {/* Specializations Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-gray-150 dark:border-gray-750 space-y-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-100 dark:border-slate-700/60 space-y-4">
           <div className="space-y-1.5 text-left relative">
             <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
               Chuyên môn sở hữu * <span className="text-gray-400 font-normal">(Chọn nhiều từ danh sách)</span>
@@ -384,7 +383,7 @@ export default function RescueTeamCreatePage() {
             {/* Combo box trigger */}
             <div
               onClick={() => setIsSpecDropdownOpen(!isSpecDropdownOpen)}
-              className="w-full min-h-[38px] px-3.5 py-2 rounded-xl text-xs border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-950 dark:text-white focus:outline-none cursor-pointer flex flex-wrap gap-1.5 items-center justify-between shadow-sm hover:border-gray-300 dark:hover:border-gray-600 transition-all"
+              className="w-full min-h-[38px] px-3.5 py-2 rounded-xl text-xs border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-950 dark:text-white focus:outline-none cursor-pointer flex flex-wrap gap-1.5 items-center justify-between shadow-sm hover:border-gray-300 dark:hover:border-gray-600 transition-all"
             >
               {selectedSpecs.length === 0 ? (
                 <span className="text-gray-400 font-medium">-- Chọn chuyên môn của đội --</span>
@@ -417,7 +416,7 @@ export default function RescueTeamCreatePage() {
                 {/* Backdrop to close */}
                 <div className="fixed inset-0 z-10" onClick={() => { setIsSpecDropdownOpen(false); setSpecSearch(''); }} />
                 
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-750 rounded-xl shadow-lg p-2.5 z-20 space-y-2 max-h-60 overflow-y-auto">
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-gray-800 border border-slate-100 dark:border-slate-700/60 rounded-xl shadow-lg p-2.5 z-20 space-y-2 max-h-60 overflow-y-auto">
                   {/* Search input */}
                   <input
                     type="text"
@@ -474,7 +473,7 @@ export default function RescueTeamCreatePage() {
         <div className="flex justify-end gap-3 pt-3">
           <Link
             to={ROUTES.RESCUE_TEAM_LIST}
-            className="px-5 py-2 border border-gray-250 dark:border-gray-650 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold text-xs shadow-sm transition-all"
+            className="px-5 py-2 border border-slate-200 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold text-xs shadow-sm transition-all"
           >
             Hủy
           </Link>

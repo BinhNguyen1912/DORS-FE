@@ -90,8 +90,8 @@ export default function ImageUpload({
       <div
         onClick={() => fileInputRef.current?.click()}
         className={cn(
-          'relative w-full h-32 rounded-xl border border-dashed border-gray-250 dark:border-gray-700 bg-slate-50/30 dark:bg-gray-900/50 hover:bg-slate-50 dark:hover:bg-gray-900 cursor-pointer flex flex-col items-center justify-center gap-2 p-4 transition-all overflow-hidden group',
-          value && 'border-solid border-gray-200 dark:border-gray-750'
+          'relative w-full h-32 rounded-xl border border-dashed border-slate-200 dark:border-gray-700 bg-slate-50/30 dark:bg-gray-900/50 hover:bg-slate-50 dark:hover:bg-gray-900 cursor-pointer flex flex-col items-center justify-center gap-2 p-4 transition-all overflow-hidden group',
+          value && 'border-solid border-gray-200 dark:border-slate-700/60'
         )}
       >
         <input

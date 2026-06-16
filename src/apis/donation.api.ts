@@ -7,6 +7,7 @@ export const donationApi = {
     limit?: number;
     status?: string;
     type?: string;
+    search?: string;
   }): Promise<PaginatedResponse<Donation>> => {
     // Return mock empty data as the backend endpoint is not yet implemented
     return {

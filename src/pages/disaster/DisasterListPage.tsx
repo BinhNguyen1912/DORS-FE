@@ -21,19 +21,21 @@ const statusColors = {
 };
 
 export default function DisasterListPage() {
+  const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [severity, setSeverity] = useState('');
   const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['disasters', page, status, severity],
+    queryKey: ['disasters', page, status, severity, searchQuery],
     queryFn: () =>
       disasterApi.getAll({
         page,
         limit: 10,
         status: status || undefined,
         severity: severity || undefined,
+        search: searchQuery || undefined,
       }),
   });
 
@@ -65,7 +67,9 @@ export default function DisasterListPage() {
             <input
               type="text"
               placeholder="Search disasters..."
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500"
             />
           </div>
           <select

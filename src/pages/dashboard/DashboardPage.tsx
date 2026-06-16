@@ -181,7 +181,7 @@ function RecentActivity() {
         {disasters?.data?.map((disaster) => (
           <div
             key={disaster.id}
-            className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
+            className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-gray-700 last:border-0"
           >
             <div className="flex items-center gap-3">
               <div

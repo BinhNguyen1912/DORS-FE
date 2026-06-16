@@ -5,9 +5,7 @@ import {
   Plus,
   Edit,
   Trash2,
-  Sliders,
   ChevronLeft,
-  Info,
 } from 'lucide-react';
 import { rescueTeamApi } from '../../apis';
 import { ROUTES } from '../../constants';
@@ -157,7 +155,7 @@ export default function TeamSpecializationListPage() {
   return (
     <div className="space-y-4 text-left">
       {/* Top Header & Breadcrumbs & Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-gray-100 dark:border-gray-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-slate-100 dark:border-gray-800">
         <div className="text-left">
           <h1 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight mb-0.5">Danh sách Chuyên môn</h1>
           <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
@@ -187,14 +185,14 @@ export default function TeamSpecializationListPage() {
       </div>
 
       {/* Filter Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-150 dark:border-gray-750 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm">
         <div className="relative">
           <input
             type="text"
             placeholder="Tìm kiếm chuyên môn..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium"
           />
         </div>
 
@@ -202,7 +200,7 @@ export default function TeamSpecializationListPage() {
           <select
             value={teamTypeFilter}
             onChange={(e) => setTeamTypeFilter(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
           >
             <option value="">Tất cả phân loại đội</option>
             <option value="PCCC">PCCC</option>
@@ -216,11 +214,11 @@ export default function TeamSpecializationListPage() {
       </div>
 
       {/* Main Table view */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-750 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
-              <tr className="border-b border-gray-150 dark:border-gray-750 text-gray-500 dark:text-gray-400 font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
+              <tr className="border-b border-slate-100 dark:border-slate-700/60 text-gray-500 dark:text-gray-400 font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
                 <th className="py-3.5 px-4 w-12 text-center">STT</th>
                 <th className="py-3.5 px-4">Tên Chuyên Môn</th>
                 <th className="py-3.5 px-4">Loại Đội Áp Dụng</th>
@@ -229,7 +227,7 @@ export default function TeamSpecializationListPage() {
                 <th className="py-3.5 px-4 text-center w-24">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-750/50 text-gray-700 dark:text-gray-300">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-gray-700 dark:text-gray-300">
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-gray-400">
@@ -306,8 +304,8 @@ export default function TeamSpecializationListPage() {
       {/* Save Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md border border-gray-150 dark:border-gray-750 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-gray-100 dark:border-gray-750">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md border border-slate-100 dark:border-slate-700/60 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-700">
               <h3 className="text-sm font-extrabold text-gray-900 dark:text-white mb-0">
                 {editingSpec ? 'Cập nhật Chuyên môn' : 'Thêm Chuyên môn mới'}
               </h3>
@@ -324,7 +322,7 @@ export default function TeamSpecializationListPage() {
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="Ví dụ: Cứu hộ cứu nạn đường thủy..."
-                    className="w-full px-3 py-2 rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
                   />
                 </div>
 
@@ -334,7 +332,7 @@ export default function TeamSpecializationListPage() {
                   <select
                     value={formTeamType}
                     onChange={(e) => setFormTeamType(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
                   >
                     <option value="TONG_HOP">Tổng hợp</option>
                     <option value="PCCC">PCCC</option>
@@ -353,7 +351,7 @@ export default function TeamSpecializationListPage() {
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     placeholder="Mô tả cụ thể phạm vi hoạt động hoặc chuyên môn..."
-                    className="w-full px-3 py-2 rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
                   />
                 </div>
 
@@ -364,7 +362,7 @@ export default function TeamSpecializationListPage() {
                     id="isActive"
                     checked={formIsActive}
                     onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="w-4 h-4 rounded text-amber-500 border-gray-350 focus:ring-amber-500"
+                    className="w-4 h-4 rounded text-amber-500 border-slate-300 focus:ring-amber-500"
                   />
                   <label htmlFor="isActive" className="font-bold text-gray-700 dark:text-gray-300 select-none cursor-pointer">
                     Kích hoạt hoạt động (Cho phép các đội cứu hộ chọn lựa chuyên môn này)
@@ -372,11 +370,11 @@ export default function TeamSpecializationListPage() {
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-50/50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-750 flex justify-end gap-2">
+              <div className="p-4 bg-slate-50/50 dark:bg-gray-900/30 border-t border-slate-100 dark:border-slate-700/60 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-gray-250 dark:border-gray-650 text-gray-750 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-bold transition-all"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-gray-750 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-700 rounded-xl font-bold transition-all"
                 >
                   Hủy
                 </button>

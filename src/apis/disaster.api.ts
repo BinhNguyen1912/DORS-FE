@@ -8,6 +8,7 @@ export const disasterApi = {
     type?: string;
     status?: string;
     severity?: string;
+    search?: string;
   }): Promise<PaginatedResponse<DisasterEvent>> => {
     // Return mock empty data as the backend endpoint is not yet implemented
     return {

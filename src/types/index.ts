@@ -9,6 +9,46 @@ export interface User {
   adminUnitId?: number;
   createdAt: string;
   updatedAt: string;
+  isActive?: boolean;
+  
+  // Additional fields from backend UserEntity
+  nationalId?: string;
+  nationalIdVerified?: boolean;
+  dateOfBirth?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  phoneVerified?: boolean;
+  emailVerified?: boolean;
+  avatarUrl?: string;
+  nationalIdFrontUrl?: string;
+  nationalIdBackUrl?: string;
+  addressDetail?: string;
+  homeLocation?: {
+    type: 'Point';
+    coordinates: [number, number];
+  };
+  currentLocation?: {
+    type: 'Point';
+    coordinates: [number, number];
+  };
+  trustScore?: number;
+  isVerified?: boolean;
+  isVolunteer?: boolean;
+  needsHelp?: boolean;
+  userRoles?: {
+    id: number;
+    userId: number;
+    roleId: number;
+    provinceId: number;
+    isActive: boolean;
+    role?: {
+      id: number;
+      name: string;
+      description?: string;
+      level: number;
+      isSystem: boolean;
+      isActive: boolean;
+    };
+  }[];
 }
 
 export interface AuthResponse {
@@ -83,6 +123,9 @@ export interface RescueTeam {
   rescuedCount?: number;
   hoursActive?: number;
   logoUrl?: string | null;
+  leader?: User | null;
+  leaderCitizenName?: string;
+  specializations?: any[];
   createdAt: string;
   updatedAt: string;
 }
@@ -157,3 +200,33 @@ export interface AdministrativeUnit {
   code: string;
   name: string;
 }
+
+export interface Role {
+  id: number;
+  name: string;
+  description?: string;
+  level: number;
+  isSystem: boolean;
+  isActive: boolean;
+  provinceId?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RescueTeamMember {
+  id: number;
+  teamId: number;
+  userId: number | null;
+  citizenName: string | null;
+  citizenPhone: string | null;
+  roleInTeam: 'LEADER' | 'DEPUTY_LEADER' | 'MEMBER';
+  joinedAt: string;
+  leftAt?: string;
+  isActive: boolean;
+  specializationIds: number[];
+  missionsCount: number;
+  rescuedCount: number;
+  hoursActive: number;
+  user?: User | null;
+}
+

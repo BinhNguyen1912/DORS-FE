@@ -147,7 +147,7 @@ export default function HouseholdDetailPage() {
 
 function DetailRow({ label, value }: { label: string; value: any }) {
   return (
-    <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+    <div className="flex justify-between py-2 border-b border-slate-100 dark:border-gray-700 last:border-0">
       <span className="text-gray-500 dark:text-gray-400">{label}</span>
       <span className="font-medium text-gray-900 dark:text-white">{value}</span>
     </div>

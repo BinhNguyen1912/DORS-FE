@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link, useNavigate, useOutletContext } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -69,7 +69,7 @@ interface UnifiedRescueTeam {
 }
 
 export default function RescueTeamListPage() {
-  const { searchQuery, setSearchQuery } = useOutletContext<{ searchQuery: string; setSearchQuery: (val: string) => void }>();
+  const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [teamTypeFilter, setTeamTypeFilter] = useState('');
   
@@ -198,7 +198,7 @@ export default function RescueTeamListPage() {
   return (
     <div className="space-y-4">
       {/* Top Header & Breadcrumbs & Add Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-gray-100 dark:border-gray-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-slate-100 dark:border-gray-800">
         <div className="text-left">
           <h1 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight mb-0.5">{RESCUE_TEXTS.TITLE_LIST}</h1>
           <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
@@ -227,14 +227,14 @@ export default function RescueTeamListPage() {
       </div>
 
       {/* Filter Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-150 dark:border-gray-750 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm">
         <div className="relative">
           <input
             type="text"
             placeholder={RESCUE_TEXTS.SEARCH_PLACEHOLDER}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium"
           />
         </div>
 
@@ -242,7 +242,7 @@ export default function RescueTeamListPage() {
           <select
             value={teamTypeFilter}
             onChange={(e) => setTeamTypeFilter(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
           >
             <option value="">{RESCUE_TEXTS.SELECT_TYPE_ALL}</option>
             <option value="PCCC">PCCC</option>
@@ -257,7 +257,7 @@ export default function RescueTeamListPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-250 dark:border-gray-650 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
           >
             <option value="">{RESCUE_TEXTS.SELECT_STATUS_ALL}</option>
             <option value="AVAILABLE">Sẵn sàng</option>
@@ -278,11 +278,11 @@ export default function RescueTeamListPage() {
       </div>
 
       {/* Main Table view */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-750 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
-              <tr className="border-b border-gray-150 dark:border-gray-750 text-gray-500 dark:text-gray-400 font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
+              <tr className="border-b border-slate-100 dark:border-slate-700/60 text-gray-500 dark:text-gray-400 font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
                 <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_CODE}</th>
                 <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_NAME}</th>
                 <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_TYPE}</th>
@@ -293,7 +293,7 @@ export default function RescueTeamListPage() {
                 <th className="py-3.5 px-4 text-center w-28">{RESCUE_TEXTS.COL_ACTIONS}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-750/50 text-gray-700 dark:text-gray-300">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-gray-700 dark:text-gray-300">
               {isLoading ? (
                 <tr>
                   <td colSpan={8} className="py-16 text-center text-gray-400">
@@ -403,7 +403,7 @@ export default function RescueTeamListPage() {
         </div>
 
         {/* Pagination & Count footer */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-gray-100 dark:border-gray-750 select-none bg-slate-50/50 dark:bg-gray-900/20">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-slate-100 dark:border-slate-700/60 select-none bg-slate-50/50 dark:bg-gray-900/20">
           <div className="text-xs text-gray-500 dark:text-gray-400 font-semibold">
             Hiển thị <span className="text-gray-900 dark:text-white">{paginatedTeams.length}</span> trên <span className="text-gray-900 dark:text-white">{filteredTeams.length}</span> kết quả
           </div>
@@ -413,7 +413,7 @@ export default function RescueTeamListPage() {
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 dark:text-gray-405 dark:hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 transition-all shadow-sm"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer"
             >
               <ChevronsLeft size={14} />
             </button>
@@ -422,7 +422,7 @@ export default function RescueTeamListPage() {
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 dark:text-gray-405 dark:hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 transition-all shadow-sm"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer"
             >
               <ChevronLeft size={14} />
             </button>
@@ -433,10 +433,10 @@ export default function RescueTeamListPage() {
                 key={page}
                 onClick={() => setCurrentPage(page)}
                 className={cn(
-                  'w-7 h-7 rounded-lg text-xs font-bold transition-all border',
+                  'w-7 h-7 rounded-lg text-xs font-bold transition-all border cursor-pointer',
                   currentPage === page
                     ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                    : 'bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 border-gray-250 dark:border-gray-700 dark:text-gray-400'
+                    : 'bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 border-slate-200 dark:border-slate-700 dark:text-gray-400'
                 )}
               >
                 {page}
@@ -447,7 +447,7 @@ export default function RescueTeamListPage() {
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 dark:text-gray-405 dark:hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 transition-all shadow-sm"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer"
             >
               <ChevronRight size={14} />
             </button>
@@ -456,7 +456,7 @@ export default function RescueTeamListPage() {
             <button
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 dark:text-gray-405 dark:hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 transition-all shadow-sm"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer"
             >
               <ChevronsRight size={14} />
             </button>
