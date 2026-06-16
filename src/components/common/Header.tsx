@@ -2,7 +2,7 @@ import { Search, Bell, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useAuthStore } from '../../stores';
 
 interface HeaderProps {
-  title: string;
+  title: React.ReactNode;
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   searchValue?: string;

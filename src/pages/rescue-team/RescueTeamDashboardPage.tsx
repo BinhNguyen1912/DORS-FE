@@ -997,13 +997,13 @@ export default function RescueTeamDashboardPage() {
                       <span className={cn(
                         "px-2 py-0.5 text-[9px] font-extrabold rounded-full border uppercase",
                         sos.status === 'PENDING' ? "bg-red-50 text-red-700 border-red-200" :
-                        sos.status === 'ASSIGNED' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                        sos.status === 'RESOLVED' ? "bg-green-50 text-green-700 border-green-200" :
-                        "bg-amber-50 text-amber-700 border-amber-200"
+                          sos.status === 'ASSIGNED' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                            sos.status === 'RESOLVED' ? "bg-green-50 text-green-700 border-green-200" :
+                              "bg-amber-50 text-amber-700 border-amber-200"
                       )}>
                         {sos.status === 'PENDING' ? 'Chờ xử lý' :
-                         sos.status === 'ASSIGNED' ? 'Đã điều phối' :
-                         sos.status === 'RESOLVED' ? 'Hoàn thành' : sos.status}
+                          sos.status === 'ASSIGNED' ? 'Đã điều phối' :
+                            sos.status === 'RESOLVED' ? 'Hoàn thành' : sos.status}
                       </span>
                     </div>
                   </div>

@@ -86,6 +86,14 @@ export const rescueTeamApi = {
           : [];
   },
 
+  updateSosStatus: async (
+    id: number,
+    data: { status: string; resolutionNotes?: string }
+  ): Promise<any> => {
+    const response = await api.patch<any>(`/sos-requests/${id}/status`, data);
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
+
   delete: async (id: number): Promise<void> => {
     await api.delete(`/rescue-teams/${id}`);
   },

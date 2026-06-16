@@ -15,6 +15,7 @@ import {
   Plus,
   ChevronDown,
   ChevronRight,
+  Map,
 } from 'lucide-react';
 import { useAuthStore, toast } from '../stores';
 import { ROUTES } from '../constants';
@@ -29,7 +30,7 @@ export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const sidebarRef = useRef<HTMLElement>(null);
-  
+
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -65,7 +66,7 @@ export default function MainLayout() {
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
-      
+
       // Close mobile sidebar if clicked outside
       if (sidebarOpen && sidebarRef.current && !sidebarRef.current.contains(target)) {
         const mobileToggleBtn = document.querySelector('[data-mobile-toggle]');
@@ -145,11 +146,19 @@ export default function MainLayout() {
     }
     if (pathname === ROUTES.DISASTER_LIST) {
       return {
-        title: 'Tình hình thiên tai',
-        subtitle: 'Danh sách các điểm sạt lở, lũ lụt',
-        icon: <AlertTriangle size={20} />,
+        title: (
+          <div className="flex items-center gap-2">
+            <span>BẢN ĐỒ CỨU HỘ TÌNH HUỐNG THIÊN TAI</span>
+            <span className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-extrabold bg-red-650 text-white rounded-full animate-pulse flex-shrink-0">
+              <span className="w-1.5 h-1.5 bg-white rounded-full" />
+              LIVE
+            </span>
+          </div>
+        ),
+        subtitle: 'Bản đồ cứu hộ và điều phối cứu nạn',
+        icon: <Map size={20} />,
         showSearch: true,
-        searchPlaceholder: 'Tìm kiếm điểm sự cố...',
+        searchPlaceholder: 'Tìm kiếm địa điểm, đội, SOS...',
       };
     }
     if (pathname === ROUTES.DONATION_LIST) {
@@ -237,7 +246,7 @@ export default function MainLayout() {
               collapsed ? "h-9 w-9 mx-auto" : "h-13 w-full justify-start"
             )}>
               <img
-                src={collapsed 
+                src={collapsed
                   ? "https://pub-2c2241596f28433bb00bedb6391e5d78.r2.dev/assets/logo-focus.png"
                   : "https://pub-2c2241596f28433bb00bedb6391e5d78.r2.dev/assets/logo.png"
                 }
@@ -288,7 +297,7 @@ export default function MainLayout() {
                       isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
                     )}
                   </button>
-                  
+
                   {isExpanded && !collapsed && (
                     <div className="pl-6 space-y-1 mt-1 border-l border-slate-850 ml-4">
                       {item.children!.map((child) => {
@@ -437,11 +446,11 @@ export default function MainLayout() {
           onSearchChange={setSearchQuery}
           showSearch={true}
         />
-        
+
         {/* Outlet with shared search state context */}
         <div className="pt-2.5 pb-4 px-4 lg:pt-3 lg:pb-5 lg:px-5 flex-1 flex flex-col relative overflow-hidden">
           {/* Watermark Background Layer to handle the checkerboard image */}
-          <div 
+          <div
             className={cn(
               "fixed top-0 bottom-0 right-0 pointer-events-none bg-[url('https://pub-2c2241596f28433bb00bedb6391e5d78.r2.dev/assets/bg-main.png')] bg-no-repeat bg-[position:right_-300px_top_-300px] bg-[size:850px_850px] opacity-[0.12] mix-blend-multiply dark:mix-blend-screen dark:opacity-[0.18] transition-all duration-300 z-0",
               collapsed ? "lg:left-16 left-0" : "lg:left-60 left-0"
