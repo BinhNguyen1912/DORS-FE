@@ -9,13 +9,13 @@ import {
   LayoutDashboard,
   Users,
   Home,
-  AlertTriangle,
   Heart,
   Shield,
   Plus,
   ChevronDown,
   ChevronRight,
   Map,
+  Settings,
 } from 'lucide-react';
 import { useAuthStore, toast } from '../stores';
 import { ROUTES } from '../constants';
@@ -181,11 +181,19 @@ export default function MainLayout() {
     }
     if (pathname === ROUTES.ROLE_LIST) {
       return {
-        title: 'Quản lý Chức danh (Role)',
+        title: 'Quản lý Chức danh',
         subtitle: 'Danh mục vai trò & phân quyền hệ thống',
         icon: <Shield size={20} />,
         showSearch: true,
         searchPlaceholder: 'Tìm kiếm vai trò...',
+      };
+    }
+    if (pathname === ROUTES.SETTINGS) {
+      return {
+        title: 'Cấu hình hệ thống',
+        subtitle: 'Quản lý và cấu hình các thiết lập toàn hệ thống',
+        icon: <Settings size={20} />,
+        showSearch: false,
       };
     }
 
@@ -203,7 +211,7 @@ export default function MainLayout() {
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-gray-950 flex">
       {/* Mobile Top Bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-50 text-white">
+      <div className="lg:hidden layout-mobile-topbar fixed top-0 left-0 right-0 h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-50 text-white">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           data-mobile-toggle
@@ -299,7 +307,7 @@ export default function MainLayout() {
                   </button>
 
                   {isExpanded && !collapsed && (
-                    <div className="pl-6 space-y-1 mt-1 border-l border-slate-850 ml-4">
+                    <div className="pl-4 space-y-1 mt-1 border-l border-slate-800 ml-[19px]">
                       {item.children!.map((child) => {
                         const isChildActive = location.pathname === child.href;
                         return (
@@ -308,13 +316,21 @@ export default function MainLayout() {
                             to={child.href}
                             onClick={() => setSidebarOpen(false)}
                             className={cn(
-                              'flex items-center rounded-lg px-3 py-1.5 font-semibold text-[11px] transition-all',
+                              'group flex items-center rounded-lg px-3 py-1.5 font-semibold text-xs transition-all duration-200',
                               isChildActive
-                                ? 'text-amber-505 font-bold bg-amber-600/5'
+                                ? 'text-amber-500 font-bold bg-amber-600/10'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-850/40'
                             )}
                           >
-                            {child.label}
+                            <span
+                              className={cn(
+                                'w-1.5 h-1.5 rounded-full mr-2.5 transition-all duration-300 flex-shrink-0',
+                                isChildActive
+                                  ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
+                                  : 'bg-slate-650 group-hover:bg-slate-400'
+                              )}
+                            />
+                            <span className="truncate">{child.label}</span>
                           </Link>
                         );
                       })}

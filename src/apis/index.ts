@@ -7,4 +7,5 @@ export { locationApi } from './location.api';
 export { rescueTeamMemberApi } from './rescue-team-member.api';
 export { userApi } from './user.api';
 export { roleApi } from './role.api';
+export { settingsApi } from './settings.api';
 

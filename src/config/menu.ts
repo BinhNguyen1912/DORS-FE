@@ -37,5 +37,5 @@ export const menuItems: MenuItem[] = [
   { label: 'Nhân lực & Tình nguyện', href: '#/volunteer', icon: UserCheck },
   { label: 'Thiết bị & Phương tiện', href: '#/equipment', icon: Truck },
   { label: 'Báo cáo & Thống kê', href: '#/reports', icon: BarChart2 },
-  { label: 'Cài đặt hệ thống', href: '#/settings', icon: Settings },
+  { label: 'Cài đặt hệ thống', href: ROUTES.SETTINGS, icon: Settings },
 ];

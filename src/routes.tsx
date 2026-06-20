@@ -28,6 +28,7 @@ import DonationListPage from './pages/donation/DonationListPage';
 import DonationCampaignPage from './pages/donation/DonationCampaignPage';
 import UserListPage from './pages/categories/UserListPage';
 import RoleListPage from './pages/categories/RoleListPage';
+import SystemSettingsPage from './pages/settings/SystemSettingsPage';
 
 
 // Protected Route Component
@@ -199,6 +200,14 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.ROLE_LIST,
         element: <RoleListPage />,
+      },
+      {
+        path: ROUTES.SETTINGS,
+        element: (
+          <FeatureGuard route={ROUTES.SETTINGS}>
+            <SystemSettingsPage />
+          </FeatureGuard>
+        ),
       },
     ],
   },

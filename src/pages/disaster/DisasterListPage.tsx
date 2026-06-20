@@ -172,8 +172,8 @@ export default function DisasterListPage() {
         severity: (sos.severity || 'MEDIUM') as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
         lat,
         lng,
-        location: sos.adminUnit?.name 
-          ? `${sos.adminUnit.name}, ${provinceName}` 
+        location: sos.adminUnit?.name
+          ? `${sos.adminUnit.name}, ${provinceName}`
           : (sos.description || 'Hiện trường SOS'),
         time: new Date(sos.createdAt || sos.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(sos.createdAt || sos.created_at).toLocaleDateString('vi-VN'),
         sender: sos.requesterName || 'Người dân',
@@ -506,7 +506,7 @@ export default function DisasterListPage() {
     if (showSos) {
       filteredSosRequests.forEach((sos) => {
         const marker = L.marker([sos.lat, sos.lng], { icon: getSosIcon(sos.severity) });
-        
+
         const popupContent = `
           <div class="p-2 w-56 text-left font-sans text-xs">
             <div class="flex items-center justify-between border-b border-slate-200 pb-1.5 mb-2">
@@ -544,7 +544,7 @@ export default function DisasterListPage() {
     if (showTeams) {
       filteredTeams.forEach((team) => {
         const marker = L.marker([team.lat, team.lng], { icon: getTeamIcon(team.teamType, team.status) });
-        
+
         const typeLabels: Record<string, string> = {
           PCCC: 'Đội PCCC & CNCH',
           Y_TE: 'Đội Y Tế Cấp Cứu',
@@ -569,7 +569,7 @@ export default function DisasterListPage() {
             </span>
           </div>
         `, { className: 'custom-theme-popup' });
-        
+
         group.addLayer(marker);
       });
     }
@@ -625,7 +625,7 @@ export default function DisasterListPage() {
     const pending = list.filter(s => s.status === 'PENDING').length;
     const active = list.filter(s => s.status === 'DISPATCHED' || s.status === 'ON_SITE').length;
     const completed = list.filter(s => s.status === 'RESOLVED').length;
-    
+
     return { total, pending, active, completed };
   }, [parsedSosRequests]);
 
@@ -671,7 +671,7 @@ export default function DisasterListPage() {
   const quickStats = useMemo(() => {
     const list = parsedSosRequests;
     const now = new Date().getTime();
-    
+
     const newSosCount = list.filter(s => {
       const created = new Date(s.time.split(' ')[1]?.split('/').reverse().join('-') || '').getTime();
       return now - created < 24 * 60 * 60 * 1000;
@@ -704,7 +704,7 @@ export default function DisasterListPage() {
             <AlertTriangle size={20} />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase leading-none">Tổng SOS ({provinceName})</p>
+            <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase leading-none">Tổng SOS</p>
             <p className="text-xl font-extrabold text-gray-900 dark:text-white mt-1 leading-none">{stats.total}</p>
             <p className="text-[9px] text-blue-600 dark:text-blue-400 font-semibold mt-1 flex items-center gap-0.5 leading-none">
               <span>Hệ thống thực tế</span>
@@ -756,7 +756,7 @@ export default function DisasterListPage() {
             <Users size={20} />
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase leading-none">Đội cứu hộ ({provinceName})</p>
+            <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase leading-none">Đội cứu hộ</p>
             <p className="text-xl font-extrabold text-gray-900 dark:text-white mt-1 leading-none">{parsedTeams.length}</p>
             <p className="text-[9px] text-red-600 dark:text-red-400 font-semibold mt-1 flex items-center gap-0.5 leading-none">
               <span>{parsedTeams.filter(t => t.status === 'BUSY' || t.status === 'ON_DUTY').length} đang làm nhiệm vụ</span>
@@ -781,11 +781,11 @@ export default function DisasterListPage() {
       {/* 2. MIDDLE GRID: MAP & FILTERS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
         {/* Left Map Container - Swaps styling conditionally for fullscreen support */}
-        <div 
+        <div
           className={cn(
             "border rounded-2xl flex flex-col relative overflow-hidden transition-all duration-300 shadow-sm",
-            isMapFullscreen 
-              ? "absolute inset-0 z-[50] bg-white dark:bg-gray-950 border-slate-200 dark:border-slate-800 p-4 h-full w-full rounded-none" 
+            isMapFullscreen
+              ? "absolute inset-0 z-[50] bg-white dark:bg-gray-950 border-slate-200 dark:border-slate-800 p-4 h-full w-full rounded-none"
               : showSidebar
                 ? "lg:col-span-9 bg-white dark:bg-gray-800 border-slate-100 dark:border-gray-700 p-3 h-[680px]"
                 : "lg:col-span-12 bg-white dark:bg-gray-800 border-slate-100 dark:border-gray-700 p-3 h-[680px]"
@@ -793,34 +793,34 @@ export default function DisasterListPage() {
         >
           {/* Tile switch control */}
           <div className="absolute top-6 left-6 flex bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 z-10 font-bold text-xs select-none shadow">
-            <button 
+            <button
               onClick={() => setActiveTileType('streets')}
               className={cn(
                 "px-3 py-1 rounded-md transition cursor-pointer",
-                activeTileType === 'streets' 
-                  ? "bg-slate-100 dark:bg-gray-800 text-gray-900 dark:text-white font-bold shadow-sm" 
+                activeTileType === 'streets'
+                  ? "bg-slate-100 dark:bg-gray-800 text-gray-900 dark:text-white font-bold shadow-sm"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               )}
             >
               Bản đồ
             </button>
-            <button 
+            <button
               onClick={() => setActiveTileType('satellite')}
               className={cn(
                 "px-3 py-1 rounded-md transition cursor-pointer",
-                activeTileType === 'satellite' 
-                  ? "bg-slate-100 dark:bg-gray-800 text-gray-900 dark:text-white font-bold shadow-sm" 
+                activeTileType === 'satellite'
+                  ? "bg-slate-100 dark:bg-gray-800 text-gray-900 dark:text-white font-bold shadow-sm"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               )}
             >
               Vệ tinh
             </button>
-            <button 
+            <button
               onClick={() => setActiveTileType('terrain')}
               className={cn(
                 "px-3 py-1 rounded-md transition cursor-pointer",
-                activeTileType === 'terrain' 
-                  ? "bg-slate-100 dark:bg-gray-800 text-gray-900 dark:text-white font-bold shadow-sm" 
+                activeTileType === 'terrain'
+                  ? "bg-slate-100 dark:bg-gray-800 text-gray-900 dark:text-white font-bold shadow-sm"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               )}
             >
@@ -832,25 +832,25 @@ export default function DisasterListPage() {
 
           {/* Map Controls */}
           <div className="absolute top-6 right-6 flex flex-col gap-2 z-10">
-            <button 
+            <button
               className="p-2.5 bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white shadow transition"
               onClick={() => setIsMapFullscreen(!isMapFullscreen)}
               title={isMapFullscreen ? "Thu nhỏ màn hình" : "Phóng to màn hình"}
             >
               {isMapFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
-            
-            <button 
+
+            <button
               className="p-2.5 bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white shadow transition cursor-pointer"
               title="Lớp bản đồ"
             >
               <Layers size={16} />
             </button>
-            <button 
+            <button
               className={cn(
                 "p-2.5 border rounded-xl shadow transition duration-200 cursor-pointer",
-                showSidebar 
-                  ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-850 text-blue-600 dark:text-blue-400" 
+                showSidebar
+                  ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-850 text-blue-600 dark:text-blue-400"
                   : "bg-white dark:bg-gray-900 border-slate-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800"
               )}
               onClick={() => setShowSidebar(!showSidebar)}
@@ -859,11 +859,11 @@ export default function DisasterListPage() {
               <Filter size={16} />
             </button>
             {isMapFullscreen && (
-              <button 
+              <button
                 className={cn(
                   "p-2.5 border rounded-xl shadow transition duration-200 cursor-pointer",
-                  showStatsOverlay 
-                    ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-850 text-blue-600 dark:text-blue-400" 
+                  showStatsOverlay
+                    ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-850 text-blue-600 dark:text-blue-400"
                     : "bg-white dark:bg-gray-900 border-slate-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800"
                 )}
                 onClick={() => setShowStatsOverlay(!showStatsOverlay)}
@@ -872,7 +872,7 @@ export default function DisasterListPage() {
                 <Activity size={16} />
               </button>
             )}
-            <button 
+            <button
               className="p-2.5 bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white shadow transition cursor-pointer"
               onClick={requestUserLocation}
               title="Vị trí của tôi"
@@ -880,15 +880,15 @@ export default function DisasterListPage() {
               <Compass size={16} />
             </button>
             <hr className="border-slate-200 dark:border-slate-700 my-0.5" />
-            
-            <button 
+
+            <button
               className="p-2.5 bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white shadow transition font-extrabold"
               onClick={() => mapRef.current?.zoomIn()}
               title="Phóng to"
             >
               <ZoomIn size={16} />
             </button>
-            <button 
+            <button
               className="p-2.5 bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white shadow transition font-extrabold"
               onClick={() => mapRef.current?.zoomOut()}
               title="Thu nhỏ"
@@ -917,7 +917,7 @@ export default function DisasterListPage() {
 
           {/* FLOATING TOP STATS OVERLAY IN FULLSCREEN */}
           {isMapFullscreen && showStatsOverlay && (
-            <div 
+            <div
               className={cn(
                 "absolute top-6 left-6 bg-white/95 dark:bg-gray-900/95 border border-slate-200 dark:border-slate-700 shadow-lg rounded-2xl py-3 px-5 z-[1001] flex items-center justify-between select-none animate-fade-in text-gray-800 dark:text-white backdrop-blur-md transition-all duration-300",
                 showSidebar ? "right-[420px]" : "right-24"
@@ -931,7 +931,7 @@ export default function DisasterListPage() {
                 </div>
               </div>
               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
-              
+
               <div className="flex items-center gap-3 flex-1 justify-center min-w-0">
                 <span className="p-2 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl flex-shrink-0"><Clock size={18} /></span>
                 <div className="truncate text-left">
@@ -940,7 +940,7 @@ export default function DisasterListPage() {
                 </div>
               </div>
               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
-              
+
               <div className="flex items-center gap-3 flex-1 justify-center min-w-0">
                 <span className="p-2 bg-sky-50 dark:bg-sky-950/40 text-sky-650 dark:text-sky-450 rounded-xl flex-shrink-0"><Activity size={18} /></span>
                 <div className="truncate text-left">
@@ -949,7 +949,7 @@ export default function DisasterListPage() {
                 </div>
               </div>
               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
-              
+
               <div className="flex items-center gap-3 flex-1 justify-center min-w-0">
                 <span className="p-2 bg-green-50 dark:bg-green-950/40 text-green-650 dark:text-green-400 rounded-xl flex-shrink-0"><CheckCircle2 size={18} /></span>
                 <div className="truncate text-left">
@@ -958,7 +958,7 @@ export default function DisasterListPage() {
                 </div>
               </div>
               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
-              
+
               <div className="flex items-center gap-3 flex-1 justify-center min-w-0">
                 <span className="p-2 bg-red-50 dark:bg-red-950/40 text-red-650 dark:text-red-400 rounded-xl flex-shrink-0"><Users size={18} /></span>
                 <div className="truncate text-left">
@@ -967,7 +967,7 @@ export default function DisasterListPage() {
                 </div>
               </div>
               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
-              
+
               <div className="flex items-center gap-3 flex-1 justify-center min-w-0">
                 <span className="p-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400 rounded-xl flex-shrink-0"><Truck size={18} /></span>
                 <div className="truncate text-left">
@@ -976,8 +976,8 @@ export default function DisasterListPage() {
                 </div>
               </div>
               <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
-              
-              <button 
+
+              <button
                 onClick={() => setShowStatsOverlay(false)}
                 className="p-1 hover:bg-slate-100 dark:hover:bg-gray-750 text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-white rounded transition cursor-pointer flex-shrink-0 ml-2"
                 title="Đóng thanh thống kê"
@@ -992,7 +992,7 @@ export default function DisasterListPage() {
             <div className="absolute top-6 right-20 bottom-6 w-80 bg-white/95 dark:bg-gray-900/95 border border-slate-200 dark:border-slate-700 shadow rounded-2xl p-4 z-[1001] flex flex-col gap-4 overflow-y-auto no-scrollbar text-gray-800 dark:text-white backdrop-blur">
               <div className="flex flex-col text-left">
                 <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2 mb-3 border-slate-250">
-                  <button 
+                  <button
                     onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
                     className="flex items-center gap-1.5 text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider hover:opacity-80 transition cursor-pointer select-none"
                   >
@@ -1000,7 +1000,7 @@ export default function DisasterListPage() {
                     <span>Bộ lọc bản đồ</span>
                     {isFiltersExpanded ? <ChevronDown size={12} className="text-gray-400" /> : <ChevronRight size={12} className="text-gray-400" />}
                   </button>
-                  <button 
+                  <button
                     onClick={() => setShowSidebar(false)}
                     className="p-1 hover:bg-slate-100 dark:hover:bg-gray-750 text-gray-450 dark:text-gray-500 hover:text-gray-800 dark:hover:text-white rounded transition cursor-pointer"
                     title="Đóng bộ lọc & danh sách"
@@ -1008,7 +1008,7 @@ export default function DisasterListPage() {
                     <X size={12} />
                   </button>
                 </div>
-                
+
                 {isFiltersExpanded && (
                   <div className="space-y-2.5 text-left">
                     <div>
@@ -1031,7 +1031,7 @@ export default function DisasterListPage() {
                         <option value="Ngập nhẹ (Thấp)">Ngập nhẹ (Thấp)</option>
                       </select>
                     </div>
-                    
+
                     <div className="pt-2 border-t border-slate-200 dark:border-slate-700 text-[11px] font-bold text-gray-700 dark:text-gray-300 space-y-1.5">
                       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Hiển thị lớp dữ liệu</p>
                       <div className="grid grid-cols-2 gap-1.5">
@@ -1057,7 +1057,7 @@ export default function DisasterListPage() {
                 <div className="flex items-center justify-between pb-2 mb-2 flex-shrink-0">
                   <h3 className="text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider">SOS trong khu vực</h3>
                 </div>
-                
+
                 <div className="space-y-1.5 overflow-y-auto pr-1 flex-1 no-scrollbar text-xs">
                   {filteredSosRequests.length === 0 ? (
                     <div className="py-8 text-center text-xs font-semibold text-gray-400">Không có yêu cầu SOS</div>
@@ -1113,7 +1113,7 @@ export default function DisasterListPage() {
           <div className="lg:col-span-3 flex flex-col gap-4 h-[680px]">
             <div className="bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-700 rounded-2xl p-4 text-left flex flex-col shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2 mb-3.5 select-none">
-                <button 
+                <button
                   onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
                   className="flex items-center gap-1.5 text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider hover:opacity-80 transition cursor-pointer"
                 >
@@ -1127,7 +1127,7 @@ export default function DisasterListPage() {
                     setSelectedSeverity('Tất cả');
                     setSelectedTeamStatus('Tất cả');
                   }}>Đặt lại</button>
-                  <button 
+                  <button
                     onClick={() => setShowSidebar(false)}
                     className="p-1 hover:bg-slate-100 dark:hover:bg-gray-750 text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-white rounded transition cursor-pointer"
                     title="Đóng bộ lọc & danh sách"
@@ -1213,7 +1213,7 @@ export default function DisasterListPage() {
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2 mb-2 flex-shrink-0">
                 <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider">SOS trong khu vực</h3>
               </div>
-              
+
               <div className="space-y-2 overflow-y-auto pr-1 flex-1 no-scrollbar">
                 {filteredSosRequests.length === 0 ? (
                   <div className="py-8 text-center text-xs font-semibold text-gray-500">Không có yêu cầu SOS nào</div>

@@ -1,23 +1,26 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Plus,
-  Eye,
-  Edit,
-  Trash2,
-  Users,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from 'lucide-react';
+
 import { rescueTeamApi } from '../../apis';
 import { ROUTES } from '../../constants';
 import { RESCUE_TEXTS } from '../../constants/rescueTexts';
 import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
 import ConfirmDeleteModal from '../../components/common/ConfirmDeleteModal';
+import TableSettings from '../../components/common/TableSettings';
+import type { TableColumnDef } from '../../components/common/TableSettings';
+
+const RESCUE_TEAM_COLUMNS: TableColumnDef[] = [
+  { key: 'code', label: 'Mã Đội' },
+  { key: 'name', label: 'Tên Đội Cứu Hộ' },
+  { key: 'teamType', label: 'Loại Đội' },
+  { key: 'address', label: 'Địa Chỉ' },
+  { key: 'memberCount', label: 'Thành viên' },
+  { key: 'status', label: 'Trạng Thái' },
+  { key: 'activeMissions', label: 'Nhiệm Vụ' },
+  { key: 'actions', label: 'Thao Tác', alwaysVisible: true },
+];
 
 // Types mapping and colors matching the screenshot
 const teamTypeLabels: Record<string, string> = {
@@ -72,13 +75,28 @@ export default function RescueTeamListPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [teamTypeFilter, setTeamTypeFilter] = useState('');
-  
+
   // Modal delete state
   const [deleteTeamId, setDeleteTeamId] = useState<number | null>(null);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // Table column configuration
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('rescue_team_table_columns');
+    return saved ? JSON.parse(saved) : {
+      code: true,
+      name: true,
+      teamType: true,
+      address: true,
+      memberCount: true,
+      status: true,
+      activeMissions: true,
+      actions: true,
+    };
+  });
 
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -197,106 +215,100 @@ export default function RescueTeamListPage() {
 
   return (
     <div className="space-y-4">
-      {/* Top Header & Breadcrumbs & Add Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-slate-100 dark:border-gray-800">
-        <div className="text-left">
-          <h1 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight mb-0.5">{RESCUE_TEXTS.TITLE_LIST}</h1>
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
-            <span>{RESCUE_TEXTS.BREADCRUMB_HOME}</span>
-            <span>&gt;</span>
-            <span>{RESCUE_TEXTS.BREADCRUMB_TEAM}</span>
-            <span>&gt;</span>
-            <span className="text-amber-500 font-semibold">Danh sách</span>
+      {/* Filter Row & Actions */}
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 flex-1">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder={RESCUE_TEXTS.SEARCH_PLACEHOLDER}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium"
+            />
+          </div>
+
+          <div>
+            <select
+              value={teamTypeFilter}
+              onChange={(e) => setTeamTypeFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold cursor-pointer"
+            >
+              <option value="">{RESCUE_TEXTS.SELECT_TYPE_ALL}</option>
+              <option value="PCCC">PCCC</option>
+              <option value="Y_TE">Y tế</option>
+              <option value="DAN_PHONG">Dân phòng</option>
+              <option value="QUAN_SU">Quân sự</option>
+              <option value="TINH_NGUYEN">Tình nguyện</option>
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold cursor-pointer"
+            >
+              <option value="">{RESCUE_TEXTS.SELECT_STATUS_ALL}</option>
+              <option value="AVAILABLE">Sẵn sàng</option>
+              <option value="BUSY">Đang làm nhiệm vụ</option>
+              <option value="STANDBY">Dự phòng</option>
+              <option value="OFF_DUTY">Ngoại tuyến</option>
+            </select>
+          </div>
+
+          <div>
+            <select
+              disabled
+              className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-slate-100/50 dark:bg-gray-900/50 text-gray-450 focus:outline-none cursor-not-allowed font-semibold"
+            >
+              <option value="">{RESCUE_TEXTS.SELECT_AREA_ALL}</option>
+            </select>
           </div>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+
+        <div className="flex items-center gap-2">
           <Link
             to={ROUTES.TEAM_SPECIALIZATION_LIST}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 font-bold text-xs rounded-xl shadow-sm transition-all"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 font-bold text-xs rounded-xl shadow-sm transition-all"
           >
             Quản lý Chuyên môn
           </Link>
           <Link
             to={ROUTES.RESCUE_TEAM_CREATE}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500/90 hover:bg-amber-600/90 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all"
           >
-            <Plus size={14} />
+            <i className="fa-solid fa-plus text-[11px]"></i>
             {RESCUE_TEXTS.BTN_ADD_TEAM}
           </Link>
-        </div>
-      </div>
-
-      {/* Filter Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder={RESCUE_TEXTS.SEARCH_PLACEHOLDER}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium"
+          <TableSettings
+            columns={RESCUE_TEAM_COLUMNS}
+            visibleColumns={visibleColumns}
+            onChange={setVisibleColumns as any}
+            storageKey="rescue_team_table_columns"
           />
         </div>
-
-        <div>
-          <select
-            value={teamTypeFilter}
-            onChange={(e) => setTeamTypeFilter(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
-          >
-            <option value="">{RESCUE_TEXTS.SELECT_TYPE_ALL}</option>
-            <option value="PCCC">PCCC</option>
-            <option value="Y_TE">Y tế</option>
-            <option value="DAN_PHONG">Dân phòng</option>
-            <option value="QUAN_SU">Quân sự</option>
-            <option value="TINH_NGUYEN">Tình nguyện</option>
-          </select>
-        </div>
-
-        <div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold"
-          >
-            <option value="">{RESCUE_TEXTS.SELECT_STATUS_ALL}</option>
-            <option value="AVAILABLE">Sẵn sàng</option>
-            <option value="BUSY">Đang làm nhiệm vụ</option>
-            <option value="STANDBY">Dự phòng</option>
-            <option value="OFF_DUTY">Ngoại tuyến</option>
-          </select>
-        </div>
-
-        <div>
-          <select
-            disabled
-            className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-slate-100/50 dark:bg-gray-900/50 text-gray-400 focus:outline-none cursor-not-allowed font-semibold"
-          >
-            <option value="">{RESCUE_TEXTS.SELECT_AREA_ALL}</option>
-          </select>
-        </div>
       </div>
-
       {/* Main Table view */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-700/60 text-gray-500 dark:text-gray-400 font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
-                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_CODE}</th>
-                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_NAME}</th>
-                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_TYPE}</th>
-                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_AREA}</th>
-                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_MEMBERS}</th>
-                <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_STATUS}</th>
-                <th className="py-3.5 px-4 text-center">{RESCUE_TEXTS.COL_MISSIONS}</th>
-                <th className="py-3.5 px-4 text-center w-28">{RESCUE_TEXTS.COL_ACTIONS}</th>
+              <tr className="border-b border-slate-100 dark:border-slate-700/60 text-black dark:text-white font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
+                {visibleColumns.code !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_CODE}</th>}
+                {visibleColumns.name !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_NAME}</th>}
+                {visibleColumns.teamType !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_TYPE}</th>}
+                {visibleColumns.address !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_AREA}</th>}
+                {visibleColumns.memberCount !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_MEMBERS}</th>}
+                {visibleColumns.status !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_STATUS}</th>}
+                {visibleColumns.activeMissions !== false && <th className="py-3.5 px-4 text-center">{RESCUE_TEXTS.COL_MISSIONS}</th>}
+                {visibleColumns.actions !== false && <th className="py-3.5 px-4 text-center w-28">{RESCUE_TEXTS.COL_ACTIONS}</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-gray-700 dark:text-gray-300">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-black dark:text-white">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-gray-400">
+                  <td colSpan={Object.values(visibleColumns).filter(v => v !== false).length} className="py-16 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
                       <p className="font-semibold text-xs">Đang tải danh sách đội cứu hộ...</p>
@@ -305,7 +317,7 @@ export default function RescueTeamListPage() {
                 </tr>
               ) : paginatedTeams.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-gray-400 font-semibold">
+                  <td colSpan={Object.values(visibleColumns).filter(v => v !== false).length} className="py-16 text-center text-gray-400 font-semibold">
                     Không tìm thấy đội cứu hộ nào phù hợp
                   </td>
                 </tr>
@@ -320,80 +332,97 @@ export default function RescueTeamListPage() {
                       className="group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors"
                     >
                       {/* Code */}
-                      <td className="py-4 px-4 font-mono font-bold text-gray-500 dark:text-gray-400">
-                        {team.code}
-                      </td>
+                      {visibleColumns.code !== false && (
+                        <td className="py-4 px-4 font-mono text-black dark:text-white font-normal">
+                          {team.code}
+                        </td>
+                      )}
 
                       {/* Name */}
-                      <td className="py-4 px-4 font-bold text-gray-900 dark:text-white max-w-[200px] truncate">
-                        {team.name}
-                      </td>
+                      {visibleColumns.name !== false && (
+                        <td className="py-4 px-4 text-black dark:text-white font-normal max-w-[200px] truncate">
+                          {team.name}
+                        </td>
+                      )}
 
                       {/* Team Type Badge */}
-                      <td className="py-4 px-4">
-                        <span className={cn(
-                          'px-2 py-0.5 text-[10px] font-bold rounded-lg uppercase tracking-wide',
-                          typeStyle.bg
-                        )}>
-                          {teamTypeLabels[team.teamType] || team.teamType}
-                        </span>
-                      </td>
+                      {visibleColumns.teamType !== false && (
+                        <td className="py-4 px-4 font-normal">
+                          <span className={cn(
+                            'px-2 py-0.5 text-[10px] font-normal rounded-lg uppercase tracking-wide border whitespace-nowrap',
+                            typeStyle.bg
+                          )}>
+                            {teamTypeLabels[team.teamType] || team.teamType}
+                          </span>
+                        </td>
+                      )}
 
                       {/* Area of Duty */}
-                      <td className="py-4 px-4 text-gray-500 dark:text-gray-400 font-semibold">
-                        {team.address}
-                      </td>
+                      {visibleColumns.address !== false && (
+                        <td className="py-4 px-4 text-black dark:text-white font-normal">
+                          {team.address}
+                        </td>
+                      )}
 
                       {/* Members */}
-                      <td className="py-4 px-4 text-gray-600 dark:text-gray-300 font-bold flex items-center gap-1.5 mt-2">
-                        <Users size={12} className="text-gray-400" />
-                        {team.memberCount}
-                      </td>
+                      {visibleColumns.memberCount !== false && (
+                        <td className="py-4 px-4 text-black dark:text-white font-normal">
+                          <span className="flex items-center gap-1.5 whitespace-nowrap">
+                            <i className="fa-solid fa-users text-gray-400 text-[12px]"></i>
+                            {team.memberCount}
+                          </span>
+                        </td>
+                      )}
 
                       {/* Status Badge */}
-                      <td className="py-4 px-4">
-                        <span className={cn(
-                          'px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase',
-                          statusColor
-                        )}>
-                          {statusLabels[team.status] || team.status}
-                        </span>
-                      </td>
+                      {visibleColumns.status !== false && (
+                        <td className="py-4 px-4 font-normal">
+                          <span className={cn(
+                            'px-2.5 py-0.5 text-[10px] font-normal rounded-full uppercase whitespace-nowrap',
+                            statusColor
+                          )}>
+                            {statusLabels[team.status] || team.status}
+                          </span>
+                        </td>
+                      )}
 
                       {/* Active Missions */}
-                      <td className="py-4 px-4 text-center font-bold text-gray-800 dark:text-slate-200">
-                        {team.activeMissions}
-                      </td>
+                      {visibleColumns.activeMissions !== false && (
+                        <td className="py-4 px-4 text-center text-black dark:text-white font-normal">
+                          {team.activeMissions}
+                        </td>
+                      )}
 
-                      {/* Actions - Hover triggers transition to show button icons directly */}
-                      <td className="py-4 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                          {/* View detail & edit now go to detail page */}
-                          <button
-                            onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
-                            title={RESCUE_TEXTS.BTN_VIEW_DETAIL}
-                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 text-blue-500 hover:text-blue-600 rounded-lg transition-all"
-                          >
-                            <Eye size={14} />
-                          </button>
-                          
-                          <button
-                            onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
-                            title={RESCUE_TEXTS.BTN_EDIT}
-                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 text-amber-500 hover:text-amber-600 rounded-lg transition-all"
-                          >
-                            <Edit size={14} />
-                          </button>
+                      {/* Actions */}
+                      {visibleColumns.actions !== false && (
+                        <td className="py-4 px-4 text-center font-normal">
+                          <div className="flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                            <button
+                              onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
+                              title={RESCUE_TEXTS.BTN_VIEW_DETAIL}
+                              className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all"
+                            >
+                              <i className="fa-solid fa-eye text-[13px] text-blue-500 hover:text-blue-600"></i>
+                            </button>
 
-                          <button
-                            onClick={() => setDeleteTeamId(team.id)}
-                            title={RESCUE_TEXTS.BTN_DELETE}
-                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 hover:text-red-600 rounded-lg transition-all"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
+                            <button
+                              onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
+                              title={RESCUE_TEXTS.BTN_EDIT}
+                              className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all"
+                            >
+                              <i className="fa-solid fa-pen text-[13px] text-amber-500 hover:text-amber-600"></i>
+                            </button>
+
+                            <button
+                              onClick={() => setDeleteTeamId(team.id)}
+                              title={RESCUE_TEXTS.BTN_DELETE}
+                              className="p-1.5 hover:bg-red-55/10 rounded-lg transition-all"
+                            >
+                              <i className="fa-solid fa-trash text-[13px] text-red-550 hover:text-red-650"></i>
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -413,18 +442,18 @@ export default function RescueTeamListPage() {
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer flex items-center justify-center"
             >
-              <ChevronsLeft size={14} />
+              <i className="fa-solid fa-angles-left text-[11px]"></i>
             </button>
 
             {/* Prev Page */}
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer flex items-center justify-center"
             >
-              <ChevronLeft size={14} />
+              <i className="fa-solid fa-chevron-left text-[11px]"></i>
             </button>
 
             {/* Page Numbers */}
@@ -433,7 +462,7 @@ export default function RescueTeamListPage() {
                 key={page}
                 onClick={() => setCurrentPage(page)}
                 className={cn(
-                  'w-7 h-7 rounded-lg text-xs font-bold transition-all border cursor-pointer',
+                  'w-7 h-7 rounded-lg text-xs font-bold transition-all border cursor-pointer flex items-center justify-center',
                   currentPage === page
                     ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
                     : 'bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 border-slate-200 dark:border-slate-700 dark:text-gray-400'
@@ -447,18 +476,18 @@ export default function RescueTeamListPage() {
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer flex items-center justify-center"
             >
-              <ChevronRight size={14} />
+              <i className="fa-solid fa-chevron-right text-[11px]"></i>
             </button>
 
             {/* Last Page */}
             <button
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800/40 text-gray-500 hover:text-gray-900 disabled:opacity-30 transition-all shadow-sm cursor-pointer flex items-center justify-center"
             >
-              <ChevronsRight size={14} />
+              <i className="fa-solid fa-angles-right text-[11px]"></i>
             </button>
           </div>
         </div>

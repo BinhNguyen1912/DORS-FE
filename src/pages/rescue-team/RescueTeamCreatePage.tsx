@@ -10,6 +10,7 @@ import { cn } from '../../lib/utils';
 import type { Province, AdministrativeUnit } from '../../types';
 import { useAuthStore, toast } from '../../stores';
 import ImageUpload from '../../components/common/ImageUpload';
+import LocationPickerMap from '../../components/rescue-team/LocationPickerMap';
 
 // Zod validation schema matching backend inputs (treated as strings from HTML elements, cast on submission)
 const rescueTeamSchema = z.object({
@@ -75,6 +76,8 @@ export default function RescueTeamCreatePage() {
   const provinceIdStr = watch('provinceId');
   const provinceId = provinceIdStr ? Number(provinceIdStr) : undefined;
   const selectedSpecs = watch('specializationIds') || [];
+
+
 
   // Pre-populate province from user profile when provinces are loaded
   useEffect(() => {
@@ -338,40 +341,19 @@ export default function RescueTeamCreatePage() {
           </div>
         </div>
 
-        {/* Location Coordinates Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-100 dark:border-gray-700 space-y-4">
-
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Vĩ Độ (Latitude) */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
-                Vĩ độ (Latitude)
-              </label>
-              <input
-                type="number"
-                step="any"
-                {...register('latitude')}
-                placeholder="Ví dụ: 16.0678"
-                className="w-full px-3.5 py-2 rounded-xl text-xs border border-gray-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
-              />
-            </div>
-
-            {/* Kinh Độ (Longitude) */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
-                Kinh độ (Longitude)
-              </label>
-              <input
-                type="number"
-                step="any"
-                {...register('longitude')}
-                placeholder="Ví dụ: 108.2208"
-                className="w-full px-3.5 py-2 rounded-xl text-xs border border-gray-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all"
-              />
-            </div>
-          </div>
-        </div>
+        {/* Location Coordinates Card with Interactive Map */}
+        <LocationPickerMap
+          latitude={watch('latitude')}
+          longitude={watch('longitude')}
+          onChange={(lat, lng) => {
+            setValue('latitude', lat);
+            setValue('longitude', lng);
+          }}
+          provinceId={provinceId}
+          adminUnitId={watch('adminUnitId')}
+          provinces={provinces}
+          wards={wards}
+        />
 
         {/* Specializations Card */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-100 dark:border-slate-700/60 space-y-4">

@@ -24,4 +24,5 @@ export const ROUTES = {
   DONATION_CAMPAIGN: '/donation/campaign',
   USER_LIST: '/categories/users',
   ROLE_LIST: '/categories/roles',
+  SETTINGS: '/settings',
 } as const;

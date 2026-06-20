@@ -1,24 +1,38 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Plus,
-  Edit,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { roleApi } from '../../apis';
 import { cn } from '../../lib/utils';
 import { toast } from '../../stores';
 import ConfirmDeleteModal from '../../components/common/ConfirmDeleteModal';
 import type { Role } from '../../types';
+import TableSettings from '../../components/common/TableSettings';
+import type { TableColumnDef } from '../../components/common/TableSettings';
+
+const ROLE_COLUMNS: TableColumnDef[] = [
+  { key: 'name', label: 'Tên Chức Danh' },
+  { key: 'description', label: 'Mô Tả' },
+  { key: 'level', label: 'Cấp độ (Level)' },
+  { key: 'isSystem', label: 'Loại vai trò' },
+  { key: 'isActive', label: 'Trạng Thái' },
+];
 
 export default function RoleListPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Table column configuration
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('role_table_columns');
+    return saved ? JSON.parse(saved) : {
+      name: true,
+      description: true,
+      level: true,
+      isSystem: true,
+      isActive: true,
+    };
+  });
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -146,36 +160,30 @@ export default function RoleListPage() {
 
   return (
     <div className="space-y-4 text-left">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 border-b border-slate-100 dark:border-gray-800">
-        <div>
-          <h1 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight mb-0.5">Danh sách Chức danh (Role)</h1>
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
-            <span>Danh mục tổng</span>
-            <span>&gt;</span>
-            <span className="text-amber-500 font-semibold">Chức danh (role)</span>
-          </div>
-        </div>
-        <div>
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all"
-          >
-            <Plus size={14} />
-            Thêm Chức danh
-          </button>
-        </div>
-      </div>
-
       {/* Filter Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm">
-        <div className="relative">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm">
+        <div className="relative flex-1 max-w-xs">
           <input
             type="text"
             placeholder="Tìm kiếm chức danh..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleOpenCreate}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500/90 hover:bg-amber-600/90 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all"
+          >
+            <i className="fa-solid fa-plus text-[11px]"></i>
+            Thêm Chức danh
+          </button>
+          <TableSettings
+            columns={ROLE_COLUMNS}
+            visibleColumns={visibleColumns}
+            onChange={setVisibleColumns}
+            storageKey="role_table_columns"
           />
         </div>
       </div>
@@ -185,20 +193,20 @@ export default function RoleListPage() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-700/60 text-gray-500 dark:text-gray-400 font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
+              <tr className="border-b border-slate-100 dark:border-slate-700/60 text-black dark:text-white font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
                 <th className="py-3.5 px-4 w-12 text-center">STT</th>
-                <th className="py-3.5 px-4">Tên Chức Danh</th>
-                <th className="py-3.5 px-4">Mô Tả</th>
-                <th className="py-3.5 px-4 text-center">Cấp độ (Level)</th>
-                <th className="py-3.5 px-4 text-center">Loại vai trò</th>
-                <th className="py-3.5 px-4 text-center">Trạng Thái</th>
+                {visibleColumns.name !== false && <th className="py-3.5 px-4">Tên Chức Danh</th>}
+                {visibleColumns.description !== false && <th className="py-3.5 px-4">Mô Tả</th>}
+                {visibleColumns.level !== false && <th className="py-3.5 px-4 text-center">Cấp độ (Level)</th>}
+                {visibleColumns.isSystem !== false && <th className="py-3.5 px-4 text-center">Loại vai trò</th>}
+                {visibleColumns.isActive !== false && <th className="py-3.5 px-4 text-center">Trạng Thái</th>}
                 <th className="py-3.5 px-4 text-center w-24">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-gray-700 dark:text-gray-300">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-black dark:text-white">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-gray-400">
+                  <td colSpan={2 + Object.values(visibleColumns).filter(v => v !== false).length} className="py-16 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
                       <p className="font-semibold text-xs">Đang tải danh sách chức danh...</p>
@@ -207,7 +215,7 @@ export default function RoleListPage() {
                 </tr>
               ) : filteredRoles.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-gray-400 font-semibold">
+                  <td colSpan={2 + Object.values(visibleColumns).filter(v => v !== false).length} className="py-16 text-center text-gray-400 font-semibold">
                     Không tìm thấy chức danh nào phù hợp
                   </td>
                 </tr>
@@ -219,50 +227,58 @@ export default function RoleListPage() {
                       key={role.id}
                       className="group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors"
                     >
-                      <td className="py-4 px-4 text-center text-gray-400 font-semibold">{num}</td>
-                      <td className="py-4 px-4 font-bold text-gray-900 dark:text-white">{role.name}</td>
-                      <td className="py-4 px-4 text-gray-500 dark:text-gray-400 max-w-sm truncate" title={role.description}>
-                        {role.description || 'Chưa cập nhật mô tả'}
-                      </td>
-                      <td className="py-4 px-4 text-center font-bold text-gray-800 dark:text-slate-200">
-                        {role.level}
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <span className={cn(
-                          'px-2 py-0.5 text-[9px] font-bold rounded-lg border',
-                          role.isSystem
-                            ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                            : 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
-                        )}>
-                          {role.isSystem ? 'Hệ thống' : 'Tùy chỉnh'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <span className={cn(
-                          'px-2 py-0.5 text-[10px] font-bold rounded-full',
-                          role.isActive
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
-                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400'
-                        )}>
-                          {role.isActive ? 'Kích hoạt' : 'Tạm dừng'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      <td className="py-4 px-4 text-center text-black dark:text-white font-normal">{num}</td>
+                      {visibleColumns.name !== false && <td className="py-4 px-4 font-normal text-black dark:text-white">{role.name}</td>}
+                      {visibleColumns.description !== false && (
+                        <td className="py-4 px-4 text-black dark:text-white font-normal max-w-sm truncate" title={role.description}>
+                          {role.description || 'Chưa cập nhật mô tả'}
+                        </td>
+                      )}
+                      {visibleColumns.level !== false && (
+                        <td className="py-4 px-4 text-center font-normal text-black dark:text-white">
+                          {role.level}
+                        </td>
+                      )}
+                      {visibleColumns.isSystem !== false && (
+                        <td className="py-4 px-4 text-center font-normal">
+                          <span className={cn(
+                            'px-2 py-0.5 text-[9px] font-normal rounded-lg border',
+                            role.isSystem
+                              ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                              : 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
+                          )}>
+                            {role.isSystem ? 'Hệ thống' : 'Tùy chỉnh'}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.isActive !== false && (
+                        <td className="py-4 px-4 text-center font-normal">
+                          <span className={cn(
+                            'px-2 py-0.5 text-[10px] font-normal rounded-full',
+                            role.isActive
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
+                              : 'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400'
+                          )}>
+                            {role.isActive ? 'Kích hoạt' : 'Tạm dừng'}
+                          </span>
+                        </td>
+                      )}
+                      <td className="py-4 px-4 text-center font-normal">
+                        <div className="flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                           <button
                             onClick={() => handleOpenEdit(role)}
                             title="Sửa chức danh"
-                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 text-amber-500 hover:text-amber-600 rounded-lg transition-all"
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all"
                           >
-                            <Edit size={14} />
+                            <i className="fa-solid fa-pen text-[13px] text-amber-500 hover:text-amber-600"></i>
                           </button>
                           {!role.isSystem && (
                             <button
                               onClick={() => setDeleteRoleId(role.id)}
                               title="Xóa chức danh"
-                              className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 hover:text-red-600 rounded-lg transition-all"
+                              className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all"
                             >
-                              <Trash2 size={14} />
+                              <i className="fa-solid fa-trash text-[13px] text-red-500 hover:text-red-600"></i>
                             </button>
                           )}
                         </div>
@@ -337,7 +353,7 @@ export default function RoleListPage() {
                 {editingRole ? 'Cập nhật Chức danh' : 'Thêm Chức danh mới'}
               </h3>
             </div>
-            
+
             <form onSubmit={handleFormSubmit}>
               <div className="p-5 space-y-4 text-xs text-slate-700 dark:text-slate-350">
                 {/* Name */}

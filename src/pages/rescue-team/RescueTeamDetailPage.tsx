@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -96,29 +96,42 @@ export default function RescueTeamDetailPage() {
   const [citizenPhone, setCitizenPhone] = useState('');
   const [roleInTeam, setRoleInTeam] = useState<'LEADER' | 'DEPUTY_LEADER' | 'MEMBER'>('MEMBER');
   const [memberSpecIds, setMemberSpecIds] = useState<number[]>([]);
-  const [userSearchQuery, setUserSearchQuery] = useState('');
   const [searchedUsers, setSearchedUsers] = useState<User[]>([]);
   const [isUserSearchLoading, setIsUserSearchLoading] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [userDropdownSearch, setUserDropdownSearch] = useState('');
   
   // Delete/Role change loading states
   const [deleteMemberId, setDeleteMemberId] = useState<number | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [isAddLoading, setIsAddLoading] = useState(false);
 
-  // Search users
-  const handleSearchUsers = async () => {
-    if (!userSearchQuery.trim()) return;
+  // Automatically fetch user list by province with debounced search support
+  useEffect(() => {
+    if (!isAddMemberOpen || memberType !== 'user') return;
+
     setIsUserSearchLoading(true);
-    try {
-      const res = await userApi.search(userSearchQuery);
-      setSearchedUsers(res);
-    } catch (err) {
-      console.error(err);
-      toast.error('Lỗi khi tìm kiếm người dùng');
-    } finally {
-      setIsUserSearchLoading(false);
-    }
-  };
+    const delayDebounce = setTimeout(() => {
+      userApi.getAll({
+        page: 1,
+        limit: 150,
+        provinceId: team?.provinceId || undefined,
+        search: userDropdownSearch.trim() || undefined
+      }).then(res => {
+        setSearchedUsers(res.data);
+      }).catch(err => {
+        console.error('Lỗi khi tải danh sách người dùng:', err);
+      }).finally(() => {
+        setIsUserSearchLoading(false);
+      });
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [userDropdownSearch, isAddMemberOpen, memberType, team?.provinceId]);
+
+  const selectedUser = useMemo(() => {
+    return searchedUsers.find(u => u.id === selectedUserId);
+  }, [searchedUsers, selectedUserId]);
 
   // Load initial list of users
   useEffect(() => {
@@ -159,7 +172,8 @@ export default function RescueTeamDetailPage() {
       setCitizenPhone('');
       setRoleInTeam('MEMBER');
       setMemberSpecIds([]);
-      setUserSearchQuery('');
+      setUserDropdownSearch('');
+      setIsUserDropdownOpen(false);
     } catch (err: any) {
       toast.api(err, 'Lỗi khi thêm thành viên');
     } finally {
@@ -841,7 +855,7 @@ export default function RescueTeamDetailPage() {
                             <div className="p-5 space-y-4 text-xs max-h-[65vh] overflow-y-auto">
                               {/* Member Type Selection */}
                               <div className="space-y-1.5">
-                                <label className="block font-bold text-gray-700 dark:text-gray-300">Hình thức đăng ký</label>
+                                <label className="block font-bold text-black dark:text-white">Hình thức đăng ký</label>
                                 <div className="flex gap-2">
                                   <button
                                     type="button"
@@ -850,7 +864,7 @@ export default function RescueTeamDetailPage() {
                                       'flex-1 py-2 text-xs font-bold rounded-xl border transition-all',
                                       memberType === 'user'
                                         ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                                        : 'bg-slate-50/50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-750'
+                                        : 'bg-slate-50/50 dark:bg-gray-900 text-gray-550 dark:text-gray-400 border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-750'
                                     )}
                                   >
                                     Tài khoản hệ thống
@@ -862,7 +876,7 @@ export default function RescueTeamDetailPage() {
                                       'flex-1 py-2 text-xs font-bold rounded-xl border transition-all',
                                       memberType === 'citizen'
                                         ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                                        : 'bg-slate-50/50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-750'
+                                        : 'bg-slate-50/50 dark:bg-gray-900 text-gray-550 dark:text-gray-400 border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-750'
                                     )}
                                   >
                                     Đăng ký công dân tự do
@@ -872,55 +886,91 @@ export default function RescueTeamDetailPage() {
 
                               {/* Search & Select System User */}
                               {memberType === 'user' && (
-                                <div className="space-y-3 p-3 bg-slate-50/50 dark:bg-gray-900/30 border border-slate-100 dark:border-gray-700 rounded-xl">
-                                  <div className="space-y-1.5">
-                                    <label className="block font-bold text-gray-700 dark:text-gray-300">Tìm kiếm tài khoản</label>
-                                    <div className="flex gap-2">
-                                      <div className="relative flex-1">
-                                        <input
-                                          type="text"
-                                          value={userSearchQuery}
-                                          onChange={e => setUserSearchQuery(e.target.value)}
-                                          placeholder="Tên, email, số điện thoại..."
-                                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none"
-                                          onKeyDown={e => {
-                                            if (e.key === 'Enter') {
-                                              e.preventDefault();
-                                              handleSearchUsers();
-                                            }
-                                          }}
-                                        />
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={handleSearchUsers}
-                                        disabled={isUserSearchLoading}
-                                        className="px-3 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-all"
-                                      >
-                                        {isUserSearchLoading ? (
-                                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                          <Search size={14} />
-                                        )}
-                                        Tìm
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    <label className="block font-bold text-gray-700 dark:text-gray-300">Chọn người dùng *</label>
-                                    <select
-                                      value={selectedUserId || ''}
-                                      onChange={e => setSelectedUserId(Number(e.target.value) || null)}
-                                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-850 text-gray-950 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                                <div className="space-y-3 p-3 bg-slate-50/50 dark:bg-gray-900/30 border border-slate-100 dark:border-gray-700 rounded-xl text-left relative">
+                                  <div className="space-y-1.5 relative">
+                                    <label className="block font-bold text-black dark:text-white">
+                                      Chọn người dùng <span className="text-red-500 ml-1">(*)</span>
+                                    </label>
+                                    
+                                    {/* Combobox Trigger Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                                      className="w-full min-h-[38px] px-3.5 py-2 rounded-xl text-xs border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none cursor-pointer flex items-center justify-between shadow-sm hover:border-gray-300 dark:hover:border-gray-600 transition-all font-semibold"
                                     >
-                                      <option value="">-- Chọn thành viên hệ thống --</option>
-                                      {searchedUsers.map(u => (
-                                        <option key={u.id} value={u.id}>
-                                          {u.fullName} ({u.email || u.phone || u.username})
-                                        </option>
-                                      ))}
-                                    </select>
+                                      {selectedUser ? (
+                                        <div className="text-left">
+                                          <p className="font-bold text-black dark:text-white">{selectedUser.fullName}</p>
+                                          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-normal">
+                                            SĐT: {selectedUser.phone || 'Chưa rõ'} | Email: {selectedUser.email || 'Chưa rõ'}
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-450 dark:text-gray-400">-- Chọn thành viên hệ thống --</span>
+                                      )}
+                                      <span className="text-gray-450 dark:text-gray-400 text-[10px]">▼</span>
+                                    </button>
+
+                                    {/* Dropdown Panel */}
+                                    {isUserDropdownOpen && (
+                                      <>
+                                        {/* Backdrop overlay for closing */}
+                                        <div 
+                                          className="fixed inset-0 z-10" 
+                                          onClick={() => setIsUserDropdownOpen(false)} 
+                                        />
+                                        
+                                        <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-gray-850 border border-slate-200 dark:border-slate-700/60 rounded-xl shadow-lg p-2.5 z-20 space-y-2 max-h-60 overflow-y-auto text-left">
+                                          {/* Search Input inside the dropdown */}
+                                          <div className="relative">
+                                            <input
+                                              type="text"
+                                              placeholder="Tìm nhanh người dùng..."
+                                              value={userDropdownSearch}
+                                              onChange={(e) => setUserDropdownSearch(e.target.value)}
+                                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-gray-900 text-black dark:text-white placeholder-gray-400 focus:outline-none"
+                                              onClick={(e) => e.stopPropagation()}
+                                            />
+                                          </div>
+                                          
+                                          {isUserSearchLoading ? (
+                                            <div className="py-6 text-center text-gray-400 font-semibold text-xs flex items-center justify-center gap-1.5">
+                                              <div className="w-3.5 h-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                                              Đang tìm kiếm...
+                                            </div>
+                                          ) : searchedUsers.length === 0 ? (
+                                            <p className="text-[10px] text-center text-gray-400 py-4 font-semibold">Không tìm thấy kết quả</p>
+                                          ) : (
+                                            <div className="space-y-1">
+                                              {searchedUsers.map((u) => {
+                                                const isSelected = selectedUserId === u.id;
+                                                return (
+                                                  <div
+                                                    key={u.id}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setSelectedUserId(u.id);
+                                                      setIsUserDropdownOpen(false);
+                                                    }}
+                                                    className={cn(
+                                                      "p-2 rounded-lg cursor-pointer transition-all border border-transparent",
+                                                      isSelected 
+                                                        ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 font-bold" 
+                                                        : "hover:bg-slate-50 dark:hover:bg-gray-750 text-black dark:text-white font-medium"
+                                                    )}
+                                                  >
+                                                    <p className="font-bold text-xs">{u.fullName}</p>
+                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                                      SĐT: {u.phone || 'Chưa rõ'} | Email: {u.email || 'Chưa rõ'}
+                                                    </p>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               )}
@@ -929,24 +979,26 @@ export default function RescueTeamDetailPage() {
                               {memberType === 'citizen' && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-slate-50/50 dark:bg-gray-900/30 border border-slate-100 dark:border-gray-700 rounded-xl">
                                   <div className="space-y-1.5">
-                                    <label className="block font-bold text-gray-700 dark:text-gray-300">Tên công dân *</label>
+                                    <label className="block font-bold text-black dark:text-white">
+                                      Tên công dân <span className="text-red-500 ml-1">(*)</span>
+                                    </label>
                                     <input
                                       type="text"
                                       required
                                       value={citizenName}
                                       onChange={e => setCitizenName(e.target.value)}
                                       placeholder="Ví dụ: Nguyễn Văn A"
-                                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none"
+                                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none"
                                     />
                                   </div>
                                   <div className="space-y-1.5">
-                                    <label className="block font-bold text-gray-700 dark:text-gray-300">Số điện thoại</label>
+                                    <label className="block font-bold text-black dark:text-white">Số điện thoại</label>
                                     <input
                                       type="tel"
                                       value={citizenPhone}
                                       onChange={e => setCitizenPhone(e.target.value)}
                                       placeholder="Ví dụ: 0905123456"
-                                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none"
+                                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none"
                                     />
                                   </div>
                                 </div>
@@ -954,11 +1006,13 @@ export default function RescueTeamDetailPage() {
 
                               {/* Role selection */}
                               <div className="space-y-1.5">
-                                <label className="block font-bold text-gray-700 dark:text-gray-300">Vị trí trong đội *</label>
+                                <label className="block font-bold text-black dark:text-white">
+                                  Vị trí trong đội <span className="text-red-500 ml-1">(*)</span>
+                                </label>
                                 <select
                                   value={roleInTeam}
                                   onChange={e => setRoleInTeam(e.target.value as any)}
-                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
+                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold"
                                 >
                                   <option value="MEMBER">Thành viên</option>
                                   <option value="DEPUTY_LEADER">Phó đội trưởng</option>
@@ -973,7 +1027,7 @@ export default function RescueTeamDetailPage() {
 
                               {/* Member Specialization checklist */}
                               <div className="space-y-1.5">
-                                <label className="block font-bold text-gray-700 dark:text-gray-300">Chuyên môn sở hữu</label>
+                                <label className="block font-bold text-black dark:text-white">Chuyên môn sở hữu</label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-slate-100 dark:border-gray-700 rounded-xl bg-slate-50/50 dark:bg-gray-900/30">
                                   {specializations.length === 0 ? (
                                     <p className="text-[10px] text-gray-400 py-2 col-span-2 text-center">Không có chuyên môn khả dụng</p>

@@ -1,22 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Search,
-  Trash2,
-  UserCheck,
-  UserX,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Eye,
-  X,
-  User as UserIcon,
-  Filter,
-  MapPin,
-  ShieldAlert,
-  Check,
-  Pencil,
 } from 'lucide-react';
 import { userApi, locationApi } from '../../apis';
 import { cn } from '../../lib/utils';
@@ -24,10 +12,36 @@ import { toast, useAuthStore } from '../../stores';
 import ConfirmDeleteModal from '../../components/common/ConfirmDeleteModal';
 import UserFormModal from './UserFormModal';
 import type { User, Province, AdministrativeUnit } from '../../types';
+import TableSettings from '../../components/common/TableSettings';
+import type { TableColumnDef } from '../../components/common/TableSettings';
+
+const USER_COLUMNS: TableColumnDef[] = [
+  { key: 'user', label: 'Người Dùng' },
+  { key: 'dob', label: 'Ngày Sinh' },
+  { key: 'contact', label: 'Liên Hệ' },
+  { key: 'adminUnit', label: 'Đơn vị hành chính' },
+  { key: 'role', label: 'Vai Trò' },
+  { key: 'status', label: 'Trạng Thái' },
+  { key: 'nationalId', label: 'CCCD' },
+];
 
 export default function UserListPage() {
   const { user: currentUser } = useAuthStore();
   const queryClient = useQueryClient();
+
+  // Table column configuration
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('user_table_columns');
+    return saved ? JSON.parse(saved) : {
+      user: true,
+      dob: true,
+      contact: true,
+      adminUnit: true,
+      role: true,
+      status: true,
+      nationalId: true,
+    };
+  });
 
   // Filters & State
   const [searchQuery, setSearchQuery] = useState('');
@@ -395,7 +409,7 @@ export default function UserListPage() {
             type="button"
             className="flex items-center justify-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
           >
-            <Filter size={13} />
+            <i className="fa-solid fa-filter text-[11px]"></i>
             Bộ lọc
           </button>
           
@@ -405,9 +419,10 @@ export default function UserListPage() {
               setEditUser(null);
               setIsFormOpen(true);
             }}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500/90 hover:bg-amber-600/90 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
           >
-            + Thêm người dùng
+            <i className="fa-solid fa-plus text-[11px]"></i>
+            Thêm người dùng
           </button>
         </div>
       </div>
@@ -433,7 +448,7 @@ export default function UserListPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-3.5 py-2 pl-9 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all font-medium placeholder-gray-400"
               />
-              <Search size={14} className="absolute left-3 text-gray-400" />
+              <i className="fa-solid fa-magnifying-glass absolute left-3 text-gray-400 text-[12px]"></i>
             </div>
 
             {/* Role select */}
@@ -467,13 +482,21 @@ export default function UserListPage() {
             </div>
 
             {/* Clear filters action */}
-            <button 
-              type="button"
-              onClick={clearFilters}
-              className="px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-750 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm text-center"
-            >
-              Xóa lọc
-            </button>
+            <div className="flex gap-2">
+              <button 
+                type="button"
+                onClick={clearFilters}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-750 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm text-center"
+              >
+                Xóa lọc
+              </button>
+              <TableSettings
+                columns={USER_COLUMNS}
+                visibleColumns={visibleColumns}
+                onChange={setVisibleColumns}
+                storageKey="user_table_columns"
+              />
+            </div>
           </div>
 
           {/* User Table card */}
@@ -481,7 +504,7 @@ export default function UserListPage() {
             <div className="overflow-x-auto flex-1">
               <table className="w-full border-collapse text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-700/60 text-gray-500 dark:text-gray-400 font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
+                  <tr className="border-b border-slate-100 dark:border-slate-700/60 text-black dark:text-white font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
                     <th className="py-3.5 px-4 w-10 text-center">
                       <input 
                         type="checkbox"
@@ -491,20 +514,20 @@ export default function UserListPage() {
                       />
                     </th>
                     <th className="py-3.5 px-4 w-12 text-center">STT</th>
-                    <th className="py-3.5 px-4">Người Dùng</th>
-                    <th className="py-3.5 px-4">Ngày Sinh</th>
-                    <th className="py-3.5 px-4">Liên Hệ</th>
-                    <th className="py-3.5 px-4">Đơn vị hành chính</th>
-                    <th className="py-3.5 px-4">Vai Trò</th>
-                    <th className="py-3.5 px-4">Trạng Thái</th>
-                    <th className="py-3.5 px-4">CCCD</th>
+                    {visibleColumns.user !== false && <th className="py-3.5 px-4">Người Dùng</th>}
+                    {visibleColumns.dob !== false && <th className="py-3.5 px-4">Ngày Sinh</th>}
+                    {visibleColumns.contact !== false && <th className="py-3.5 px-4">Liên Hệ</th>}
+                    {visibleColumns.adminUnit !== false && <th className="py-3.5 px-4">Đơn vị hành chính</th>}
+                    {visibleColumns.role !== false && <th className="py-3.5 px-4">Vai Trò</th>}
+                    {visibleColumns.status !== false && <th className="py-3.5 px-4">Trạng Thái</th>}
+                    {visibleColumns.nationalId !== false && <th className="py-3.5 px-4">CCCD</th>}
                     <th className="py-3.5 px-4 text-center w-24">Thao Tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-gray-700 dark:text-gray-300">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-black dark:text-white">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={10} className="py-16 text-center text-gray-400">
+                      <td colSpan={3 + Object.values(visibleColumns).filter(v => v !== false).length} className="py-16 text-center text-gray-400">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
                           <p className="font-semibold text-xs">Đang tải danh sách người dùng...</p>
@@ -513,7 +536,7 @@ export default function UserListPage() {
                     </tr>
                   ) : paginatedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-16 text-center text-gray-400 font-semibold">
+                      <td colSpan={3 + Object.values(visibleColumns).filter(v => v !== false).length} className="py-16 text-center text-gray-400 font-semibold">
                         Không tìm thấy người dùng nào
                       </td>
                     </tr>
@@ -561,89 +584,102 @@ export default function UserListPage() {
                           </td>
 
                           {/* Index STT */}
-                          <td className="py-4 px-4 text-center text-gray-400 font-semibold">{num}</td>
+                          <td className="py-4 px-4 text-center text-black dark:text-white font-normal">{num}</td>
                           
                           {/* Profile details stacked */}
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-700 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                                {item.avatarUrl ? (
-                                  <img src={item.avatarUrl} alt={item.fullName} className="w-full h-full object-cover" />
-                                ) : (
-                                  item.fullName.charAt(0).toUpperCase()
-                                )}
-                              </div>
-                              <div className="text-left leading-tight">
-                                <p className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                                  {item.fullName}
-                                  {item.isVerified && (
-                                    <span 
-                                      className="w-3.5 h-3.5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[8px]" 
-                                      title="Đã xác thực"
-                                    >
-                                      ✓
-                                    </span>
+                          {visibleColumns.user !== false && (
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-700 flex items-center justify-center font-normal text-xs flex-shrink-0">
+                                  {item.avatarUrl ? (
+                                    <img src={item.avatarUrl} alt={item.fullName} className="w-full h-full object-cover" />
+                                  ) : (
+                                    item.fullName.charAt(0).toUpperCase()
                                   )}
-                                </p>
-                                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">ID: {item.id}</p>
+                                </div>
+                                <div className="text-left leading-tight">
+                                  <p className="font-normal text-black dark:text-white flex items-center gap-1.5">
+                                    {item.fullName}
+                                    {item.isVerified && (
+                                      <span 
+                                        className="w-3.5 h-3.5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[8px]" 
+                                        title="Đã xác thực"
+                                      >
+                                        ✓
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="text-[10px] text-black dark:text-white font-normal mt-0.5">ID: {item.id}</p>
+                                </div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
+                          )}
 
                           {/* Ngày sinh */}
-                          <td className="py-3 px-4 text-gray-500 dark:text-gray-400 font-semibold">
-                            {formatDate(item.dateOfBirth)}
-                          </td>
+                          {visibleColumns.dob !== false && (
+                            <td className="py-3 px-4 text-black dark:text-white font-normal">
+                              {formatDate(item.dateOfBirth)}
+                            </td>
+                          )}
 
                           {/* Contact information stacked */}
-                          <td className="py-3 px-4 text-left leading-normal font-semibold">
-                            <p className="text-gray-900 dark:text-white font-semibold">{item.phone || 'Chưa có sđt'}</p>
-                            <p className="text-[10px] text-gray-400 font-medium">{item.email || 'Chưa có email'}</p>
-                          </td>
+                          {visibleColumns.contact !== false && (
+                            <td className="py-3 px-4 text-left leading-normal font-normal">
+                              <p className="text-black dark:text-white font-normal">{item.phone || 'Chưa có sđt'}</p>
+                              <p className="text-[10px] text-black dark:text-white font-normal">{item.email || 'Chưa có email'}</p>
+                            </td>
+                          )}
 
                           {/* Đơn vị hành chính */}
-                          <td className="py-3 px-4 text-gray-500 dark:text-gray-400 font-semibold">
-                            {displayAdminUnit(item)}
-                          </td>
+                          {visibleColumns.adminUnit !== false && (
+                            <td className="py-3 px-4 text-black dark:text-white font-normal">
+                              {displayAdminUnit(item)}
+                            </td>
+                          )}
 
                           {/* Dynamic Roles badges */}
-                          <td className="py-3 px-4">
-                            <span className={cn('px-2.5 py-0.5 text-[9px] font-bold rounded-lg uppercase tracking-wider', getRoleBadge(getUserRoleName(item)))}>
-                              {getUserRoleName(item)}
-                            </span>
-                          </td>
+                          {visibleColumns.role !== false && (
+                            <td className="py-3 px-4">
+                              <span className={cn('px-2.5 py-0.5 text-[9px] font-normal rounded-lg uppercase tracking-wider whitespace-nowrap', getRoleBadge(getUserRoleName(item)))}>
+                                {getUserRoleName(item)}
+                              </span>
+                            </td>
+                          )}
 
                           {/* Status code badges */}
-                          <td className="py-3 px-4">
-                            {item.isActive ? (
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
-                                <Check size={11} className="stroke-[3]" />
-                              </span>
-                            ) : (
-                              <span className={cn('px-2.5 py-0.5 text-[9px] font-bold rounded-full inline-flex items-center gap-1.5 uppercase', statusBadgeClass)}>
-                                <span className={cn('w-1.5 h-1.5 rounded-full', dotColor)} />
-                                {statusText}
-                              </span>
-                            )}
-                          </td>
+                          {visibleColumns.status !== false && (
+                            <td className="py-3 px-4">
+                              {item.isActive ? (
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
+                                  <i className="fa-solid fa-check text-[11px] text-emerald-500"></i>
+                                </span>
+                              ) : (
+                                <span className={cn('px-2.5 py-0.5 text-[9px] font-normal rounded-full inline-flex items-center gap-1.5 uppercase', statusBadgeClass)}>
+                                  <span className={cn('w-1.5 h-1.5 rounded-full', dotColor)} />
+                                  {statusText}
+                                </span>
+                              )}
+                            </td>
+                          )}
 
                           {/* CCCD (National ID) Column */}
-                          <td className="py-3 px-4 text-gray-500 dark:text-gray-400 font-mono font-semibold">
-                            {item.nationalId || 'Chưa cập nhật'}
-                          </td>
+                          {visibleColumns.nationalId !== false && (
+                            <td className="py-3 px-4 text-black dark:text-white font-mono font-normal">
+                              {item.nationalId || 'Chưa cập nhật'}
+                            </td>
+                          )}
 
-                          {/* Action row with hover actions */}
                           <td className="py-3 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1 bg-white/20 dark:bg-slate-900/20 rounded-lg p-0.5 select-none opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedUser(item);
                                 }}
-                                className="p-1 hover:bg-slate-100 dark:hover:bg-gray-700 text-blue-500 rounded-lg transition-all"
+                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all"
                                 title="Xem chi tiết"
                               >
-                                <Eye size={13} />
+                                <i className="fa-solid fa-eye text-[13px] text-blue-500 hover:text-blue-600"></i>
                               </button>
 
                               <button
@@ -652,23 +688,22 @@ export default function UserListPage() {
                                   setEditUser(item);
                                   setIsFormOpen(true);
                                 }}
-                                className="p-1 hover:bg-slate-100 dark:hover:bg-gray-700 text-amber-500 rounded-lg transition-all"
+                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all"
                                 title="Chỉnh sửa"
                               >
-                                <Pencil size={13} />
+                                <i className="fa-solid fa-pen text-[13px] text-amber-500 hover:text-amber-600"></i>
                               </button>
                               
                               <button
                                 onClick={(e) => handleToggleStatus(item, e)}
-                                className={cn(
-                                  'p-1 rounded-lg transition-all',
-                                  item.isActive
-                                    ? 'hover:bg-amber-50 dark:hover:bg-amber-955/20 text-amber-500'
-                                    : 'hover:bg-emerald-50 dark:hover:bg-emerald-955/20 text-emerald-500'
-                                )}
+                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg transition-all"
                                 title={item.isActive ? 'Khóa hoạt động' : 'Kích hoạt'}
                               >
-                                {item.isActive ? <UserX size={13} /> : <UserCheck size={13} />}
+                                {item.isActive ? (
+                                  <i className="fa-solid fa-user-xmark text-[13px] text-amber-500 hover:text-amber-600"></i>
+                                ) : (
+                                  <i className="fa-solid fa-user-check text-[13px] text-emerald-500 hover:text-emerald-600"></i>
+                                )}
                               </button>
 
                               <button
@@ -676,10 +711,10 @@ export default function UserListPage() {
                                   e.stopPropagation();
                                   setDeleteUserId(item.id);
                                 }}
-                                className="p-1 hover:bg-red-55/10 text-red-500 rounded-lg transition-all"
+                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-955/20 rounded-lg transition-all"
                                 title="Xóa tài khoản"
                               >
-                                <Trash2 size={13} />
+                                <i className="fa-solid fa-trash text-[13px] text-red-500 hover:text-red-600"></i>
                               </button>
                             </div>
                           </td>
@@ -749,7 +784,6 @@ export default function UserListPage() {
         {selectedUser && (
           <div className="lg:col-span-4 bg-white dark:bg-gray-800 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm p-5 space-y-4 flex flex-col h-full sticky top-3">
             
-            {/* Header X Close */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
               <h3 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider">
                 Chi tiết người dùng
@@ -759,17 +793,16 @@ export default function UserListPage() {
                 className="p-1 hover:bg-slate-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-gray-600 transition-all cursor-pointer"
                 title="Đóng bảng"
               >
-                <X size={15} />
+                <i className="fa-solid fa-xmark text-[13px]"></i>
               </button>
             </div>
 
-            {/* Profile Avatar Card inside details */}
             <div className="flex items-center gap-4 py-3 border-b border-slate-100 dark:border-slate-700">
               <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-100 dark:bg-gray-700 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-gray-400 flex-shrink-0">
                 {selectedUser.avatarUrl ? (
                   <img src={selectedUser.avatarUrl} alt={selectedUser.fullName} className="w-full h-full object-cover" />
                 ) : (
-                  <UserIcon size={28} />
+                  <i className="fa-solid fa-user text-[24px]"></i>
                 )}
               </div>
               <div className="space-y-1 text-left min-w-0 flex-1">
@@ -845,7 +878,7 @@ export default function UserListPage() {
                       </div>
                       <div className="py-2 flex justify-between gap-2 items-center">
                         <span className="text-gray-500 font-semibold">Giới tính</span>
-                        <span className="font-bold text-gray-900 dark:text-white text-right">
+                        <span className="font-normal text-gray-900 dark:text-white text-right">
                           {selectedUser.gender === 'MALE' ? 'Nam' : selectedUser.gender === 'FEMALE' ? 'Nữ' : 'Khác'}
                         </span>
                       </div>
@@ -856,9 +889,8 @@ export default function UserListPage() {
                         <div className="flex items-center text-right font-mono font-bold text-gray-950 dark:text-white">
                           <span>{selectedUser.nationalId || 'Chưa cập nhật'}</span>
                           {selectedUser.nationalIdVerified && (
-                            <span className="ml-1.5 inline-flex items-center gap-0.5 px-1 py-0.5 text-[8px] bg-emerald-500/10 text-emerald-500 rounded font-bold">
-                              <Check size={8} className="stroke-[3]" />
-                              Đã xác thực
+                            <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 bg-emerald-500/10 text-emerald-500 rounded-full font-bold" title="Đã xác thực">
+                              <i className="fa-solid fa-check text-[9px] text-emerald-500"></i>
                             </span>
                           )}
                         </div>
@@ -870,9 +902,8 @@ export default function UserListPage() {
                         <div className="flex items-center text-right font-bold text-gray-900 dark:text-white">
                           <span>{selectedUser.phone || 'Chưa cập nhật'}</span>
                           {selectedUser.phoneVerified && (
-                            <span className="ml-1.5 inline-flex items-center gap-0.5 px-1 py-0.5 text-[8px] bg-emerald-500/10 text-emerald-500 rounded font-bold">
-                              <Check size={8} className="stroke-[3]" />
-                              Đã xác thực
+                            <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 bg-emerald-500/10 text-emerald-500 rounded-full font-bold" title="Đã xác thực">
+                              <i className="fa-solid fa-check text-[9px] text-emerald-500"></i>
                             </span>
                           )}
                         </div>
@@ -884,9 +915,8 @@ export default function UserListPage() {
                         <div className="flex items-center text-right font-bold text-gray-900 dark:text-white min-w-0">
                           <span className="truncate max-w-[120px]" title={selectedUser.email}>{selectedUser.email || 'Chưa cập nhật'}</span>
                           {selectedUser.emailVerified && (
-                            <span className="ml-1.5 inline-flex items-center gap-0.5 px-1 py-0.5 text-[8px] bg-emerald-500/10 text-emerald-500 rounded font-bold flex-shrink-0">
-                              <Check size={8} className="stroke-[3]" />
-                              Đã xác thực
+                            <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 bg-emerald-500/10 text-emerald-500 rounded-full font-bold flex-shrink-0" title="Đã xác thực">
+                              <i className="fa-solid fa-check text-[9px] text-emerald-500"></i>
                             </span>
                           )}
                         </div>
@@ -933,9 +963,9 @@ export default function UserListPage() {
                       <div className="p-2 border border-slate-100 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900/30 rounded-xl text-center flex flex-col items-center gap-1.5">
                         <span className="text-[9px] text-gray-400 font-bold uppercase leading-none">CCCD</span>
                         {selectedUser.nationalIdVerified ? (
-                          <Check size={16} className="text-emerald-500 stroke-[3]" />
+                          <i className="fa-solid fa-check text-[14px] text-emerald-500"></i>
                         ) : (
-                          <X size={16} className="text-red-500 stroke-[3]" />
+                          <i className="fa-solid fa-xmark text-[14px] text-red-500"></i>
                         )}
                         <span className="text-[9px] font-bold">{selectedUser.nationalIdVerified ? 'Đã xác thực' : 'Chưa xác thực'}</span>
                       </div>
@@ -943,9 +973,9 @@ export default function UserListPage() {
                       <div className="p-2 border border-slate-100 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900/30 rounded-xl text-center flex flex-col items-center gap-1.5">
                         <span className="text-[9px] text-gray-400 font-bold uppercase leading-none">SĐT</span>
                         {selectedUser.phoneVerified ? (
-                          <Check size={16} className="text-emerald-500 stroke-[3]" />
+                          <i className="fa-solid fa-check text-[14px] text-emerald-500"></i>
                         ) : (
-                          <X size={16} className="text-red-500 stroke-[3]" />
+                          <i className="fa-solid fa-xmark text-[14px] text-red-500"></i>
                         )}
                         <span className="text-[9px] font-bold">{selectedUser.phoneVerified ? 'Đã xác thực' : 'Chưa xác thực'}</span>
                       </div>
@@ -953,9 +983,9 @@ export default function UserListPage() {
                       <div className="p-2 border border-slate-100 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900/30 rounded-xl text-center flex flex-col items-center gap-1.5">
                         <span className="text-[9px] text-gray-400 font-bold uppercase leading-none">Email</span>
                         {selectedUser.emailVerified ? (
-                          <Check size={16} className="text-emerald-500 stroke-[3]" />
+                          <i className="fa-solid fa-check text-[14px] text-emerald-500"></i>
                         ) : (
-                          <X size={16} className="text-red-500 stroke-[3]" />
+                          <i className="fa-solid fa-xmark text-[14px] text-red-500"></i>
                         )}
                         <span className="text-[9px] font-bold">{selectedUser.emailVerified ? 'Đã xác thực' : 'Chưa xác thực'}</span>
                       </div>
@@ -969,7 +999,7 @@ export default function UserListPage() {
                     </h5>
                     <div className="space-y-2 bg-slate-50/50 dark:bg-gray-900/30 border border-slate-100 dark:border-gray-700 rounded-xl p-3 text-left">
                       <div className="flex items-start gap-2.5">
-                        <MapPin size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                        <i className="fa-solid fa-map-pin text-[13px] text-amber-500 flex-shrink-0 mt-0.5"></i>
                         <div>
                           <p className="font-bold text-gray-800 dark:text-slate-200 text-[10px] leading-none mb-1">Tọa độ nơi ở</p>
                           <p className="text-[10px] text-gray-400 font-semibold font-mono">
@@ -987,7 +1017,7 @@ export default function UserListPage() {
               {/* Roles tab view */}
               {detailsTab === 'roles' && (
                 <div className="py-6 text-center text-gray-400">
-                  <ShieldAlert size={28} className="mx-auto mb-2 text-gray-300 dark:text-gray-650" />
+                  <i className="fa-solid fa-shield-halved text-[24px] mx-auto mb-2 text-gray-300 dark:text-gray-650"></i>
                   <p className="font-bold text-[10px] uppercase">Phân quyền chức năng</p>
                   <p className="text-[9px] text-gray-400 mt-1 max-w-[200px] mx-auto">
                     Vai trò "{getUserRoleName(selectedUser)}" sở hữu quyền đọc, ghi, cập nhật danh mục thuộc phạm vi {provinceName}.
@@ -1020,7 +1050,7 @@ export default function UserListPage() {
                 }}
                 className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Pencil size={14} />
+                <i className="fa-solid fa-pen text-[13px]"></i>
                 Chỉnh sửa thông tin
               </button>
               
@@ -1035,7 +1065,11 @@ export default function UserListPage() {
                       : 'border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-800 text-emerald-500 hover:bg-emerald-500/5'
                   )}
                 >
-                  {selectedUser.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
+                  {selectedUser.isActive ? (
+                    <i className="fa-solid fa-user-xmark text-[13px]"></i>
+                  ) : (
+                    <i className="fa-solid fa-user-check text-[13px]"></i>
+                  )}
                   {selectedUser.isActive ? 'Khóa tài khoản' : 'Kích hoạt'}
                 </button>
                 
@@ -1044,7 +1078,7 @@ export default function UserListPage() {
                   onClick={() => setDeleteUserId(selectedUser.id)}
                   className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Trash2 size={14} />
+                  <i className="fa-solid fa-trash text-[13px]"></i>
                   Xóa tài khoản
                 </button>
               </div>

@@ -28,4 +28,5 @@ export const FEATURE_FLAGS: Record<string, boolean> = {
   // Donations module
   [ROUTES.DONATION_LIST]: false,
   [ROUTES.DONATION_CAMPAIGN]: false,
+  [ROUTES.SETTINGS]: true,
 };
