@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS Operation Simulator & Stress Tester</title>
+  
+  <!-- Font & Leaflet Map CSS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Socket.io Client CDN -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at top left, #0f172a, #020617);
+      color: #f8fafc;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.5);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .glow-dot {
+      box-shadow: 0 0 12px currentColor;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col custom-scroll">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-[1000]">
+    <div class="flex items-center space-x-3">
+      <div class="p-2 bg-red-600/20 rounded-lg text-red-500 border border-red-500/30 glow-dot">
+        <i data-lucide="shield-alert" class="w-6 h-6 animate-pulse"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-red-400 via-orange-400 to-amber-300 bg-clip-text text-transparent">
+          SOS Operation Simulator
+        </h1>
+        <p class="text-xs text-slate-400">Trình giả lập & Stress Test điều phối khẩn cấp SOS Real-time</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-2 text-xs">
+        <span class="text-slate-400">Trạng thái API:</span>
+        <span id="api-status-badge" class="px-2 py-0.5 rounded-full font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center space-x-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping mr-1"></span>
+          Đang kiểm tra...
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 p-6 h-[calc(100vh-80px)] overflow-hidden">
+    
+    <!-- Left Column: Controls & Form (5/12 cols) -->
+    <section class="xl:col-span-5 flex flex-col gap-6 overflow-y-auto pr-2 custom-scroll">
+      
+      <!-- Panel 1: Connection & Auth Config -->
+      <div class="glass-card rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+        
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="settings" class="w-5 h-5 text-indigo-400"></i>
+            <h2 class="font-semibold text-slate-200">Cấu hình kết nối hệ thống</h2>
+          </div>
+          <button id="btn-save-config" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Lưu cấu hình</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">BACKEND API URL</label>
+            <input type="text" id="cfg-backend-url" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500" value="http://localhost:8585">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">PROVINCE ID (LỌC VÙNG)</label>
+            <input type="number" id="cfg-province-id" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500" value="1">
+          </div>
+        </div>
+
+        <!-- System Authentication & Login (Visible by default) -->
+        <div class="p-3.5 bg-slate-900/40 rounded-xl border border-slate-800 mb-4">
+          <span class="text-xs font-semibold text-indigo-300 flex items-center mb-3">
+            <i data-lucide="key" class="w-4 h-4 mr-1.5 text-amber-400"></i> Đăng nhập tài khoản hệ thống
+          </span>
+          
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-400 mb-1">TÀI KHOẢN (EMAIL/SDT)</label>
+              <input type="text" id="login-username" placeholder="admin@rescue.gov.vn" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-400 mb-1">MẬT KHẨU</label>
+              <input type="password" id="login-password" placeholder="••••••••" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+          
+          <div class="flex justify-between items-center mb-3.5">
+            <span class="text-[10px] text-slate-400 italic">Đăng nhập để tự lấy Province ID từ tài khoản</span>
+            <button id="btn-do-login" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition flex items-center shadow-md shadow-indigo-950/20">
+              <i data-lucide="log-in" class="w-3.5 h-3.5 mr-1.5"></i> Đăng nhập & Lấy Config
+            </button>
+          </div>
+
+          <!-- Token Textarea & Decoded Meta Badge -->
+          <div class="border-t border-slate-800/80 pt-3">
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">JWT ACCESS TOKEN</label>
+            <textarea id="cfg-jwt-token" rows="2" placeholder="JWT Token sẽ tự động điền khi đăng nhập, hoặc bạn có thể tự dán vào đây..." class="w-full p-2 bg-slate-950/80 border border-slate-800 rounded-lg text-[10px] font-mono text-slate-300 focus:outline-none focus:border-indigo-500 custom-scroll"></textarea>
+          </div>
+
+          <!-- Token Decoded Info Panel -->
+          <div id="token-info-badge" class="hidden mt-2 p-2.5 bg-indigo-950/30 border border-indigo-500/20 rounded-lg">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Connection Toggles for Namespaces -->
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Notification socket connection -->
+          <div class="bg-slate-950/50 p-3 rounded-xl border border-slate-800 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-slate-300">NS: /notification</span>
+              <span id="status-notification" class="w-2.5 h-2.5 rounded-full bg-slate-600 glow-dot" title="Chưa kết nối"></span>
+            </div>
+            <div class="flex space-x-1.5">
+              <button onclick="connectNamespace('/notification')" class="flex-1 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/20 rounded text-[11px] font-medium transition">Kết nối</button>
+              <button onclick="disconnectNamespace('/notification')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded text-[11px] transition">Hủy</button>
+            </div>
+          </div>
+
+          <!-- Dispatch socket connection -->
+          <div class="bg-slate-950/50 p-3 rounded-xl border border-slate-800 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-slate-300">NS: /dispatch</span>
+              <span id="status-dispatch" class="w-2.5 h-2.5 rounded-full bg-slate-600 glow-dot" title="Chưa kết nối"></span>
+            </div>
+            <div class="flex space-x-1.5">
+              <button onclick="connectNamespace('/dispatch')" class="flex-1 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/20 rounded text-[11px] font-medium transition">Kết nối</button>
+              <button onclick="disconnectNamespace('/dispatch')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded text-[11px] transition">Hủy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Generate SOS (Form) -->
+      <div class="glass-card rounded-2xl p-5 shadow-2xl relative flex-1 flex flex-col">
+        <div class="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="megaphone" class="w-5 h-5 text-red-400"></i>
+            <h2 class="font-semibold text-slate-200">Gửi yêu cầu cứu hộ khẩn cấp</h2>
+          </div>
+          <div class="flex space-x-2">
+            <button id="btn-fill-random" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/20 rounded-lg text-xs font-medium transition flex items-center">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1 animate-pulse"></i> Tạo ngẫu nhiên
+            </button>
+          </div>
+        </div>
+
+        <form id="sos-form" class="space-y-4 flex-1 flex flex-col justify-between">
+          <div class="space-y-3">
+            
+            <!-- Row 1: Requester profile -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Tên người yêu cầu</label>
+                <input type="text" id="sos-name" required placeholder="Nguyễn Văn A" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Số điện thoại liên hệ</label>
+                <input type="text" id="sos-phone" required placeholder="0917234567" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
+              </div>
+            </div>
+
+            <!-- Row 2: Disaster Type & Severity -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Loại thiên tai / Sự cố</label>
+                <select id="sos-type" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                  <option value="FLOOD">Lũ lụt, ngập lụt (FLOOD)</option>
+                  <option value="FIRE_FIGHTING">Hỏa hoạn, cháy nổ (FIRE_FIGHTING)</option>
+                  <option value="TRAFFIC_ACCIDENT">Tai nạn giao thông (TRAFFIC_ACCIDENT)</option>
+                  <option value="MEDICAL_EMERGENCY">Cấp cứu y tế khẩn cấp (MEDICAL_EMERGENCY)</option>
+                  <option value="NATURAL_DISASTER">Thiên tai, bão, sạt lở (NATURAL_DISASTER)</option>
+                  <option value="OTHER">Khác (OTHER)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Mức độ nguy cấp</label>
+                <select id="sos-severity" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                  <option value="LOW">Thấp (LOW)</option>
+                  <option value="MEDIUM">Trung bình (MEDIUM)</option>
+                  <option value="HIGH" selected>Cao (HIGH)</option>
+                  <option value="CRITICAL">Nguy kịch (CRITICAL)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Address Geocoding Search (Vietnam) -->
+            <div class="relative">
+              <label class="block text-xs font-medium text-slate-400 mb-1">Địa chỉ (Gợi ý tự động)</label>
+              <div class="relative">
+                <input type="text" id="sos-address-input" placeholder="Gõ tìm kiếm địa chỉ (ví dụ: Điện Biên Phủ, Bình Thạnh)..." class="w-full pl-9 pr-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <i data-lucide="search" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <!-- Floating Suggestions Dropdown -->
+              <div id="address-suggestions" class="hidden absolute left-0 right-0 mt-1 bg-slate-950 border border-slate-800 rounded-lg max-h-52 overflow-y-auto z-[2000] shadow-2xl custom-scroll">
+                <!-- Dropdown suggestions -->
+              </div>
+            </div>
+
+            <!-- Row 3: Admin Areas / Trapped People -->
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Tỉnh / Thành</label>
+                <select id="sos-province" required class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                  <option value="1">Đang tải...</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Quận / Huyện</label>
+                <select id="sos-ward" required class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                  <option value="">Chọn Quận/Huyện</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Số người bị kẹt</label>
+                <input type="number" id="sos-trapped" required class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500" value="1" min="0">
+              </div>
+            </div>
+
+            <!-- Row 4: Coordinates -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Vĩ độ (Latitude)</label>
+                <input type="number" step="any" id="sos-lat" required class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500" value="10.762622">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Kinh độ (Longitude)</label>
+                <input type="number" step="any" id="sos-lng" required class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500" value="106.660172">
+              </div>
+            </div>
+
+            <!-- Description -->
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Mô tả tình huống</label>
+              <textarea id="sos-desc" rows="2" placeholder="Ghi cụ thể các thông tin cứu hộ, ví dụ: Nước dâng ngập tầng trệt, có người già cần hỗ trợ..." class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500 custom-scroll"></textarea>
+            </div>
+
+            <!-- Image Upload & Preview -->
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Hình ảnh đính kèm (Upload lên R2)</label>
+              <div class="grid grid-cols-4 gap-3 items-center">
+                <label class="col-span-2 border border-dashed border-slate-700 hover:border-red-500/50 bg-slate-950/40 hover:bg-slate-950/60 rounded-lg p-3 text-center cursor-pointer transition flex flex-col items-center justify-center h-20">
+                  <i data-lucide="image-plus" class="w-5 h-5 text-slate-400 mb-1"></i>
+                  <span class="text-[10px] text-slate-400">Chọn hoặc thả ảnh</span>
+                  <input type="file" id="sos-image-input" accept="image/*" class="hidden">
+                </label>
+                <div class="col-span-2 relative border border-slate-800 bg-slate-950 rounded-lg h-20 flex items-center justify-center overflow-hidden">
+                  <img id="image-preview" src="" alt="Preview" class="hidden w-full h-full object-cover">
+                  <div id="image-placeholder" class="text-[10px] text-slate-500 italic text-center">Chưa có ảnh</div>
+                  <div id="upload-spinner" class="hidden absolute inset-0 bg-slate-950/80 flex items-center justify-center">
+                    <i data-lucide="loader-2" class="w-5 h-5 animate-spin text-red-500"></i>
+                  </div>
+                  <button type="button" id="btn-clear-image" class="hidden absolute top-1 right-1 p-0.5 bg-red-600/80 hover:bg-red-600 rounded text-white transition">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              </div>
+              <input type="hidden" id="sos-uploaded-url">
+            </div>
+
+          </div>
+
+          <div class="pt-4">
+            <button type="submit" class="w-full py-3 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white rounded-xl font-semibold shadow-lg shadow-red-950/30 flex items-center justify-center space-x-2 transition uppercase text-sm tracking-wider">
+              <i data-lucide="radio" class="w-5 h-5 animate-pulse"></i>
+              <span>Phát tín hiệu SOS khẩn cấp</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </section>
+
+    <!-- Right Column: Interactive Map & Socket Event Console (7/12 cols) -->
+    <section class="xl:col-span-7 flex flex-col gap-6 overflow-hidden">
+      
+      <!-- Live Map (Leaflet) -->
+      <div class="glass-card rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col min-h-[350px] relative">
+        <!-- Map header with controls -->
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-3 flex items-center justify-between z-[500]">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="map-pin" class="w-5 h-5 text-emerald-400"></i>
+            <span class="font-semibold text-slate-200">Bản đồ Giám sát Điều phối (Live GIS)</span>
+          </div>
+          <div class="flex items-center space-x-3 text-xs">
+            <span class="text-slate-400">Click bản đồ để chọn tọa độ SOS</span>
+            <button id="btn-clear-map" class="text-slate-400 hover:text-slate-200 flex items-center">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1"></i> Xóa vết quét
+            </button>
+          </div>
+        </div>
+        
+        <!-- Leaflet Container -->
+        <div id="map" class="flex-1 w-full bg-slate-950 z-[10]"></div>
+        
+        <!-- Legend Overlay -->
+        <div class="absolute bottom-3 left-3 bg-slate-950/90 border border-slate-800/80 rounded-lg p-2.5 z-[500] text-[10px] space-y-1.5 shadow-xl backdrop-blur-md">
+          <div class="font-semibold text-slate-400 border-b border-slate-800 pb-1 mb-1 uppercase">Chú giải bản đồ</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-red-600 inline-block mr-2 border border-white"></span> Yêu cầu SOS Mới (PENDING)</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-orange-500 inline-block mr-2 border border-white"></span> Đã Phân Đội (ASSIGNED)</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 inline-block mr-2 border border-white"></span> Hoàn thành (COMPLETED)</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-400/20 border border-emerald-400 inline-block mr-2"></span> Đội cứu hộ hoạt động</div>
+        </div>
+      </div>
+
+      <!-- Realtime Event Logger Console -->
+      <div class="glass-card rounded-2xl shadow-2xl h-[280px] flex flex-col overflow-hidden">
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-3 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="terminal" class="w-5 h-5 text-indigo-400"></i>
+            <span class="font-semibold text-slate-200 font-mono">Bảng điều khiển dòng sự kiện (Live Sockets Stream)</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button id="btn-clear-console" class="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded transition flex items-center">
+              <i data-lucide="ban" class="w-3.5 h-3.5 mr-1"></i> Xóa màn hình
+            </button>
+          </div>
+        </div>
+        <div id="socket-console" class="flex-1 p-4 bg-slate-950/90 font-mono text-xs overflow-y-auto space-y-2.5 custom-scroll text-slate-300">
+          <div class="text-slate-500 italic">[00:00:00] Bắt đầu phiên kiểm thử. Đang chờ kết nối Socket hoặc hành động...</div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Leaflet Javascript -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Application Variables
+    let map, clickMarker, sosMarkers = {}, activeScans = [];
+    const sockets = {
+      '/notification': null,
+      '/dispatch': null
+    };
+
+    // Hotspot coordinates for Vietnam HCMC region to randomize
+    const hcmcHotspots = [
+      { lat: 10.762622, lng: 106.660172, label: "Quận 10 (HCMC)" },
+      { lat: 10.798152, lng: 106.689531, label: "Bình Thạnh (HCMC)" },
+      { lat: 10.823096, lng: 106.629664, label: "Quận 12 (HCMC)" },
+      { lat: 10.755431, lng: 106.602516, label: "Quận 6 (HCMC)" },
+      { lat: 10.729124, lng: 106.721835, label: "Quận 7 (HCMC)" },
+      { lat: 10.849185, lng: 106.772594, label: "Thủ Đức (HCMC)" },
+      { lat: 10.776111, lng: 106.695833, label: "Quận 1 (HCMC)" }
+    ];
+
+    // LocalStorage keys
+    const LS_KEY_CONFIG = 'sos_simulator_config';
+
+    // 1. Initialize Map
+    function initMap() {
+      // Center at HCMC initially
+      map = L.map('map', { zoomControl: true }).setView([10.762622, 106.660172], 12);
+      
+      // Modern Dark Map tiles from CartoDB (perfect match for dark UI)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+      }).addTo(map);
+
+      // Handle map clicks to set lat/lng
+      map.on('click', function(e) {
+        const lat = parseFloat(e.latlng.lat.toFixed(6));
+        const lng = parseFloat(e.latlng.lng.toFixed(6));
+        
+        document.getElementById('sos-lat').value = lat;
+        document.getElementById('sos-lng').value = lng;
+        
+        setClickLocation(lat, lng);
+        
+        // Reverse Geocode click point for better user experience
+        fetchReverseGeocode(lat, lng);
+      });
+    }
+
+    function setClickLocation(lat, lng) {
+      if (clickMarker) {
+        clickMarker.setLatLng([lat, lng]);
+      } else {
+        const pinIcon = L.icon({
+          iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+        
+        clickMarker = L.marker([lat, lng], { icon: pinIcon, draggable: true })
+          .addTo(map)
+          .bindPopup("<b>Điểm phát SOS đang dựng</b><br>Kéo thả để tinh chỉnh vị trí.")
+          .openPopup();
+
+        clickMarker.on('dragend', function(e) {
+          const pos = clickMarker.getLatLng();
+          const newLat = parseFloat(pos.lat.toFixed(6));
+          const newLng = parseFloat(pos.lng.toFixed(6));
+          document.getElementById('sos-lat').value = newLat;
+          document.getElementById('sos-lng').value = newLng;
+          fetchReverseGeocode(newLat, newLng);
+        });
+      }
+      map.panTo([lat, lng]);
+    }
+
+    // Geocoding helper - reverse lookup address from lat/lng click
+    async function fetchReverseGeocode(lat, lng) {
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'vi' } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.display_name) {
+            document.getElementById('sos-address-input').value = data.display_name;
+            logConsole('SYSTEM', `Ghim bản đồ -> Tự dịch địa chỉ: ${data.display_name}`, 'info');
+          }
+        }
+      } catch (err) {
+        logConsole('SYSTEM', `Đã chọn điểm: vĩ độ ${lat}, kinh độ ${lng}`, 'info');
+      }
+    }
+
+    // 2. JWT Decoding & Auto-configuration extraction
+    function decodeJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function handleTokenChange(token) {
+      const infoBadge = document.getElementById('token-info-badge');
+      if (!token) {
+        infoBadge.classList.add('hidden');
+        return;
+      }
+
+      const payload = decodeJwt(token);
+      if (payload) {
+        // Extract parameters
+        const provinceId = payload.provinceId || 1;
+        const roleId = payload.roleId;
+        const userId = payload.sub;
+        const email = payload.email || 'Ẩn danh';
+
+        // Auto update config values
+        document.getElementById('cfg-province-id').value = provinceId;
+        const provinceSelect = document.getElementById('sos-province');
+        if (provinceSelect) {
+          provinceSelect.value = provinceId;
+          provinceSelect.dispatchEvent(new Event('change'));
+        }
+
+        // Map role name visually
+        let roleName = 'RESCUE_MEMBER';
+        if (roleId === 1) roleName = 'SUPER_ADMIN';
+        else if (roleId === 2) roleName = 'ADMIN_PROVINCE';
+        else if (roleId === 3) roleName = 'TEAM_LEADER';
+        else if (roleId === 4) roleName = 'RESCUE_MEMBER';
+        else if (roleId === 5) roleName = 'VOLUNTEER';
+
+        infoBadge.innerHTML = `
+          <div class="flex items-center space-x-2 text-indigo-400 font-semibold mb-1 text-xs">
+            <i data-lucide="file-json" class="w-3.5 h-3.5"></i>
+            <span>DỮ LIỆU ĐÃ GIẢI MÃ TỪ TOKEN:</span>
+          </div>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-slate-300">
+            <div>• ID người dùng: <b class="text-indigo-300">${userId}</b></div>
+            <div>• Cấp quyền: <b class="text-indigo-300">${roleName}</b></div>
+            <div>• Tỉnh thành ID: <b class="text-indigo-300">${provinceId}</b></div>
+            <div class="truncate">• Email: <b class="text-indigo-300" title="${email}">${email}</b></div>
+          </div>
+        `;
+        infoBadge.classList.remove('hidden');
+        lucide.createIcons();
+        logConsole('JWT PARSER', `🔑 Tự động trích xuất cấu hình: Tỉnh=${provinceId} | Quyền=${roleName} | UserId=${userId}`, 'success');
+      } else {
+        infoBadge.classList.add('hidden');
+      }
+    }
+
+    // 3. Logging utility
+    function logConsole(source, message, type = 'log', data = null) {
+      const consoleEl = document.getElementById('socket-console');
+      const timeStr = new Date().toLocaleTimeString();
+      
+      const entry = document.createElement('div');
+      entry.className = 'border-l-2 pl-3 py-1 flex flex-col space-y-1';
+      
+      let borderClass = 'border-slate-700';
+      let titleClass = 'text-slate-400';
+      if (type === 'success') {
+        borderClass = 'border-emerald-500';
+        titleClass = 'text-emerald-400 font-bold';
+      } else if (type === 'error') {
+        borderClass = 'border-red-500';
+        titleClass = 'text-red-400 font-bold';
+      } else if (type === 'warning') {
+        borderClass = 'border-amber-500';
+        titleClass = 'text-amber-400 font-bold';
+      } else if (type === 'info') {
+        borderClass = 'border-indigo-400';
+        titleClass = 'text-indigo-400';
+      }
+      
+      entry.className += ` ${borderClass}`;
+      
+      let sourceTag = `[${timeStr}] <span class="${titleClass}">${source}</span>: `;
+      let textSpan = `<span class="text-slate-200">${message}</span>`;
+      
+      entry.innerHTML = `<div class="flex items-start text-xs">${sourceTag} ${textSpan}</div>`;
+      
+      if (data) {
+        const details = document.createElement('details');
+        details.className = 'mt-1 text-[11px] bg-slate-900/80 p-2 rounded border border-slate-800 text-slate-400 cursor-pointer overflow-x-auto';
+        details.innerHTML = `<summary class="outline-none hover:text-slate-300">Chi tiết payload (JSON)</summary><pre class="mt-1 font-mono text-[10px] text-slate-300 whitespace-pre">${JSON.stringify(data, null, 2)}</pre>`;
+        entry.appendChild(details);
+      }
+      
+      consoleEl.appendChild(entry);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    // Helper to get clean backend url (removing trailing slashes)
+    function getCleanBackendUrl() {
+      let url = document.getElementById('cfg-backend-url').value.trim();
+      if (url.endsWith('/')) {
+        url = url.slice(0, -1);
+      }
+      return url;
+    }
+
+    // 4. Backend Health check
+    async function checkBackendHealth() {
+      const url = getCleanBackendUrl();
+      const badge = document.getElementById('api-status-badge');
+      try {
+        const res = await fetch(`${url}/sos-requests/nearby?lat=10.7&lng=106&radius=1&status=PENDING`);
+        if (res.status === 200 || res.status === 401 || res.status === 403) {
+          badge.className = "px-2 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1";
+          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 glow-dot"></span> Đang chạy`;
+          return true;
+        }
+      } catch (err) {}
+      badge.className = "px-2 py-0.5 rounded-full font-medium bg-red-500/20 text-red-400 border border-red-500/30 flex items-center space-x-1";
+      badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-red-400 mr-1 glow-dot"></span> Không kết nối`;
+      return false;
+    }
+
+    // 5. Socket Connections
+    function connectNamespace(ns) {
+      const backendUrl = getCleanBackendUrl();
+      const provinceId = document.getElementById('cfg-province-id').value;
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+      const statusIndicator = document.getElementById(ns === '/notification' ? 'status-notification' : 'status-dispatch');
+      
+      if (sockets[ns] && sockets[ns].connected) {
+        logConsole('SOCKET', `Namespace ${ns} đã được kết nối rồi!`, 'warning');
+        return;
+      }
+      
+      logConsole('SOCKET', `Đang kết nối đến ${ns} tại ${backendUrl}...`, 'info');
+      
+      let queryParams = {};
+      
+      if (ns === '/notification') {
+        let userId = '1';
+        if (token) {
+          try {
+            const payload = decodeJwt(token);
+            userId = payload.userId || payload.sub || '1';
+          } catch(e){}
+        }
+        queryParams = { userId: String(userId), device: 'web' };
+      } else if (ns === '/dispatch') {
+        let role = 'ADMIN';
+        if (token) {
+          try {
+            const payload = decodeJwt(token);
+            role = payload.role || 'ADMIN';
+          } catch(e){}
+        }
+        queryParams = { provinceId: String(provinceId), role };
+      }
+
+      const socket = io(`${backendUrl}${ns}`, {
+        query: queryParams,
+        auth: token ? { token: `Bearer ${token}` } : undefined,
+        extraHeaders: token ? { Authorization: `Bearer ${token}` } : undefined,
+        transports: ['websocket'],
+        forceNew: true
+      });
+
+      socket.on('connect', () => {
+        statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 glow-dot";
+        statusIndicator.title = "Đã kết nối";
+        logConsole(`SOCKET [${ns}]`, `🟢 Đã kết nối thành công! Socket ID: ${socket.id}`, 'success', {
+          socketId: socket.id,
+          query: queryParams
+        });
+      });
+
+      socket.on('disconnect', (reason) => {
+        statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-red-500 glow-dot";
+        statusIndicator.title = "Mất kết nối: " + reason;
+        logConsole(`SOCKET [${ns}]`, `🔴 Đã mất kết nối! Lý do: ${reason}`, 'error');
+      });
+
+      socket.on('connect_error', (err) => {
+        statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-red-500 glow-dot";
+        statusIndicator.title = "Lỗi kết nối";
+        logConsole(`SOCKET [${ns}]`, `⚠️ Lỗi bắt tay (connection error): ${err.message}`, 'error', err);
+      });
+
+      // Bind events for /dispatch
+      if (ns === '/dispatch') {
+        socket.on('sos:created', (sos) => {
+          logConsole('WS EVENT (sos:created)', `📣 SOS Mới từ ${sos.requesterName || 'Người dân'}!`, 'warning', sos);
+          plotSosOnMap(sos);
+          animateScan(sos);
+        });
+
+        socket.on('sos:status-updated', (payload) => {
+          logConsole('WS EVENT (sos:status-updated)', `🔄 SOS #${payload.sosId} cập nhật trạng thái: ${payload.status}`, 'info', payload);
+          updateSosStatus(payload.sosId, payload.status);
+        });
+
+        socket.on('sos:no-team-available', (payload) => {
+          logConsole('WS EVENT (sos:no-team-available)', `⚠️ SOS #${payload.sosId} lỗi điều phối: ${payload.message}`, 'error', payload);
+          highlightDispatchFail(payload.sosId);
+        });
+
+        socket.on('sos:assigned', (payload) => {
+          logConsole('WS EVENT (sos:assigned)', `🤝 SOS #${payload.sosId} được gán cho Đội #${payload.teamId}`, 'success', payload);
+          updateSosStatus(payload.sosId, 'ASSIGNED', payload);
+        });
+
+        socket.on('joined', (payload) => {
+          logConsole('WS EVENT (joined)', `⚡ Đã tham gia phòng: ${payload.room}`, 'info', payload);
+        });
+      }
+
+      if (ns === '/notification') {
+        socket.on('notification:push', (notification) => {
+          logConsole('WS EVENT (notification:push)', `🔔 Push notification mới nhận được: ${notification.title}`, 'info', notification);
+        });
+        
+        socket.on('notification:badge', (badgeInfo) => {
+          logConsole('WS EVENT (notification:badge)', `🔴 Số lượng thông báo chưa đọc mới: ${badgeInfo.count}`, 'info', badgeInfo);
+        });
+      }
+
+      sockets[ns] = socket;
+    }
+
+    function disconnectNamespace(ns) {
+      if (sockets[ns]) {
+        sockets[ns].disconnect();
+        sockets[ns] = null;
+        const statusIndicator = document.getElementById(ns === '/notification' ? 'status-notification' : 'status-dispatch');
+        statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-slate-600 glow-dot";
+        statusIndicator.title = "Chưa kết nối";
+        logConsole(`SOCKET [${ns}]`, `🔌 Đã ngắt kết nối thủ công.`, 'info');
+      }
+    }
+
+    // 6. Map UI feedback (concentric scanner waves & custom marker pins)
+    function plotSosOnMap(sos) {
+      const id = sos.id;
+      let lat = sos.latitude || (sos.location && sos.location.coordinates && sos.location.coordinates[1]);
+      let lng = sos.longitude || (sos.location && sos.location.coordinates && sos.location.coordinates[0]);
+
+      if (!lat || !lng) return;
+
+      if (sosMarkers[id]) {
+        map.removeLayer(sosMarkers[id]);
+      }
+
+      let markerColor = 'red';
+      if (sos.status === 'ASSIGNED' || sos.status === 'RESOLVING') markerColor = 'orange';
+      if (sos.status === 'COMPLETED') markerColor = 'green';
+
+      const icon = L.icon({
+        iconUrl: `https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+
+      const popupHtml = `
+        <div class="text-slate-900 text-xs">
+          <div class="font-bold border-b border-slate-200 pb-1 mb-1 text-sm text-red-600">🆘 SOS #${id} (${sos.requestType})</div>
+          <div><b>Người gửi:</b> ${sos.requesterName || 'Ẩn danh'}</div>
+          <div><b>Điện thoại:</b> ${sos.requesterPhone || 'Không'}</div>
+          <div><b>Số người mắc kẹt:</b> ${sos.trappedPeopleCount || 1}</div>
+          <div><b>Mức độ nguy cấp:</b> <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-bold">${sos.severity}</span></div>
+          <div><b>Mô tả:</b> ${sos.description || 'Không có'}</div>
+          <div class="mt-1.5 font-bold">Trạng thái: <span id="popup-status-${id}" class="text-indigo-600">${sos.status}</span></div>
+          ${sos.imageUrls && sos.imageUrls.length > 0 ? `<div class="mt-2"><img src="${sos.imageUrls[0]}" class="rounded max-w-full max-h-24 object-cover border border-slate-300"></div>` : ''}
+        </div>
+      `;
+
+      const marker = L.marker([lat, lng], { icon }).addTo(map).bindPopup(popupHtml);
+      sosMarkers[id] = marker;
+      
+      map.setView([lat, lng], 13);
+    }
+
+    function updateSosStatus(sosId, status, payload = null) {
+      const marker = sosMarkers[sosId];
+      if (marker) {
+        let markerColor = 'red';
+        if (status === 'ASSIGNED' || status === 'RESOLVING') markerColor = 'orange';
+        if (status === 'COMPLETED') markerColor = 'green';
+        
+        const newIcon = L.icon({
+          iconUrl: `https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+        marker.setIcon(newIcon);
+
+        const statusEl = document.getElementById(`popup-status-${sosId}`);
+        if (statusEl) {
+          statusEl.textContent = status;
+        }
+      }
+    }
+
+    function highlightDispatchFail(sosId) {
+      const marker = sosMarkers[sosId];
+      if (marker) {
+        const pos = marker.getLatLng();
+        const flashCircle = L.circle(pos, {
+          color: '#ef4444',
+          fillColor: '#ef4444',
+          fillOpacity: 0.4,
+          radius: 1200
+        }).addTo(map);
+
+        setTimeout(() => {
+          map.removeLayer(flashCircle);
+        }, 3000);
+      }
+    }
+
+    function animateScan(sos) {
+      let lat = sos.latitude || (sos.location && sos.location.coordinates && sos.location.coordinates[1]);
+      let lng = sos.longitude || (sos.location && sos.location.coordinates && sos.location.coordinates[0]);
+      if (!lat || !lng) return;
+
+      const scanRadii = [5000, 10000, 20000, 40000, 50000];
+      
+      scanRadii.forEach((radius, idx) => {
+        setTimeout(() => {
+          const scanCircle = L.circle([lat, lng], {
+            color: '#3b82f6',
+            weight: 1.5,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.05,
+            radius: radius
+          }).addTo(map);
+          
+          activeScans.push(scanCircle);
+          
+          let opacity = 0.5;
+          const fadeInterval = setInterval(() => {
+            opacity -= 0.05;
+            scanCircle.setStyle({ opacity: opacity });
+            if (opacity <= 0.1) {
+              clearInterval(fadeInterval);
+            }
+          }, 100);
+          
+        }, idx * 600);
+      });
+    }
+
+    // 7. Address Suggestion & Autocomplete API
+    let geocodeDebounceTimer;
+    document.getElementById('sos-address-input').addEventListener('input', function(e) {
+      clearTimeout(geocodeDebounceTimer);
+      const query = e.target.value.trim();
+      if (query.length < 3) {
+        document.getElementById('address-suggestions').classList.add('hidden');
+        return;
+      }
+      geocodeDebounceTimer = setTimeout(() => {
+        fetchAddressSuggestions(query);
+      }, 400);
+    });
+
+    async function fetchAddressSuggestions(query) {
+      const suggestionsEl = document.getElementById('address-suggestions');
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=vn`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'vi' } });
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data.length === 0) {
+          suggestionsEl.innerHTML = '<div class="p-2 text-slate-500 italic text-center">Không tìm thấy địa chỉ phù hợp</div>';
+          suggestionsEl.classList.remove('hidden');
+          return;
+        }
+
+        suggestionsEl.innerHTML = '';
+        data.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'p-2.5 hover:bg-slate-900 border-b border-slate-900 cursor-pointer text-slate-200 transition';
+          div.textContent = item.display_name;
+          div.addEventListener('click', () => {
+            // Fill inputs
+            document.getElementById('sos-address-input').value = item.display_name;
+            const lat = parseFloat(item.lat);
+            const lng = parseFloat(item.lon);
+            document.getElementById('sos-lat').value = lat;
+            document.getElementById('sos-lng').value = lng;
+            
+            // Move marker & map
+            setClickLocation(lat, lng);
+            
+            logConsole('GEOCODER', `📍 Đã chọn địa chỉ: ${item.display_name} | Vĩ độ: ${lat}, Kinh độ: ${lng}`, 'success');
+            suggestionsEl.classList.add('hidden');
+          });
+          suggestionsEl.appendChild(div);
+        });
+        suggestionsEl.classList.remove('hidden');
+      } catch (err) {
+        console.error('Error fetching geocoding suggestions', err);
+      }
+    }
+
+    // Dismiss dropdown on clicking outside
+    document.addEventListener('click', function(e) {
+      const suggestionsEl = document.getElementById('address-suggestions');
+      const inputEl = document.getElementById('sos-address-input');
+      if (e.target !== suggestionsEl && e.target !== inputEl) {
+        suggestionsEl.classList.add('hidden');
+      }
+    });
+
+    // 8. Form Handlers & File Upload
+    document.getElementById('sos-image-input').addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const previewImg = document.getElementById('image-preview');
+      const placeholder = document.getElementById('image-placeholder');
+      const spinner = document.getElementById('upload-spinner');
+      const clearBtn = document.getElementById('btn-clear-image');
+      const hiddenInput = document.getElementById('sos-uploaded-url');
+      const backendUrl = getCleanBackendUrl();
+
+      placeholder.classList.add('hidden');
+      spinner.classList.remove('hidden');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        logConsole('REST UPLOAD', `Đang tải ảnh "${file.name}" lên Cloudflare R2...`, 'info');
+        const response = await fetch(`${backendUrl}/upload/single?folder=sos`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upload thất bại với status code ${response.status}`);
+        }
+
+        const data = await response.json();
+        const uploadedUrl = data.url;
+
+        previewImg.src = uploadedUrl;
+        previewImg.classList.remove('hidden');
+        clearBtn.classList.remove('hidden');
+        hiddenInput.value = uploadedUrl;
+
+        logConsole('REST UPLOAD', `🟢 Tải ảnh thành công! URL: ${uploadedUrl}`, 'success', data);
+      } catch (err) {
+        logConsole('REST UPLOAD', `🔴 Lỗi tải ảnh: ${err.message}`, 'error');
+        placeholder.classList.remove('hidden');
+        previewImg.classList.add('hidden');
+      } finally {
+        spinner.classList.add('hidden');
+      }
+    });
+
+    document.getElementById('btn-clear-image').addEventListener('click', function() {
+      const previewImg = document.getElementById('image-preview');
+      const placeholder = document.getElementById('image-placeholder');
+      const clearBtn = document.getElementById('btn-clear-image');
+      const hiddenInput = document.getElementById('sos-uploaded-url');
+      const fileInput = document.getElementById('sos-image-input');
+
+      previewImg.src = '';
+      previewImg.classList.add('hidden');
+      clearBtn.classList.add('hidden');
+      placeholder.classList.remove('hidden');
+      hiddenInput.value = '';
+      fileInput.value = '';
+    });
+
+    // Create SOS Request
+    document.getElementById('sos-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const backendUrl = getCleanBackendUrl();
+
+      const payload = {
+        requesterName: document.getElementById('sos-name').value,
+        requesterPhone: document.getElementById('sos-phone').value,
+        requestType: document.getElementById('sos-type').value,
+        latitude: parseFloat(document.getElementById('sos-lat').value),
+        longitude: parseFloat(document.getElementById('sos-lng').value),
+        description: document.getElementById('sos-desc').value,
+        severity: document.getElementById('sos-severity').value,
+        provinceId: parseInt(document.getElementById('sos-province').value),
+        adminUnitId: parseInt(document.getElementById('sos-ward').value),
+        trappedPeopleCount: parseInt(document.getElementById('sos-trapped').value),
+        imageUrls: document.getElementById('sos-uploaded-url').value ? [document.getElementById('sos-uploaded-url').value] : [],
+        specialNeedsTags: []
+      };
+
+      logConsole('REST API (Post SOS)', 'Đang gửi yêu cầu SOS khẩn cấp lên backend...', 'info', payload);
+
+      try {
+        const token = document.getElementById('cfg-jwt-token').value.trim();
+        const response = await fetch(`${backendUrl}/sos-requests`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || `API báo lỗi ${response.status}`);
+        }
+
+        const newSos = await response.json();
+        logConsole('REST API (Post SOS)', `🟢 Tạo yêu cầu SOS #${newSos.id} thành công!`, 'success', newSos);
+        plotSosOnMap(newSos);
+        animateScan(newSos);
+      } catch (err) {
+        logConsole('REST API (Post SOS)', `🔴 Lỗi tạo SOS: ${err.message}`, 'error');
+      }
+    });
+
+    // Random generator
+    document.getElementById('btn-fill-random').addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      const names = ["Trần Văn Thành", "Lê Thị Lan", "Nguyễn Quốc Bảo", "Phạm Minh Hoàng", "Đỗ Hữu Quân", "Vũ Huy Khang", "Bùi Thị Tuyết"];
+      const phones = ["0912111222", "0983444555", "0905666777", "0917222333", "0934888999", "0915667788"];
+      const types = ["FLOOD", "FIRE_FIGHTING", "TRAFFIC_ACCIDENT", "MEDICAL_EMERGENCY", "NATURAL_DISASTER", "OTHER"];
+      const severities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+      const descs = [
+        "Nước dâng cao ngập nửa nhà, đang lánh trên gác lửng cần cứu nạn gấp.",
+        "Nhà bị tốc mái tôn, sập bờ tường phía sau, có trẻ em nhỏ.",
+        "Chập điện cháy lan khu bếp nhà kho, khói mù mịt không ra cửa chính được.",
+        "Có vết nứt sạt lở đồi phía sau nhà, đất đá tràn xuống cửa bếp.",
+        "Lật thuyền gỗ trên sông do gió giật, 2 người đang bám vào mạn thuyền kêu cứu.",
+        "Chấn thương gãy chân do sập đồ đạc trong bão lốc, không tự di chuyển được."
+      ];
+
+      const hotspot = hcmcHotspots[Math.floor(Math.random() * hcmcHotspots.length)];
+      const offsetLat = (Math.random() - 0.5) * 0.02;
+      const offsetLng = (Math.random() - 0.5) * 0.02;
+      const finalLat = parseFloat((hotspot.lat + offsetLat).toFixed(6));
+      const finalLng = parseFloat((hotspot.lng + offsetLng).toFixed(6));
+
+      document.getElementById('sos-name').value = names[Math.floor(Math.random() * names.length)];
+      document.getElementById('sos-phone').value = phones[Math.floor(Math.random() * phones.length)];
+      document.getElementById('sos-type').value = types[Math.floor(Math.random() * types.length)];
+      document.getElementById('sos-severity').value = severities[Math.floor(Math.random() * severities.length)];
+      document.getElementById('sos-lat').value = finalLat;
+      document.getElementById('sos-lng').value = finalLng;
+      document.getElementById('sos-desc').value = descs[Math.floor(Math.random() * descs.length)];
+      document.getElementById('sos-trapped').value = Math.floor(Math.random() * 5) + 1;
+
+      setClickLocation(finalLat, finalLng);
+      fetchReverseGeocode(finalLat, finalLng);
+      
+      logConsole('SYSTEM', `Đã tạo ngẫu nhiên dữ liệu mẫu tại: ${hotspot.label}`, 'success');
+    });
+
+    document.getElementById('btn-clear-console').addEventListener('click', function() {
+      document.getElementById('socket-console').innerHTML = '<div class="text-slate-500 italic">[Màn hình đã được dọn sạch]</div>';
+    });
+
+    document.getElementById('btn-clear-map').addEventListener('click', function() {
+      activeScans.forEach(circle => map.removeLayer(circle));
+      activeScans = [];
+      logConsole('SYSTEM', 'Đã dọn sạch các vòng tròn quét trên bản đồ.', 'info');
+    });
+
+    // 9. LocalStorage Persistence helpers
+    document.getElementById('btn-save-config').addEventListener('click', function() {
+      const config = {
+        backendUrl: document.getElementById('cfg-backend-url').value,
+        provinceId: document.getElementById('cfg-province-id').value,
+        token: document.getElementById('cfg-jwt-token').value
+      };
+      localStorage.setItem(LS_KEY_CONFIG, JSON.stringify(config));
+      logConsole('SYSTEM', 'Đã lưu cấu hình kết nối vào LocalStorage!', 'success');
+      checkBackendHealth();
+    });
+
+    function loadSavedConfig() {
+      const configStr = localStorage.getItem(LS_KEY_CONFIG);
+      if (configStr) {
+        try {
+          const config = JSON.parse(configStr);
+          document.getElementById('cfg-backend-url').value = config.backendUrl || 'http://localhost:3000';
+          document.getElementById('cfg-province-id').value = config.provinceId || '1';
+          
+          const token = config.token || '';
+          document.getElementById('cfg-jwt-token').value = token;
+          if (token) {
+            handleTokenChange(token);
+          }
+          logConsole('SYSTEM', 'Đã nạp lại cấu hình kết nối đã lưu.', 'info');
+        } catch(e){}
+      }
+    }
+
+    // Direct Login action
+    document.getElementById('btn-do-login').addEventListener('click', async function(e) {
+      e.preventDefault();
+      const backendUrl = getCleanBackendUrl();
+      const username = document.getElementById('login-username').value;
+      const password = document.getElementById('login-password').value;
+
+      if (!username || !password) {
+        logConsole('REST AUTH', 'Vui lòng điền đầy đủ tên đăng nhập và mật khẩu!', 'error');
+        return;
+      }
+
+      logConsole('REST AUTH', `Đang đăng nhập tài khoản "${username}"...`, 'info');
+
+      try {
+        const response = await fetch(`${backendUrl}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ identifier: username, password })
+        });
+
+        if (!response.ok) {
+          throw new Error('Sai tài khoản hoặc mật khẩu');
+        }
+
+        const resBody = await response.json();
+        const data = resBody.data || resBody; // Support nested "data" envelope
+        const token = data.accessToken || data.token;
+        
+        if (token) {
+          document.getElementById('cfg-jwt-token').value = token;
+          logConsole('REST AUTH', '🟢 Đăng nhập thành công!', 'success', data);
+          
+          // Trigger parsing
+          handleTokenChange(token);
+          
+          // Save config automatically
+          document.getElementById('btn-save-config').click();
+        } else {
+          logConsole('REST AUTH', '🔴 Không tìm thấy JWT token trong phản hồi API.', 'error', data);
+        }
+      } catch (err) {
+        logConsole('REST AUTH', `🔴 Đăng nhập thất bại: ${err.message}`, 'error');
+      }
+    });
+
+    // Fetch and populate provinces from DB
+    async function loadProvinces() {
+      const backendUrl = getCleanBackendUrl();
+      const provinceSelect = document.getElementById('sos-province');
+      try {
+        const response = await fetch(`${backendUrl}/locations/provinces`);
+        if (!response.ok) return;
+        const resBody = await response.json();
+        const provinces = resBody.data || [];
+        
+        provinceSelect.innerHTML = '';
+        provinces.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name;
+          provinceSelect.appendChild(opt);
+        });
+
+        // Match with the current active province config
+        const savedProvinceId = document.getElementById('cfg-province-id').value;
+        if (savedProvinceId && provinces.some(p => p.id == savedProvinceId)) {
+          provinceSelect.value = savedProvinceId;
+        }
+        
+        if (provinceSelect.value) {
+          await loadWards(provinceSelect.value);
+        }
+      } catch (err) {
+        logConsole('SYSTEM', 'Lỗi khi tải danh sách Tỉnh/Thành từ API locations', 'error');
+      }
+    }
+
+    // Fetch and populate wards/districts for the selected province
+    async function loadWards(provinceId) {
+      if (!provinceId) return;
+      const backendUrl = getCleanBackendUrl();
+      const wardSelect = document.getElementById('sos-ward');
+      try {
+        const response = await fetch(`${backendUrl}/locations/wards?provinceId=${provinceId}`);
+        if (!response.ok) return;
+        const resBody = await response.json();
+        const wards = resBody.data || [];
+        
+        wardSelect.innerHTML = '';
+        if (wards.length === 0) {
+          wardSelect.innerHTML = '<option value="">Không có đơn vị hành chính</option>';
+          return;
+        }
+
+        wards.forEach(w => {
+          const opt = document.createElement('option');
+          opt.value = w.id;
+          opt.textContent = w.name;
+          wardSelect.appendChild(opt);
+        });
+      } catch (err) {
+        logConsole('SYSTEM', `Lỗi khi tải danh sách Đơn vị hành chính của tỉnh ID ${provinceId}`, 'error');
+      }
+    }
+
+    // Centering map on the province's designated center
+    async function centerMapOnProvince(provinceId) {
+      if (!provinceId) return;
+      const backendUrl = getCleanBackendUrl();
+      try {
+        const response = await fetch(`${backendUrl}/locations/provinces/${provinceId}/center`);
+        if (!response.ok) return;
+        const resBody = await response.json();
+        const center = resBody.data;
+        if (center && center.latitude && center.longitude) {
+          map.setView([center.latitude, center.longitude], 10);
+          logConsole('SYSTEM', `Đã di chuyển bản đồ tới trung tâm Tỉnh ID ${provinceId}`, 'info');
+        }
+      } catch (err) {}
+    }
+
+    // Listen to province changes
+    document.getElementById('sos-province').addEventListener('change', async function(e) {
+      const provinceId = e.target.value;
+      document.getElementById('cfg-province-id').value = provinceId;
+      
+      // Save config automatically
+      document.getElementById('btn-save-config').click();
+      
+      // Load administrative units and center map
+      await loadWards(provinceId);
+      await centerMapOnProvince(provinceId);
+    });
+
+    // Listen to manual token paste/input changes to decode immediately
+    document.getElementById('cfg-jwt-token').addEventListener('input', function(e) {
+      handleTokenChange(e.target.value.trim());
+    });
+
+    // 10. Startup
+    window.addEventListener('DOMContentLoaded', async () => {
+      initMap();
+      loadSavedConfig();
+      await checkBackendHealth();
+      
+      // Load locations dynamically from API
+      await loadProvinces();
+      
+      setInterval(checkBackendHealth, 15000);
+    });
+  </script>
+</body>
+</html>
