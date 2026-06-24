@@ -18,13 +18,13 @@ export default function AuditTab() {
   const [auditRole, setAuditRole] = useState(true);
   const [auditLockout, setAuditLockout] = useState(true);
 
-  const [logs, setLogs] = useState<AuditLogEntry[]>([
+  const logs: AuditLogEntry[] = [
     { timestamp: '2026-06-20 12:10:45', user: 'admin@system.com', action: 'Cấu hình hệ thống', details: 'Thay đổi tên hệ thống sang Cứu Hộ Việt Nam', ip: '192.168.1.5' },
     { timestamp: '2026-06-20 11:58:30', user: 'admin@system.com', action: 'Phân công cứu hộ', details: 'Điều phối Đội y tế khẩn cấp số 2 tới điểm ngập SOS-452', ip: '192.168.1.5' },
     { timestamp: '2026-06-20 11:42:15', user: 'p_admin.hcm@system.com', action: 'Duyệt thành viên', details: 'Gán tài khoản tran.van.a@gmail.com vào Đội xuồng hơi quận 4', ip: '172.16.12.110' },
     { timestamp: '2026-06-20 11:20:02', user: 'admin@system.com', action: 'Khóa tài khoản', details: 'Tự động khóa tài khoản user.test@gmail.com do đăng nhập sai 5 lần', ip: '127.0.0.1' },
     { timestamp: '2026-06-20 10:55:40', user: 'admin@system.com', action: 'Thay đổi quyền', details: 'Cập nhật phân quyền module SOS cho vai trò TEAM_LEADER', ip: '192.168.1.5' },
-  ]);
+  ];
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();

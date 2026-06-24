@@ -8,4 +8,4 @@ export { rescueTeamMemberApi } from './rescue-team-member.api';
 export { userApi } from './user.api';
 export { roleApi } from './role.api';
 export { settingsApi } from './settings.api';
-
+export { sosApi } from './sos.api';

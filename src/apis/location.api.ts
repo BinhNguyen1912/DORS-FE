@@ -13,4 +13,17 @@ export const locationApi = {
     });
     return response.data.data;
   },
+
+  resolveLocation: async (
+    lat: number,
+    lng: number
+  ): Promise<{ provinceId: number; adminUnitId: number } | null> => {
+    const response = await api.get<{
+      success: boolean;
+      data: { provinceId: number; adminUnitId: number } | null;
+    }>('/locations/resolve', {
+      params: { lat, lng },
+    });
+    return response.data.data;
+  },
 };

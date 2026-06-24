@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
-  Search,
   Filter,
   Layers,
   ZoomIn,
@@ -13,24 +11,21 @@ import {
   AlertTriangle,
   Users,
   Clock,
-  Heart,
-  Wrench,
   CheckCircle2,
   Activity,
   Truck,
-  Shield,
-  Eye,
-  Check,
   Maximize2,
   Minimize2,
   ChevronDown,
   ChevronRight,
-  X
+  X,
+  Plus
 } from 'lucide-react';
-import { rescueTeamApi, locationApi } from '../../apis';
-import { ROUTES } from '../../constants';
+import { rescueTeamApi, locationApi, sosApi } from '../../apis';
 import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
+import { useSocket } from '../../providers/SocketProvider';
+import { DISPATCH_EVENTS } from '../../constants/websocket.constant';
 
 // Inject custom CSS to override Leaflet default white styles to fit the clean light theme
 const injectStyles = `
@@ -73,8 +68,8 @@ const getProvinceCenter = (name: string): [number, number] => {
 
 export default function DisasterListPage() {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { dispatchSocket } = useSocket();
 
   const [selectedSosType, setSelectedSosType] = useState('Tất cả');
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
@@ -82,6 +77,52 @@ export default function DisasterListPage() {
   const [showStatsOverlay, setShowStatsOverlay] = useState(true);
   const [selectedSeverity, setSelectedSeverity] = useState('Tất cả');
   const [selectedTeamStatus, setSelectedTeamStatus] = useState('Tất cả');
+
+  // Form states for creating SOS
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newRequesterName, setNewRequesterName] = useState('');
+  const [newRequesterPhone, setNewRequesterPhone] = useState('');
+  const [newRequestType, setNewRequestType] = useState('FLOOD');
+  const [newSeverity, setNewSeverity] = useState('HIGH');
+  const [newDescription, setNewDescription] = useState('');
+  const [newTrappedPeopleCount, setNewTrappedPeopleCount] = useState(1);
+  const [newRequiresEquipment, setNewRequiresEquipment] = useState(false);
+  const [newSpecialNeedsTags, setNewSpecialNeedsTags] = useState<string[]>([]);
+  const [newLatitude, setNewLatitude] = useState(16.0544);
+  const [newLongitude, setNewLongitude] = useState(108.2022);
+  const [isPickingLocation, setIsPickingLocation] = useState(false);
+
+  const resetCreateForm = () => {
+    setNewRequesterName('');
+    setNewRequesterPhone('');
+    setNewRequestType('FLOOD');
+    setNewSeverity('HIGH');
+    setNewDescription('');
+    setNewTrappedPeopleCount(1);
+    setNewRequiresEquipment(false);
+    setNewSpecialNeedsTags([]);
+    setNewLatitude(defaultCenter[0]);
+    setNewLongitude(defaultCenter[1]);
+    setIsPickingLocation(false);
+  };
+
+  const statusBadgeColors = useMemo(() => ({
+    PENDING: 'bg-yellow-50 text-yellow-600 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-450 dark:border-yellow-900',
+    PENDING_SPECIALIST: 'bg-purple-50 text-purple-650 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-900 animate-pulse',
+    DISPATCHED: 'bg-blue-50 text-blue-650 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900',
+    ON_SITE: 'bg-teal-50 text-teal-650 border-teal-200 dark:bg-teal-950/40 dark:text-teal-400 dark:border-teal-900',
+    RESOLVED: 'bg-green-50 text-green-650 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900',
+    CANCELLED: 'bg-gray-50 text-gray-500 border-gray-250 dark:bg-gray-800 dark:text-gray-400',
+  } as Record<string, string>), []);
+
+  const statusLabels = useMemo(() => ({
+    PENDING: 'Chờ duyệt',
+    PENDING_SPECIALIST: 'Chờ Đội chuyên môn',
+    DISPATCHED: 'Đang di chuyển',
+    ON_SITE: 'Đã tiếp cận',
+    RESOLVED: 'Hoàn thành',
+    CANCELLED: 'Đã hủy',
+  } as Record<string, string>), []);
 
   // Layer toggles
   const [showSos, setShowSos] = useState(true);
@@ -126,6 +167,80 @@ export default function DisasterListPage() {
     queryFn: () => rescueTeamApi.getAll({ provinceId: user?.provinceId, limit: 100 }),
   });
 
+  // 📡 Real-time WebSockets integration for SOS dispatch updates
+  useEffect(() => {
+    if (!dispatchSocket) return;
+
+    const handleNewSos = (sos: any) => {
+      console.log('📡 [WS] New SOS received:', sos);
+      
+      // Update the React Query cache: ['db-sos-requests', user?.provinceId]
+      queryClient.setQueryData<any[]>(['db-sos-requests', user?.provinceId], (oldData) => {
+        const list = oldData || [];
+        if (list.some((item) => item.id === sos.id)) return list;
+        return [sos, ...list];
+      });
+
+      // Show notification to user
+      toast.warning(`🚨 SOS MỚI: Yêu cầu từ ${sos.requesterName || 'Người dân'} (SĐT: ${sos.requesterPhone || 'Chưa cập nhật'}) tại ${sos.addressDetail || sos.adminUnit?.name || 'Vị trí hiện trường'}`);
+    };
+
+    const handleSosStatusUpdated = (payload: { sosId: number; status: string; assignedTeamId?: number; distanceMeters?: number }) => {
+      console.log('📡 [WS] SOS status updated:', payload);
+      
+      // Update the React Query cache: ['db-sos-requests', user?.provinceId]
+      queryClient.setQueryData<any[]>(['db-sos-requests', user?.provinceId], (oldData) => {
+        if (!oldData) return [];
+        return oldData.map((item) => {
+          if (item.id === payload.sosId) {
+            return {
+              ...item,
+              status: payload.status,
+              assignedTeamId: payload.assignedTeamId ?? item.assignedTeamId,
+            };
+          }
+          return item;
+        });
+      });
+
+      // Invalidate teams query to refresh team availability status
+      queryClient.invalidateQueries({ queryKey: ['db-teams-all', user?.provinceId] });
+
+      // Notify status change
+      const statusLabels: Record<string, string> = {
+        PENDING: 'Đang chờ xử lý',
+        DISPATCHED: 'Đang di chuyển đội cứu hộ',
+        ON_SITE: 'Đã tiếp cận hiện trường',
+        RESOLVED: 'Đã hoàn thành',
+        CANCELLED: 'Đã hủy',
+      };
+      const label = statusLabels[payload.status] || payload.status;
+      
+      if (payload.status === 'RESOLVED') {
+        toast.success(`✓ SOS-2024-${payload.sosId} đã được xử lý thành công!`);
+      } else if (payload.status === 'CANCELLED') {
+        toast.info(`✕ SOS-2024-${payload.sosId} đã bị hủy.`);
+      } else {
+        toast.info(`🔔 Trạng thái SOS-2024-${payload.sosId} cập nhật thành: ${label}`);
+      }
+    };
+
+    const handleNoTeam = (payload: { sosId: number; message: string }) => {
+      console.log('📡 [WS] No team available:', payload);
+      toast.error(`⚠️ BÁO ĐỘNG: SOS-2024-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
+    };
+
+    dispatchSocket.on(DISPATCH_EVENTS.SOS_CREATED, handleNewSos);
+    dispatchSocket.on(DISPATCH_EVENTS.SOS_STATUS_UPDATED, handleSosStatusUpdated);
+    dispatchSocket.on(DISPATCH_EVENTS.SOS_NO_TEAM, handleNoTeam);
+
+    return () => {
+      dispatchSocket.off(DISPATCH_EVENTS.SOS_CREATED, handleNewSos);
+      dispatchSocket.off(DISPATCH_EVENTS.SOS_STATUS_UPDATED, handleSosStatusUpdated);
+      dispatchSocket.off(DISPATCH_EVENTS.SOS_NO_TEAM, handleNoTeam);
+    };
+  }, [dispatchSocket, user?.provinceId, queryClient]);
+
   // Geolocation trigger
   const requestUserLocation = () => {
     if (navigator.geolocation) {
@@ -151,6 +266,26 @@ export default function DisasterListPage() {
   useEffect(() => {
     requestUserLocation();
   }, []);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    
+    const handleMapClick = (e: L.LeafletMouseEvent) => {
+      if (isPickingLocation) {
+        setNewLatitude(e.latlng.lat);
+        setNewLongitude(e.latlng.lng);
+        setIsPickingLocation(false);
+        setIsCreateModalOpen(true);
+        toast.success(`Đã chọn vị trí hiện trường: ${e.latlng.lng.toFixed(5)}, ${e.latlng.lat.toFixed(5)}`);
+      }
+    };
+    
+    map.on('click', handleMapClick);
+    return () => {
+      map.off('click', handleMapClick);
+    };
+  }, [isPickingLocation]);
 
   // Parse SOS requests from API
   const parsedSosRequests = useMemo(() => {
@@ -179,8 +314,12 @@ export default function DisasterListPage() {
         sender: sos.requesterName || 'Người dân',
         phone: sos.requesterPhone || 'Chưa cập nhật',
         description: sos.description || 'Yêu cầu cứu trợ khẩn cấp',
-        status: (sos.status || 'PENDING') as 'PENDING' | 'DISPATCHED' | 'ON_SITE' | 'RESOLVED' | 'CANCELLED',
+        status: (sos.status || 'PENDING') as 'PENDING' | 'PENDING_SPECIALIST' | 'DISPATCHED' | 'ON_SITE' | 'RESOLVED' | 'CANCELLED',
         trappedCount: sos.trappedPeopleCount || 1,
+        requiresEquipment: !!sos.requiresEquipment,
+        specialistPending: !!sos.specialistPending,
+        specialistType: sos.specialistType || '',
+        assignedTeamId: sos.assignedTeamId,
       };
     });
   }, [dbSosList, defaultCenter, provinceName]);
@@ -247,22 +386,45 @@ export default function DisasterListPage() {
     });
   }, [parsedTeams, selectedTeamStatus]);
 
-  // SOS status update mutation
-  const updateSosMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      return rescueTeamApi.updateSosStatus(id, { status });
+
+  // Auto-dispatch v6 mutation
+  const assignTeamMutation = useMutation({
+    mutationFn: async ({ id, teamId }: { id: number; teamId?: number | null }) => {
+      return sosApi.assignTeam(id, { teamId });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['db-sos-requests'] });
-      toast.success('Xác thực SOS và điều phối cứu hộ thành công!');
+      queryClient.invalidateQueries({ queryKey: ['db-teams-all'] });
+      if (data?.bestTeamId) {
+        toast.success(`Đã tự động điều phối Đội ID ${data.bestTeamId} với điểm số tối ưu!`);
+      } else {
+        toast.success('Đã chạy tự động điều phối v6 thành công!');
+      }
     },
     onError: (err: any) => {
-      toast.api(err, 'Lỗi khi xác thực SOS');
+      toast.api(err, 'Lỗi khi điều phối cứu hộ');
+    }
+  });
+
+  // Create SOS request mutation
+  const createSosMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return sosApi.create(data);
+    },
+    onSuccess: (newSos) => {
+      queryClient.invalidateQueries({ queryKey: ['db-sos-requests'] });
+      toast.success(`Đã tạo yêu cầu SOS khẩn cấp thành công! Mã: SOS-2024-${newSos.id}`);
+      setIsCreateModalOpen(false);
+      resetCreateForm();
+    },
+    onError: (err: any) => {
+      toast.api(err, 'Lỗi khi gửi yêu cầu SOS');
     }
   });
 
   const handleVerifySos = (id: number) => {
-    updateSosMutation.mutate({ id, status: 'DISPATCHED' });
+    // In v6, verification triggers the auto-dispatch scoring pipeline
+    assignTeamMutation.mutate({ id });
   };
 
   // Generate GeoJSON flood zone polygons dynamically centered on active city
@@ -418,7 +580,6 @@ export default function DisasterListPage() {
   useEffect(() => {
     if (!mapRef.current || !layersGroupRef.current) return;
 
-    const map = mapRef.current;
     const group = layersGroupRef.current;
     group.clearLayers();
 
@@ -442,14 +603,23 @@ export default function DisasterListPage() {
     }
 
     // Custom pins definitions
-    const getSosIcon = (severity: string) => {
+    const getSosIcon = (severity: string, status?: string) => {
       const pingBg = severity === 'CRITICAL' ? 'bg-red-500' : severity === 'HIGH' ? 'bg-amber-500' : 'bg-blue-500';
-      const iconBg = severity === 'CRITICAL' ? 'bg-red-600' : severity === 'HIGH' ? 'bg-amber-600' : 'bg-blue-600';
+      let iconBg = severity === 'CRITICAL' ? 'bg-red-600' : severity === 'HIGH' ? 'bg-amber-600' : 'bg-blue-600';
+      let outerBorder = 'border border-white';
+      
+      if (status === 'PENDING_SPECIALIST') {
+        iconBg = 'bg-purple-600';
+        outerBorder = 'border-2 border-purple-400 animate-pulse';
+      } else if (status === 'RESOLVED') {
+        iconBg = 'bg-gray-400';
+      }
+
       return L.divIcon({
         html: `
           <div class="relative flex items-center justify-center">
             <div class="absolute w-8 h-8 ${pingBg} rounded-full opacity-40 animate-ping"></div>
-            <div class="w-5.5 h-5.5 ${iconBg} text-white rounded-full flex items-center justify-center shadow-lg border border-white text-[8px] font-black tracking-tight">SOS</div>
+            <div class="w-5.5 h-5.5 ${iconBg} text-white rounded-full flex items-center justify-center shadow-lg ${outerBorder} text-[8px] font-black tracking-tight">SOS</div>
           </div>
         `,
         className: 'custom-div-icon',
@@ -505,24 +675,38 @@ export default function DisasterListPage() {
     // Draw SOS Points
     if (showSos) {
       filteredSosRequests.forEach((sos) => {
-        const marker = L.marker([sos.lat, sos.lng], { icon: getSosIcon(sos.severity) });
+        const marker = L.marker([sos.lat, sos.lng], { icon: getSosIcon(sos.severity, sos.status) });
+
+        const statusText = sos.status === 'PENDING' ? 'Chờ xử lý' :
+                           sos.status === 'PENDING_SPECIALIST' ? 'Đợi đội chuyên môn (Queue)' :
+                           sos.status === 'DISPATCHED' ? 'Đang di chuyển' :
+                           sos.status === 'ON_SITE' ? 'Đã tiếp cận' : 'Hoàn thành';
+                           
+        const equipmentText = sos.requiresEquipment ? '<span class="text-purple-650 font-bold ml-1">🚨 (Yêu cầu thiết bị)</span>' : '';
 
         const popupContent = `
           <div class="p-2 w-56 text-left font-sans text-xs">
             <div class="flex items-center justify-between border-b border-slate-200 pb-1.5 mb-2">
               <span class="font-extrabold text-[#ef4444]">${sos.code}</span>
               <span class="px-1.5 py-0.2 bg-red-50 text-red-600 border border-red-200 rounded font-black text-[9px] uppercase">
-                ${sos.severity === 'CRITICAL' ? 'Nguy hiểm' : sos.severity === 'HIGH' ? 'Cảnh báo' : 'Thấp'}
+                ${sos.severity === 'CRITICAL' ? 'Nguy hiểm' : 'Cảnh báo'}
               </span>
             </div>
-            <p class="mb-1 text-gray-700"><strong>Người gửi:</strong> ${sos.sender}</p>
-            <p class="mb-1 text-gray-700"><strong>Liên hệ:</strong> ${sos.phone}</p>
+            <p class="mb-1 text-gray-750"><strong>Người gửi:</strong> ${sos.sender}</p>
+            <p class="mb-1 text-gray-750"><strong>Liên hệ:</strong> ${sos.phone}</p>
+            <p class="mb-1 text-gray-750"><strong>Trạng thái:</strong> <span class="font-bold">${statusText}</span>${equipmentText}</p>
             <p class="mb-1 text-[11px] text-gray-500"><strong>Thời gian:</strong> ${sos.time}</p>
             <p class="mb-2.5 text-[11px] text-gray-650 font-medium"><strong>Mô tả:</strong> ${sos.description}</p>
             <div class="flex items-center gap-1.5 mt-1">
-              <button class="verify-sos-btn-popup w-full px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold transition-all shadow" data-id="${sos.id}">
-                ${sos.status === 'PENDING' ? 'Xác thực SOS' : 'Đã xác thực'}
-              </button>
+              ${sos.status === 'PENDING' ? `
+                <button class="verify-sos-btn-popup w-full px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold transition-all shadow cursor-pointer" data-id="${sos.id}">
+                  Kích hoạt Điều phối v6
+                </button>
+              ` : `
+                <div class="text-[10px] text-center w-full font-bold text-green-600 dark:text-green-400 uppercase py-1 border border-green-200 bg-green-50 rounded">
+                  ✓ ĐÃ DUYỆT ĐIỀU PHỐI
+                </div>
+              `}
             </div>
           </div>
         `;
@@ -611,12 +795,6 @@ export default function DisasterListPage() {
     }
   };
 
-  // Re-center map to original bounds
-  const resetMapViewport = () => {
-    if (mapRef.current) {
-      mapRef.current.setView(defaultCenter, 12, { animate: true });
-    }
-  };
 
   // 3. Dynamic Stats Summaries (No Mocking)
   const stats = useMemo(() => {
@@ -1009,6 +1187,16 @@ export default function DisasterListPage() {
                   </button>
                 </div>
 
+                <button
+                  onClick={() => {
+                    resetCreateForm();
+                    setIsCreateModalOpen(true);
+                  }}
+                  className="w-full mb-3 py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition-all duration-150 shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Plus size={12} /> Gửi SOS Khẩn Cấp
+                </button>
+
                 {isFiltersExpanded && (
                   <div className="space-y-2.5 text-left">
                     <div>
@@ -1080,22 +1268,27 @@ export default function DisasterListPage() {
                             <span className="text-[9px] text-gray-400 font-semibold">{sos.time.split(' ')[0]}</span>
                           </div>
                           <p className="text-gray-650 dark:text-gray-300 leading-tight font-semibold">{sos.location}</p>
-                          <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-slate-100 dark:border-slate-700">
-                            <span className={cn("px-1.5 py-0.2 text-[8px] font-black uppercase rounded border", badgeColors[sos.severity])}>
-                              {sos.severity === 'CRITICAL' ? 'Nguy hiểm' : 'Cảnh báo'}
-                            </span>
+                          <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-slate-100 dark:border-slate-700 w-full">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className={cn("px-1 py-0.2 text-[7px] font-black uppercase rounded border", badgeColors[sos.severity])}>
+                                {sos.severity === 'CRITICAL' ? 'Nguy hiểm' : 'Cảnh báo'}
+                              </span>
+                              <span className={cn("px-1 py-0.2 text-[7px] font-black uppercase rounded border", statusBadgeColors[sos.status] || 'bg-slate-50 text-slate-650 border-slate-200')}>
+                                {statusLabels[sos.status] || sos.status}
+                              </span>
+                              {sos.requiresEquipment && (
+                                <span className="px-1 py-0.2 text-[7px] font-black uppercase bg-violet-50 text-violet-600 border border-violet-200 rounded animate-pulse" title="Cần thiết bị chuyên dụng">
+                                  Thiết bị
+                                </span>
+                              )}
+                            </div>
                             {sos.status === 'PENDING' && (
                               <button onClick={(e) => {
                                 e.stopPropagation();
                                 handleVerifySos(sos.id);
                               }} className="px-1.5 py-0.5 bg-red-650 hover:bg-red-700 text-white rounded text-[8px] font-extrabold uppercase transition">
-                                Xác thực
+                                Điều phối
                               </button>
-                            )}
-                            {sos.status !== 'PENDING' && (
-                              <span className="flex items-center gap-0.5 text-[8px] font-bold text-green-600 uppercase">
-                                <Check size={8} className="stroke-[3]" /> Đã duyệt
-                              </span>
                             )}
                           </div>
                         </div>
@@ -1136,6 +1329,16 @@ export default function DisasterListPage() {
                   </button>
                 </div>
               </div>
+
+              <button
+                onClick={() => {
+                  resetCreateForm();
+                  setIsCreateModalOpen(true);
+                }}
+                className="w-full mb-3.5 py-2.5 px-3 bg-red-650 hover:bg-red-700 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-150 shadow flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus size={14} /> Gửi SOS Khẩn Cấp
+              </button>
 
               {isFiltersExpanded && (
                 <div className="space-y-3 text-left">
@@ -1239,22 +1442,27 @@ export default function DisasterListPage() {
                         </div>
                         <p className="text-[11px] text-gray-700 dark:text-gray-300 leading-tight font-medium">{sos.location}</p>
                         <p className="text-[10px] text-gray-500 leading-none">{sos.description}</p>
-                        <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-slate-100 dark:border-slate-700">
-                          <span className={cn("px-1.5 py-0.2 text-[8px] font-black uppercase rounded border", badgeColors[sos.severity])}>
-                            {sos.severity === 'CRITICAL' ? 'Nguy hiểm' : 'Cảnh báo'}
-                          </span>
+                        <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-slate-100 dark:border-slate-700 w-full">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className={cn("px-1 py-0.2 text-[7px] font-black uppercase rounded border", badgeColors[sos.severity])}>
+                              {sos.severity === 'CRITICAL' ? 'Nguy hiểm' : 'Cảnh báo'}
+                            </span>
+                            <span className={cn("px-1 py-0.2 text-[7px] font-black uppercase rounded border", statusBadgeColors[sos.status] || 'bg-slate-50 text-slate-650 border-slate-200')}>
+                              {statusLabels[sos.status] || sos.status}
+                            </span>
+                            {sos.requiresEquipment && (
+                              <span className="px-1 py-0.2 text-[7px] font-black uppercase bg-violet-50 text-violet-600 border border-violet-200 rounded animate-pulse" title="Cần thiết bị chuyên dụng">
+                                Thiết bị
+                              </span>
+                            )}
+                          </div>
                           {sos.status === 'PENDING' && (
                             <button onClick={(e) => {
                               e.stopPropagation();
                               handleVerifySos(sos.id);
                             }} className="px-2 py-0.5 bg-red-650 hover:bg-red-700 text-white rounded text-[8px] font-extrabold uppercase transition">
-                              Xác thực
+                              Điều phối
                             </button>
-                          )}
-                          {sos.status !== 'PENDING' && (
-                            <span className="flex items-center gap-0.5 text-[8px] font-bold text-green-650 dark:text-green-400 uppercase">
-                              <Check size={8} className="stroke-[3]" /> Đã xác thực
-                            </span>
                           )}
                         </div>
                       </div>
@@ -1422,6 +1630,231 @@ export default function DisasterListPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating alert banner when picking location on map */}
+      {isPickingLocation && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[10000] bg-blue-600 border border-blue-500 text-white font-extrabold text-xs uppercase px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 animate-bounce">
+          <Compass className="animate-spin text-white" size={16} />
+          <span>Click vào bất cứ điểm nào trên bản đồ để chọn tọa độ sự cố!</span>
+        </div>
+      )}
+
+      {/* Create SOS Request Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-left">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-[#0d1527]">
+              <div>
+                <h3 className="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider">Tạo Yêu Cầu SOS Khẩn Cấp Mới</h3>
+                <p className="text-[10px] text-gray-500 mt-0.5">Hệ thống sẽ chạy thuật toán tự động điều phối v6 sau khi lưu.</p>
+              </div>
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-750 dark:hover:text-white rounded-lg transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)]">
+              {/* Requester Information */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">Tên người gửi SOS</label>
+                  <input
+                    type="text"
+                    value={newRequesterName}
+                    onChange={(e) => setNewRequesterName(e.target.value)}
+                    placeholder="Nguyễn Văn A"
+                    className="w-full bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-gray-750 dark:text-gray-300 text-xs font-semibold rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">Số điện thoại</label>
+                  <input
+                    type="text"
+                    value={newRequesterPhone}
+                    onChange={(e) => setNewRequesterPhone(e.target.value)}
+                    placeholder="0917234567"
+                    className="w-full bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-gray-750 dark:text-gray-300 text-xs font-semibold rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Request Type and Severity */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">Loại sự cố</label>
+                  <select
+                    value={newRequestType}
+                    onChange={(e) => setNewRequestType(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-gray-750 dark:text-gray-300 text-xs font-semibold rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500 transition"
+                  >
+                    <option value="FLOOD">Ngập lụt (FLOOD)</option>
+                    <option value="FIRE_FIGHTING">Hỏa hoạn (FIRE_FIGHTING)</option>
+                    <option value="TRAFFIC_ACCIDENT">Tai nạn giao thông</option>
+                    <option value="MEDICAL_EMERGENCY">Y tế khẩn cấp</option>
+                    <option value="NATURAL_DISASTER">Thiên tai khẩn cấp</option>
+                    <option value="OTHER">Khác (OTHER)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">Mức độ nghiêm trọng</label>
+                  <select
+                    value={newSeverity}
+                    onChange={(e) => setNewSeverity(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-gray-750 dark:text-gray-300 text-xs font-semibold rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500 transition"
+                  >
+                    <option value="CRITICAL">Nguy hiểm cực cao (CRITICAL)</option>
+                    <option value="HIGH">Cảnh báo cao (HIGH)</option>
+                    <option value="MEDIUM">Ngập nhẹ / Vừa (MEDIUM)</option>
+                    <option value="LOW">An toàn / Thấp (LOW)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Coordinates Picker */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">Tọa độ hiện trường</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div className="bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-850 rounded-xl px-3 py-2 text-xs font-bold text-gray-750 dark:text-gray-300">
+                      Lng: {newLongitude.toFixed(5)}
+                    </div>
+                    <div className="bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-850 rounded-xl px-3 py-2 text-xs font-bold text-gray-750 dark:text-gray-300">
+                      Lat: {newLatitude.toFixed(5)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreateModalOpen(false);
+                      setIsPickingLocation(true);
+                      toast.info("Vui lòng click 1 điểm trên bản đồ để chọn tọa độ!");
+                    }}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 flex-shrink-0"
+                  >
+                    <Compass size={14} /> Chọn trên bản đồ
+                  </button>
+                </div>
+              </div>
+
+              {/* Trapped People and Special equipment */}
+              <div className="grid grid-cols-2 gap-3 items-center">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">Số người bị nạn</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newTrappedPeopleCount}
+                    onChange={(e) => setNewTrappedPeopleCount(parseInt(e.target.value, 10) || 1)}
+                    className="w-full bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-gray-705 dark:text-gray-300 text-xs font-semibold rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500 transition"
+                  />
+                </div>
+                
+                {/* Requires Special Equipment Checkbox */}
+                <div className="flex items-center gap-2 pt-4">
+                  <input
+                    type="checkbox"
+                    id="requiresEquipment"
+                    checked={newRequiresEquipment}
+                    onChange={(e) => setNewRequiresEquipment(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 border-slate-350 focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                  />
+                  <label htmlFor="requiresEquipment" className="text-xs font-bold text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                    Cần thiết bị chuyên dụng
+                  </label>
+                </div>
+              </div>
+
+              {/* Special Needs Tags */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">Đối tượng cần lưu ý</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {[
+                    { code: 'ELDERLY', label: 'Elderly (Người già)' },
+                    { code: 'CHILD', label: 'Child (Trẻ em)' },
+                    { code: 'PREGNANT', label: 'Pregnant (Bà bầu)' },
+                    { code: 'DISABLED', label: 'Disabled (Khuyết tật)' },
+                  ].map((tag) => {
+                    const isSelected = newSpecialNeedsTags.includes(tag.code);
+                    return (
+                      <button
+                        key={tag.code}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setNewSpecialNeedsTags(newSpecialNeedsTags.filter(t => t !== tag.code));
+                          } else {
+                            setNewSpecialNeedsTags([...newSpecialNeedsTags, tag.code]);
+                          }
+                        }}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] font-bold rounded-lg border transition",
+                          isSelected
+                            ? "bg-blue-50 border-blue-300 text-blue-600 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-400"
+                            : "bg-white border-slate-200 text-gray-500 dark:bg-transparent dark:border-slate-800 dark:text-gray-450 hover:bg-slate-50"
+                        )}
+                      >
+                        {tag.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">Mô tả chi tiết</label>
+                <textarea
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="Mô tả cụ thể tình hình và yêu cầu hỗ trợ..."
+                  rows={3}
+                  className="w-full bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-gray-755 dark:text-gray-300 text-xs font-semibold rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500 transition resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-[#0d1527] flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-gray-750 text-gray-700 dark:text-gray-350 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newRequesterName || !newRequesterPhone) {
+                    toast.error("Vui lòng điền tên và số điện thoại người gửi!");
+                    return;
+                  }
+                  createSosMutation.mutate({
+                    requesterName: newRequesterName,
+                    requesterPhone: newRequesterPhone,
+                    requestType: newRequestType,
+                    severity: newSeverity as any,
+                    description: newDescription,
+                    trappedPeopleCount: newTrappedPeopleCount,
+                    requiresEquipment: newRequiresEquipment,
+                    specialNeedsTags: newSpecialNeedsTags,
+                    latitude: newLatitude,
+                    longitude: newLongitude,
+                    provinceId: user?.provinceId || 1,
+                    imageUrls: ['https://storage.rescue.gov.vn/sos/img.jpg'], // fallback
+                  });
+                }}
+                disabled={createSosMutation.isPending}
+                className="px-5 py-2 bg-red-650 hover:bg-red-750 text-white rounded-xl text-xs font-extrabold uppercase tracking-wide transition shadow flex items-center gap-1.5 cursor-pointer"
+              >
+                {createSosMutation.isPending ? "Đang gửi..." : "Gửi yêu cầu SOS"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

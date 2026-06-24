@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Save, Check, X, Shield, Users, MapPin, CheckSquare, Square } from 'lucide-react';
+import { Save, Shield, Users, MapPin, CheckSquare, Square } from 'lucide-react';
 import { toast } from '../../../stores';
 
 type RbacSubTab = 'roles' | 'matrix' | 'scope';

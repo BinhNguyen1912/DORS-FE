@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Save, ChevronDown, Database, Upload, Download } from 'lucide-react';
+import { Save, ChevronDown, Database, Upload } from 'lucide-react';
 import { toast } from '../../../stores';
 
 export default function BackupTab() {

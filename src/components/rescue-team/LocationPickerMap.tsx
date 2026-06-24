@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Search, MapPin, Loader2 } from 'lucide-react';
+import { Search, MapPin, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from '../../stores';
 import type { Province, AdministrativeUnit } from '../../types';
 
@@ -9,6 +9,7 @@ interface LocationPickerMapProps {
   latitude?: string;
   longitude?: string;
   onChange: (lat: string, lng: string) => void;
+  isResolvingLocation?: boolean;
   provinceId?: number;
   adminUnitId?: string;
   provinces: Province[];
@@ -19,6 +20,7 @@ export default function LocationPickerMap({
   latitude,
   longitude,
   onChange,
+  isResolvingLocation = false,
   provinceId,
   adminUnitId,
   provinces,
@@ -211,6 +213,15 @@ export default function LocationPickerMap({
       {/* Interactive Map */}
       <div className="relative h-[300px] w-full rounded-xl overflow-hidden border border-slate-150 dark:border-gray-700 z-10">
         <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: '300px' }} />
+        {/* Resolving overlay */}
+        {isResolvingLocation && (
+          <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2 z-20 rounded-xl">
+            <Loader2 className="animate-spin text-indigo-600" size={26} />
+            <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
+              Đang xác định đơn vị hành chính...
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Coordinates readouts */}
@@ -234,6 +245,16 @@ export default function LocationPickerMap({
           />
         </div>
       </div>
+
+      {/* Auto-resolve status */}
+      {latitude && longitude && !isResolvingLocation && (
+        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+          <CheckCircle size={13} />
+          <p className="text-[10px] font-bold">
+            Tọa độ đã được xác định — Tỉnh/Xã sẽ tự động điền
+          </p>
+        </div>
+      )}
     </div>
   );
 }

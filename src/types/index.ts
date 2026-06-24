@@ -145,6 +145,34 @@ export interface DisasterEvent {
   updatedAt: string;
 }
 
+export interface SosRequest {
+  id: number;
+  requesterName?: string;
+  requesterPhone?: string;
+  requestType: string;
+  latitude?: number;
+  longitude?: number;
+  location?: {
+    type: 'Point';
+    coordinates: [number, number];
+  };
+  description?: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'PENDING' | 'PENDING_SPECIALIST' | 'DISPATCHED' | 'ON_SITE' | 'RESOLVED' | 'CANCELLED';
+  provinceId?: number;
+  adminUnitId?: number;
+  trappedPeopleCount: number;
+  specialNeedsTags?: string[];
+  imageUrls?: string[];
+  requiresEquipment?: boolean;
+  specialistPending?: boolean;
+  specialistType?: string;
+  pendingSince?: string;
+  assignedTeamId?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Donation {
   id: number;
   donorName: string;

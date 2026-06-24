@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Save, Loader2, Info } from 'lucide-react';
 import { rescueTeamApi, locationApi } from '../../apis';
+import { useRef, useCallback } from 'react';
 import { ROUTES } from '../../constants';
 import { cn } from '../../lib/utils';
 import type { Province, AdministrativeUnit } from '../../types';
@@ -12,18 +13,29 @@ import { useAuthStore, toast } from '../../stores';
 import ImageUpload from '../../components/common/ImageUpload';
 import LocationPickerMap from '../../components/rescue-team/LocationPickerMap';
 
-// Zod validation schema matching backend inputs (treated as strings from HTML elements, cast on submission)
-const rescueTeamSchema = z.object({
-  name: z.string().min(2, 'Tên đội cứu hộ phải có ít nhất 2 ký tự'),
-  provinceId: z.string().min(1, 'Vui lòng chọn Tỉnh/Thành phố'),
-  adminUnitId: z.string().min(1, 'Vui lòng chọn Quận/Huyện/Phường/Xã'),
-  teamType: z.enum(['DAN_PHONG', 'PCCC', 'QUAN_SU', 'TINH_NGUYEN', 'Y_TE', 'TONG_HOP']),
-  maxCapacity: z.string().optional(),
-  logoUrl: z.string().optional(),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
-  specializationIds: z.array(z.number()),
-});
+// Zod validation schema - provinceId/adminUnitId are optional when coordinates are provided
+const rescueTeamSchema = z
+  .object({
+    name: z.string().min(2, 'Tên đội cứu hộ phải có ít nhất 2 ký tự'),
+    provinceId: z.string().optional(),
+    adminUnitId: z.string().optional(),
+    teamType: z.enum(['DAN_PHONG', 'PCCC', 'QUAN_SU', 'TINH_NGUYEN', 'Y_TE', 'TONG_HOP']),
+    maxCapacity: z.string().optional(),
+    logoUrl: z.string().optional(),
+    latitude: z.string().optional(),
+    longitude: z.string().optional(),
+    specializationIds: z.array(z.number()),
+  })
+  .refine(
+    (data) =>
+      (data.provinceId && data.adminUnitId) ||
+      (data.latitude && data.longitude),
+    {
+      message:
+        'Vui lòng chọn vị trí trên bản đồ hoặc chọn Tỉnh/Thành phố và Quận/Xã/Phường',
+      path: ['provinceId'],
+    }
+  );
 
 type RescueTeamForm = z.infer<typeof rescueTeamSchema>;
 
@@ -46,6 +58,8 @@ export default function RescueTeamCreatePage() {
   const [specializations, setSpecializations] = useState<any[]>([]);
   const [loadingWards, setLoadingWards] = useState(false);
   const [loadingSpecializations, setLoadingSpecializations] = useState(false);
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const resolveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigate = useNavigate();
 
@@ -76,6 +90,44 @@ export default function RescueTeamCreatePage() {
   const provinceIdStr = watch('provinceId');
   const provinceId = provinceIdStr ? Number(provinceIdStr) : undefined;
   const selectedSpecs = watch('specializationIds') || [];
+
+  // Auto-resolve province/ward from GPS coordinates after user picks on map
+  const handleMapLocationChange = useCallback(
+    (lat: string, lng: string) => {
+      setValue('latitude', lat);
+      setValue('longitude', lng);
+
+      if (resolveDebounceRef.current) {
+        clearTimeout(resolveDebounceRef.current);
+      }
+
+      resolveDebounceRef.current = setTimeout(async () => {
+        setIsResolvingLocation(true);
+        try {
+          const resolved = await locationApi.resolveLocation(
+            Number(lat),
+            Number(lng),
+          );
+          if (resolved) {
+            setValue('provinceId', String(resolved.provinceId));
+            // Trigger ward list reload before setting adminUnitId
+            await new Promise<void>((resolve) => {
+              const check = setInterval(() => {
+                clearInterval(check);
+                resolve();
+              }, 600);
+            });
+            setValue('adminUnitId', String(resolved.adminUnitId));
+          }
+        } catch (err) {
+          console.error('Lỗi khi tự động xác định đơn vị hành chính từ tọa độ:', err);
+        } finally {
+          setIsResolvingLocation(false);
+        }
+      }, 800);
+    },
+    [setValue],
+  );
 
 
 
@@ -163,19 +215,21 @@ export default function RescueTeamCreatePage() {
     try {
       const submitData: any = {
         name: data.name,
-        provinceId: Number(data.provinceId),
-        adminUnitId: Number(data.adminUnitId),
         teamType: data.teamType,
         maxCapacity: data.maxCapacity ? Number(data.maxCapacity) : undefined,
         logoUrl: data.logoUrl || undefined,
         specializationIds: data.specializationIds.length > 0 ? data.specializationIds : undefined,
       };
 
-      // Construct GeoJSON point if coordinates are provided
+      // Only send province/adminUnit if explicitly selected
+      if (data.provinceId) submitData.provinceId = Number(data.provinceId);
+      if (data.adminUnitId) submitData.adminUnitId = Number(data.adminUnitId);
+
+      // Construct GeoJSON point if coordinates are provided (backend resolves ids from coords if needed)
       if (data.latitude && data.longitude) {
         submitData.baseLocation = {
           type: 'Point',
-          coordinates: [Number(data.longitude), Number(data.latitude)], // GeoJSON standard: [lng, lat]
+          coordinates: [Number(data.longitude), Number(data.latitude)], // GeoJSON: [lng, lat]
         };
       }
 
@@ -256,8 +310,15 @@ export default function RescueTeamCreatePage() {
 
             {/* Tỉnh / Thành Phố */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
-                Tỉnh / Thành phố *
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                Tỉnh / Thành phố
+                {isResolvingLocation ? (
+                  <span className="flex items-center gap-1 text-indigo-500 font-normal">
+                    <Loader2 size={10} className="animate-spin" /> Đang tự động xác định...
+                  </span>
+                ) : (
+                  <span className="text-gray-400 dark:text-gray-500 font-normal">(Tự động điền từ bản đồ)</span>
+                )}
               </label>
               <select
                 {...register('provinceId')}
@@ -265,10 +326,12 @@ export default function RescueTeamCreatePage() {
                   'w-full px-3.5 py-2 rounded-xl text-xs border bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-semibold',
                   errors.provinceId
                     ? 'border-red-500 focus:border-red-500'
+                    : watch('provinceId')
+                    ? 'border-green-400 dark:border-green-600'
                     : 'border-gray-200 dark:border-gray-700 focus:border-indigo-500 dark:focus:border-indigo-400'
                 )}
               >
-                <option value="">-- Chọn Tỉnh / Thành phố --</option>
+                <option value="">-- Chọn hoặc để hệ thống tự điền --</option>
                 {provinces.map((prov) => (
                   <option key={prov.id} value={prov.id}>
                     {prov.name}
@@ -282,8 +345,9 @@ export default function RescueTeamCreatePage() {
 
             {/* Quận / Huyện / Phường / Xã */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
-                Quận / Huyện / Phường / Xã *
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                Quận / Huyện / Phường / Xã
+                <span className="text-gray-400 dark:text-gray-500 font-normal">(Tự động điền từ bản đồ)</span>
               </label>
               <select
                 {...register('adminUnitId')}
@@ -292,12 +356,14 @@ export default function RescueTeamCreatePage() {
                   'w-full px-3.5 py-2 rounded-xl text-xs border bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-semibold',
                   errors.adminUnitId
                     ? 'border-red-500 focus:border-red-500'
+                    : watch('adminUnitId')
+                    ? 'border-green-400 dark:border-green-600'
                     : 'border-gray-200 dark:border-gray-700 focus:border-indigo-500 dark:focus:border-indigo-400',
                   (!provinceId || loadingWards) && 'opacity-60 cursor-not-allowed'
                 )}
               >
                 <option value="">
-                  {loadingWards ? 'Đang tải danh sách...' : '-- Chọn Quận / Huyện / Xã --'}
+                  {loadingWards ? 'Đang tải danh sách...' : '-- Chọn hoặc để hệ thống tự điền --'}
                 </option>
                 {wards.map((ward) => (
                   <option key={ward.id} value={ward.id}>
@@ -345,10 +411,8 @@ export default function RescueTeamCreatePage() {
         <LocationPickerMap
           latitude={watch('latitude')}
           longitude={watch('longitude')}
-          onChange={(lat, lng) => {
-            setValue('latitude', lat);
-            setValue('longitude', lng);
-          }}
+          onChange={handleMapLocationChange}
+          isResolvingLocation={isResolvingLocation}
           provinceId={provinceId}
           adminUnitId={watch('adminUnitId')}
           provinces={provinces}

@@ -10,7 +10,6 @@ import {
   AlertCircle,
   Save,
   Trash2,
-  Search,
 } from 'lucide-react';
 import { rescueTeamApi, locationApi, rescueTeamMemberApi, userApi } from '../../apis';
 import { ROUTES } from '../../constants';

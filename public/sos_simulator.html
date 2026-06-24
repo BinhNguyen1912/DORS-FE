@@ -239,13 +239,23 @@
             <!-- Row 3: Admin Areas / Trapped People -->
             <div class="grid grid-cols-3 gap-3">
               <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Tỉnh / Thành</label>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="block text-xs font-medium text-slate-400">Tỉnh / Thành</label>
+                  <button type="button" onclick="loadProvinces()" class="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center">
+                    <i data-lucide="refresh-cw" class="w-2.5 h-2.5 mr-0.5"></i>
+                  </button>
+                </div>
                 <select id="sos-province" required class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
                   <option value="1">Đang tải...</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-400 mb-1">Quận / Huyện</label>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="block text-xs font-medium text-slate-400">Quận / Huyện</label>
+                  <button type="button" onclick="loadWards(document.getElementById('sos-province').value)" class="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center">
+                    <i data-lucide="refresh-cw" class="w-2.5 h-2.5 mr-0.5"></i>
+                  </button>
+                </div>
                 <select id="sos-ward" required class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500">
                   <option value="">Chọn Quận/Huyện</option>
                 </select>
@@ -265,6 +275,17 @@
               <div>
                 <label class="block text-xs font-medium text-slate-400 mb-1">Kinh độ (Longitude)</label>
                 <input type="number" step="any" id="sos-lng" required class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-red-500" value="106.660172">
+              </div>
+            </div>
+
+            <!-- Row 4.5: Special Equipment Requirement Toggle -->
+            <div class="flex items-start space-x-3 p-3 bg-slate-900/40 rounded-lg border border-slate-800/80">
+              <input type="checkbox" id="sos-requires-equipment" class="mt-0.5 w-4.5 h-4.5 text-indigo-600 bg-slate-950 border-slate-800 rounded focus:ring-indigo-500 focus:ring-offset-slate-950 focus:ring-2 cursor-pointer">
+              <div class="flex flex-col select-none">
+                <label for="sos-requires-equipment" class="text-xs font-semibold text-slate-200 cursor-pointer">
+                  Cần thiết bị chuyên dụng (Requires Specialist)
+                </label>
+                <span class="text-[10px] text-slate-400 font-normal">Yêu cầu đội chuyên môn (Specialist Team) thay vì đội phản ứng nhanh cơ bản</span>
               </div>
             </div>
 
@@ -336,8 +357,9 @@
         <div class="absolute bottom-3 left-3 bg-slate-950/90 border border-slate-800/80 rounded-lg p-2.5 z-[500] text-[10px] space-y-1.5 shadow-xl backdrop-blur-md">
           <div class="font-semibold text-slate-400 border-b border-slate-800 pb-1 mb-1 uppercase">Chú giải bản đồ</div>
           <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-red-600 inline-block mr-2 border border-white"></span> Yêu cầu SOS Mới (PENDING)</div>
-          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-orange-500 inline-block mr-2 border border-white"></span> Đã Phân Đội (ASSIGNED)</div>
-          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 inline-block mr-2 border border-white"></span> Hoàn thành (COMPLETED)</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-violet-500 inline-block mr-2 border border-white"></span> Chờ Đội Chuyên Môn (PENDING_SPECIALIST)</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-orange-500 inline-block mr-2 border border-white"></span> Đang di chuyển / Đã Phân (DISPATCHED/ASSIGNED)</div>
+          <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 inline-block mr-2 border border-white"></span> Hoàn thành (RESOLVED)</div>
           <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-400/20 border border-emerald-400 inline-block mr-2"></span> Đội cứu hộ hoạt động</div>
         </div>
       </div>
@@ -350,6 +372,9 @@
             <span class="font-semibold text-slate-200 font-mono">Bảng điều khiển dòng sự kiện (Live Sockets Stream)</span>
           </div>
           <div class="flex items-center space-x-2">
+            <button id="btn-check-sockets" class="text-xs px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/20 rounded transition flex items-center">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1"></i> Kiểm tra Socket
+            </button>
             <button id="btn-clear-console" class="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded transition flex items-center">
               <i data-lucide="ban" class="w-3.5 h-3.5 mr-1"></i> Xóa màn hình
             </button>
@@ -416,6 +441,11 @@
         
         // Reverse Geocode click point for better user experience
         fetchReverseGeocode(lat, lng);
+      });
+
+      // Initialize Lucide icons on dynamic popups
+      map.on('popupopen', () => {
+        lucide.createIcons();
       });
     }
 
@@ -495,12 +525,32 @@
         const userId = payload.sub;
         const email = payload.email || 'Ẩn danh';
 
+        // Extract full name & phone from token claims
+        const fullName = payload.fullName || payload.name || '';
+        const phone = payload.phone || payload.phoneNumber || '';
+
         // Auto update config values
         document.getElementById('cfg-province-id').value = provinceId;
         const provinceSelect = document.getElementById('sos-province');
         if (provinceSelect) {
-          provinceSelect.value = provinceId;
-          provinceSelect.dispatchEvent(new Event('change'));
+          if (Array.from(provinceSelect.options).some(opt => opt.value == provinceId)) {
+            provinceSelect.value = provinceId;
+            provinceSelect.dispatchEvent(new Event('change'));
+          }
+        }
+
+        // Auto-fill SOS form requester fields from token
+        if (fullName) {
+          const nameInput = document.getElementById('sos-name');
+          if (nameInput && !nameInput.value) {
+            nameInput.value = fullName;
+          }
+        }
+        if (phone) {
+          const phoneInput = document.getElementById('sos-phone');
+          if (phoneInput && !phoneInput.value) {
+            phoneInput.value = phone;
+          }
         }
 
         // Map role name visually
@@ -521,15 +571,19 @@
             <div>• Cấp quyền: <b class="text-indigo-300">${roleName}</b></div>
             <div>• Tỉnh thành ID: <b class="text-indigo-300">${provinceId}</b></div>
             <div class="truncate">• Email: <b class="text-indigo-300" title="${email}">${email}</b></div>
+            ${fullName ? `<div>• Họ tên: <b class="text-emerald-300">${fullName}</b></div>` : ''}
+            ${phone ? `<div>• Điện thoại: <b class="text-emerald-300">${phone}</b></div>` : ''}
           </div>
+          ${(fullName || phone) ? `<div class="mt-1.5 text-[10px] text-emerald-400/80 flex items-center gap-1"><i data-lucide="check-circle" class="w-3 h-3"></i> Đã tự động điền tên và SĐT vào form SOS</div>` : ''}
         `;
         infoBadge.classList.remove('hidden');
         lucide.createIcons();
-        logConsole('JWT PARSER', `🔑 Tự động trích xuất cấu hình: Tỉnh=${provinceId} | Quyền=${roleName} | UserId=${userId}`, 'success');
+        logConsole('JWT PARSER', `🔑 Tự động trích xuất cấu hình: Tỉnh=${provinceId} | Quyền=${roleName} | UserId=${userId}${fullName ? ` | Tên=${fullName}` : ''}${phone ? ` | SĐT=${phone}` : ''}`, 'success');
       } else {
         infoBadge.classList.add('hidden');
       }
     }
+
 
     // 3. Logging utility
     function logConsole(source, message, type = 'log', data = null) {
@@ -632,7 +686,18 @@
             role = payload.role || 'ADMIN';
           } catch(e){}
         }
-        queryParams = { provinceId: String(provinceId), role };
+        
+        let pId = String(provinceId).trim();
+        if (!pId || pId === 'undefined' || pId === 'null') {
+          pId = document.getElementById('cfg-province-id').value.trim();
+        }
+        if (!pId || pId === 'undefined' || pId === 'null') {
+          pId = '1';
+        }
+        // Force the input to show the fallback value if it was empty
+        document.getElementById('cfg-province-id').value = pId;
+        
+        queryParams = { provinceId: pId, role };
       }
 
       const socket = io(`${backendUrl}${ns}`, {
@@ -716,6 +781,37 @@
       }
     }
 
+    function checkSocketStatus() {
+      logConsole('SOCKET STATUS', '--- BẮT ĐẦU KIỂM TRA TRẠNG THÁI KẾT NỐI SOCKET ---', 'info');
+      
+      const namespaces = ['/notification', '/dispatch'];
+      namespaces.forEach(ns => {
+        const socket = sockets[ns];
+        if (socket) {
+          if (socket.connected) {
+            logConsole(`SOCKET [${ns}]`, `🟢 ĐÃ KẾT NỐI (CONNECTED) | ID: ${socket.id}`, 'success', {
+              connected: true,
+              id: socket.id,
+              uri: socket.io ? socket.io.uri : '',
+              path: socket.io ? socket.io.opts.path : '',
+              transports: socket.io ? socket.io.opts.transports : []
+            });
+          } else {
+            logConsole(`SOCKET [${ns}]`, `🟡 MẤT KẾT NỐI / ĐANG THỬ LẠI (DISCONNECTED)`, 'warning', {
+              connected: false,
+              disconnected: socket.disconnected
+            });
+          }
+        } else {
+          logConsole(`SOCKET [${ns}]`, `🔴 CHƯA KẾT NỐI (UNINITIALIZED) | Vui lòng nhấn nút "Kết nối" ở khung cấu hình bên trái`, 'error');
+        }
+      });
+      
+      logConsole('SOCKET STATUS', '---------------------------------------------------', 'info');
+    }
+
+    window.checkSocketStatus = checkSocketStatus;
+
     // 6. Map UI feedback (concentric scanner waves & custom marker pins)
     function plotSosOnMap(sos) {
       const id = sos.id;
@@ -729,8 +825,9 @@
       }
 
       let markerColor = 'red';
-      if (sos.status === 'ASSIGNED' || sos.status === 'RESOLVING') markerColor = 'orange';
-      if (sos.status === 'COMPLETED') markerColor = 'green';
+      if (sos.status === 'PENDING_SPECIALIST') markerColor = 'violet';
+      if (sos.status === 'DISPATCHED' || sos.status === 'ASSIGNED' || sos.status === 'RESOLVING') markerColor = 'orange';
+      if (sos.status === 'COMPLETED' || sos.status === 'RESOLVED') markerColor = 'green';
 
       const icon = L.icon({
         iconUrl: `https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
@@ -741,16 +838,42 @@
         shadowSize: [41, 41]
       });
 
+      let statusBadgeColor = 'text-red-600 bg-red-50 border-red-200';
+      if (sos.status === 'PENDING_SPECIALIST') statusBadgeColor = 'text-violet-600 bg-violet-50 border-violet-200';
+      if (sos.status === 'DISPATCHED') statusBadgeColor = 'text-amber-600 bg-amber-50 border-amber-200';
+      if (sos.status === 'ASSIGNED' || sos.status === 'RESOLVING') statusBadgeColor = 'text-orange-600 bg-orange-50 border-orange-200';
+      if (sos.status === 'COMPLETED' || sos.status === 'RESOLVED') statusBadgeColor = 'text-green-600 bg-green-50 border-green-200';
+
+      const requiresEquipBadge = sos.requiresEquipment 
+        ? '<span class="px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 text-[10px] font-bold">CÓ (Specialist)</span>' 
+        : '<span class="text-slate-500">Không</span>';
+
       const popupHtml = `
-        <div class="text-slate-900 text-xs">
-          <div class="font-bold border-b border-slate-200 pb-1 mb-1 text-sm text-red-600">🆘 SOS #${id} (${sos.requestType})</div>
-          <div><b>Người gửi:</b> ${sos.requesterName || 'Ẩn danh'}</div>
-          <div><b>Điện thoại:</b> ${sos.requesterPhone || 'Không'}</div>
-          <div><b>Số người mắc kẹt:</b> ${sos.trappedPeopleCount || 1}</div>
-          <div><b>Mức độ nguy cấp:</b> <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-bold">${sos.severity}</span></div>
-          <div><b>Mô tả:</b> ${sos.description || 'Không có'}</div>
-          <div class="mt-1.5 font-bold">Trạng thái: <span id="popup-status-${id}" class="text-indigo-600">${sos.status}</span></div>
-          ${sos.imageUrls && sos.imageUrls.length > 0 ? `<div class="mt-2"><img src="${sos.imageUrls[0]}" class="rounded max-w-full max-h-24 object-cover border border-slate-300"></div>` : ''}
+        <div class="text-slate-900 text-xs min-w-[220px]">
+          <div class="font-bold border-b border-slate-200 pb-1 mb-1 text-sm text-red-600 flex items-center justify-between">
+            <span>🆘 SOS #${id}</span>
+            <span id="popup-status-${id}" class="px-1.5 py-0.5 rounded border ${statusBadgeColor} font-mono text-[9px] uppercase font-bold">${sos.status}</span>
+          </div>
+          <div class="space-y-0.5 mt-1.5">
+            <div><b>Loại:</b> ${sos.requestType}</div>
+            <div><b>Người gửi:</b> ${sos.requesterName || 'Ẩn danh'}</div>
+            <div><b>Điện thoại:</b> ${sos.requesterPhone || 'Không'}</div>
+            <div><b>Số người:</b> ${sos.trappedPeopleCount || 1}</div>
+            <div><b>Nguy cấp:</b> <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-bold">${sos.severity}</span></div>
+            <div><b>Cần thiết bị:</b> ${requiresEquipBadge}</div>
+            <div class="max-w-[220px] break-words"><b>Mô tả:</b> ${sos.description || 'Không có'}</div>
+          </div>
+          
+          ${sos.imageUrls && sos.imageUrls.length > 0 ? `<div class="mt-2"><img src="${sos.imageUrls[0]}" class="rounded w-full max-h-24 object-cover border border-slate-200"></div>` : ''}
+          
+          <div class="mt-3 border-t border-slate-100 pt-2 flex flex-col space-y-1.5">
+            <button onclick="triggerAutoDispatch(${id})" class="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-semibold transition flex items-center justify-center shadow">
+              <i data-lucide="zap" class="w-3 h-3 mr-1"></i> Tự động điều phối (Auto-Dispatch)
+            </button>
+            <button onclick="triggerCompleteSOS(${id})" class="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-semibold transition flex items-center justify-center shadow">
+              <i data-lucide="check-check" class="w-3 h-3 mr-1"></i> Hoàn thành (Resolve)
+            </button>
+          </div>
         </div>
       `;
 
@@ -764,8 +887,9 @@
       const marker = sosMarkers[sosId];
       if (marker) {
         let markerColor = 'red';
-        if (status === 'ASSIGNED' || status === 'RESOLVING') markerColor = 'orange';
-        if (status === 'COMPLETED') markerColor = 'green';
+        if (status === 'PENDING_SPECIALIST') markerColor = 'violet';
+        if (status === 'DISPATCHED' || status === 'ASSIGNED' || status === 'RESOLVING') markerColor = 'orange';
+        if (status === 'COMPLETED' || status === 'RESOLVED') markerColor = 'green';
         
         const newIcon = L.icon({
           iconUrl: `https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
@@ -780,6 +904,14 @@
         const statusEl = document.getElementById(`popup-status-${sosId}`);
         if (statusEl) {
           statusEl.textContent = status;
+          
+          // Also update badge colors
+          statusEl.className = "px-1.5 py-0.5 rounded border font-mono text-[9px] uppercase font-bold";
+          if (status === 'PENDING') statusEl.className += " text-red-600 bg-red-50 border-red-200";
+          else if (status === 'PENDING_SPECIALIST') statusEl.className += " text-violet-600 bg-violet-50 border-violet-200";
+          else if (status === 'DISPATCHED') statusEl.className += " text-amber-600 bg-amber-50 border-amber-200";
+          else if (status === 'ASSIGNED' || status === 'RESOLVING') statusEl.className += " text-orange-600 bg-orange-50 border-orange-200";
+          else if (status === 'COMPLETED' || status === 'RESOLVED') statusEl.className += " text-green-600 bg-green-50 border-green-200";
         }
       }
     }
@@ -976,6 +1108,7 @@
         adminUnitId: parseInt(document.getElementById('sos-ward').value),
         trappedPeopleCount: parseInt(document.getElementById('sos-trapped').value),
         imageUrls: document.getElementById('sos-uploaded-url').value ? [document.getElementById('sos-uploaded-url').value] : [],
+        requiresEquipment: document.getElementById('sos-requires-equipment').checked,
         specialNeedsTags: []
       };
 
@@ -1037,6 +1170,7 @@
       document.getElementById('sos-lng').value = finalLng;
       document.getElementById('sos-desc').value = descs[Math.floor(Math.random() * descs.length)];
       document.getElementById('sos-trapped').value = Math.floor(Math.random() * 5) + 1;
+      document.getElementById('sos-requires-equipment').checked = Math.random() > 0.5;
 
       setClickLocation(finalLat, finalLng);
       fetchReverseGeocode(finalLat, finalLng);
@@ -1044,8 +1178,86 @@
       logConsole('SYSTEM', `Đã tạo ngẫu nhiên dữ liệu mẫu tại: ${hotspot.label}`, 'success');
     });
 
+    // Trigger Auto-Dispatch REST API call
+    async function triggerAutoDispatch(sosId) {
+      const backendUrl = getCleanBackendUrl();
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+
+      logConsole('REST API (Auto-Dispatch)', `Đang yêu cầu tự động điều phối cho SOS #${sosId}...`, 'info');
+
+      try {
+        const response = await fetch(`${backendUrl}/sos-requests/${sosId}/assign`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify({})
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || `API báo lỗi ${response.status}`);
+        }
+
+        const result = await response.json();
+        const data = result.data || result;
+        logConsole('REST API (Auto-Dispatch)', `🟢 Điều phối SOS #${sosId} thành công!`, 'success', data);
+        
+        // Update marker status locally if present
+        if (data.status) {
+          updateSosStatus(sosId, data.status, data);
+        } else if (data.sosRequest && data.sosRequest.status) {
+          updateSosStatus(sosId, data.sosRequest.status, data.sosRequest);
+        }
+      } catch (err) {
+        logConsole('REST API (Auto-Dispatch)', `🔴 Lỗi điều phối SOS #${sosId}: ${err.message}`, 'error');
+      }
+    }
+
+    // Trigger Complete SOS REST API call
+    async function triggerCompleteSOS(sosId) {
+      const backendUrl = getCleanBackendUrl();
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+
+      logConsole('REST API (Resolve SOS)', `Đang cập nhật trạng thái RESOLVED cho SOS #${sosId}...`, 'info');
+
+      try {
+        const response = await fetch(`${backendUrl}/sos-requests/${sosId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify({ status: 'RESOLVED', resolutionNotes: 'Được hoàn thành qua Simulator' })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || `API báo lỗi ${response.status}`);
+        }
+
+        const result = await response.json();
+        const data = result.data || result;
+        logConsole('REST API (Resolve SOS)', `🟢 Cập nhật hoàn thành SOS #${sosId} thành công!`, 'success', data);
+        
+        // Update marker status
+        updateSosStatus(sosId, 'RESOLVED', data);
+      } catch (err) {
+        logConsole('REST API (Resolve SOS)', `🔴 Lỗi cập nhật SOS #${sosId}: ${err.message}`, 'error');
+      }
+    }
+
+    // Expose helpers globally for Leaflet click handler context
+    window.triggerAutoDispatch = triggerAutoDispatch;
+    window.triggerCompleteSOS = triggerCompleteSOS;
+
     document.getElementById('btn-clear-console').addEventListener('click', function() {
       document.getElementById('socket-console').innerHTML = '<div class="text-slate-500 italic">[Màn hình đã được dọn sạch]</div>';
+    });
+
+    document.getElementById('btn-check-sockets').addEventListener('click', function() {
+      checkSocketStatus();
     });
 
     document.getElementById('btn-clear-map').addEventListener('click', function() {
@@ -1056,6 +1268,14 @@
 
     // 9. LocalStorage Persistence helpers
     document.getElementById('btn-save-config').addEventListener('click', function() {
+      const oldConfigStr = localStorage.getItem(LS_KEY_CONFIG);
+      let oldProvinceId = null;
+      if (oldConfigStr) {
+        try {
+          oldProvinceId = JSON.parse(oldConfigStr).provinceId;
+        } catch(e){}
+      }
+
       const config = {
         backendUrl: document.getElementById('cfg-backend-url').value,
         provinceId: document.getElementById('cfg-province-id').value,
@@ -1064,6 +1284,15 @@
       localStorage.setItem(LS_KEY_CONFIG, JSON.stringify(config));
       logConsole('SYSTEM', 'Đã lưu cấu hình kết nối vào LocalStorage!', 'success');
       checkBackendHealth();
+
+      // If province ID changed, reconnect dispatch socket to join the new room
+      if (oldProvinceId && oldProvinceId !== config.provinceId && sockets['/dispatch'] && sockets['/dispatch'].connected) {
+        logConsole('SOCKET', `🔄 Phát hiện Province ID thay đổi từ ${oldProvinceId} sang ${config.provinceId}. Tiến hành kết nối lại socket /dispatch...`, 'info');
+        disconnectNamespace('/dispatch');
+        connectNamespace('/dispatch');
+      }
+
+      loadProvinces();
     });
 
     function loadSavedConfig() {
@@ -1071,7 +1300,7 @@
       if (configStr) {
         try {
           const config = JSON.parse(configStr);
-          document.getElementById('cfg-backend-url').value = config.backendUrl || 'http://localhost:3000';
+          document.getElementById('cfg-backend-url').value = config.backendUrl || 'http://localhost:8585';
           document.getElementById('cfg-province-id').value = config.provinceId || '1';
           
           const token = config.token || '';
@@ -1211,6 +1440,8 @@
     // Listen to province changes
     document.getElementById('sos-province').addEventListener('change', async function(e) {
       const provinceId = e.target.value;
+      if (!provinceId) return; // Prevent setting config to empty string during async options repopulation
+      
       document.getElementById('cfg-province-id').value = provinceId;
       
       // Save config automatically
@@ -1234,6 +1465,13 @@
       
       // Load locations dynamically from API
       await loadProvinces();
+      
+      // Auto connect namespaces if backend URL is present
+      if (document.getElementById('cfg-backend-url').value) {
+        logConsole('SYSTEM', 'Tự động kích hoạt kết nối Socket.io...', 'info');
+        connectNamespace('/notification');
+        connectNamespace('/dispatch');
+      }
       
       setInterval(checkBackendHealth, 15000);
     });
