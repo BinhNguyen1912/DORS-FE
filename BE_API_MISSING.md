@@ -73,30 +73,32 @@ Backend đã cài đặt các nhóm API cốt lõi dưới đây. Frontend cần
 
 Các nhóm thông tin dưới đây hoàn toàn chưa có Controller hay Service xử lý trên Backend. Backend cần xây dựng mới các endpoint này.
 
-### 1. API Quản lý Thiết bị & Phương tiện của Đội (Rescue Equipments)
+### 1. API Quản lý Thiết bị & Phương tiện của Đội (Rescue Equipments) - **[ĐÃ HOÀN THÀNH / DONE]**
 *Tab "Thiết bị" hiển thị danh sách công cụ/phương tiện của từng đội (Ví dụ: Xe cứu thương, Thuyền phao, Máy phát điện, Máy cắt thủy lực, v.v.)*
-* **Endpoint đề xuất:**
+* **Các Endpoint thực tế đã triển khai:**
   * **Lấy danh sách thiết bị:** `GET /teams/:teamId/equipments`
-  * **Cập nhật trạng thái/số lượng thiết bị:** `PUT /teams/:teamId/equipments/:equipmentId`
+  * **Thêm thiết bị mới:** `POST /teams/:teamId/equipments` (DTO validation: `name`, `quantity`, `status`, `description`)
+  * **Cập nhật thiết bị (tên, trạng thái, số lượng, mô tả):** `PUT /teams/:teamId/equipments/:equipmentId`
+  * **Xóa thiết bị:** `DELETE /teams/:teamId/equipments/:equipmentId`
 * **Response mẫu (Lấy danh sách):**
   ```json
-  {
-    "success": true,
-    "data": [
-      {
-        "id": 1,
-        "name": "Thuyền phao cứu hộ",
-        "quantity": 3,
-        "status": "GOOD" | "MAINTENANCE" | "BROKEN",
-        "description": "Thuyền cao su gắn động cơ đầu nổ"
-      }
-    ]
-  }
+  [
+    {
+      "id": 1,
+      "teamId": 2,
+      "name": "Thuyền phao cứu hộ",
+      "quantity": 3,
+      "status": "GOOD",
+      "description": "Thuyền cao su gắn động cơ đầu nổ",
+      "createdAt": "2026-06-24T07:15:00.000Z",
+      "updatedAt": "2026-06-24T07:15:00.000Z"
+    }
+  ]
   ```
 
 ---
 
-### 2. API Phân tích Hiệu suất & Thống kê Hoạt động (Analytics & Stats)
+### 2. API Phân tích Hiệu suất & Thống kê Hoạt động (Analytics & Stats) - CHƯA CẦN LÀM
 *Hiện tại các con số trên Dashboard và Tab "Hiệu suất" của Đội đều là mock.*
 * **Endpoint đề xuất:**
   1. **Thống kê hiệu suất chi tiết của một Đội cứu hộ (Tab Hiệu suất):**
@@ -134,7 +136,7 @@ Các nhóm thông tin dưới đây hoàn toàn chưa có Controller hay Service
 
 ---
 
-### 3. API Quản lý Phân ca trực (Shifts / Schedule)
+### 3. API Quản lý Phân ca trực (Shifts / Schedule) - CHƯA CẦN LÀM
 *Giao diện Tab "Ca trực" trong trang chi tiết Đội Cứu Hộ đang hiển thị lịch trực giả lập.*
 * **Endpoint đề xuất:**
   * **Lấy lịch trực của đội:** `GET /teams/:teamId/shifts`
@@ -161,15 +163,117 @@ Các nhóm thông tin dưới đây hoàn toàn chưa có Controller hay Service
 
 ---
 
-### 4. Yêu cầu Bổ sung thông tin các Schema hiện tại (Schema Updates)
-Để Frontend render đầy đủ giao diện thiết kế, Backend cần mở rộng các trường dữ liệu trả về của các API hiện có:
+### 4. Yêu cầu Bổ sung thông tin các Schema hiện tại (Schema Updates) - **[ĐÃ HOÀN THÀNH / DONE]**
+Để Frontend render đầy đủ giao diện thiết kế, Backend đã mở rộng các trường dữ liệu trả về và bổ sung các Endpoint:
 
-1. **API lấy chi tiết đội cứu hộ (`GET /rescue-teams/:teamId`):**
-   * Cần bổ sung các trường sau vào Entity/DTO trả về:
+1. **API lấy chi tiết đội cứu hộ (`GET /rescue-teams/:teamId`) & Cập nhật (`PATCH /rescue-teams/:teamId`):** - **[XONG]**
+   * Đã bổ sung các trường sau vào Entity/DTO trả về và cho phép cập nhật:
      * `email`: string (Email liên lạc của đội)
      * `foundingDate`: string/Date (Ngày thành lập đội)
-     * `baseLocationAddress`: string (Địa chỉ văn phòng/trụ sở dạng text đọc được, ví dụ: *15 Lê Duẩn, Hải Châu, Đà Nẵng*)
-     * `coverageAreaSize`: number (Diện tích phạm vi quản lý tính theo km²)
+     * `baseLocationAddress`: string (Địa chỉ văn phòng/trụ sở dạng text)
+     * `coverageAreaSize`: number (Diện tích phạm vi quản lý)
 
-2. **API lấy vị trí real-time của đội cứu hộ:**
-   * Cần đảm bảo tọa độ lat/lng từ `currentLocation` của đội cứu hộ được lấy đúng và trả về để hiển thị các Đội trực quan lên bản đồ tương tác ở trang Rescue Dashboard.
+2. **API lấy vị trí real-time của đội cứu hộ:** - **[XONG]**
+   * Tọa độ `currentLocation` của đội cứu hộ dạng GeoJSON `{ type: "Point", coordinates: [lng, lat] }` đã được trả về đầy đủ qua các API lấy danh sách/chi tiết.
+
+3. **API lấy chi tiết yêu cầu SOS (`GET /sos-requests/:id`):** - **[XONG]**
+   * Đã mở rộng `SosRequestController` để hỗ trợ Endpoint `GET /sos-requests/:id` và trả về đầy đủ các thực thể quan hệ (`relations: ['province', 'adminUnit', 'user', 'assignedTeam']`).
+
+4. **API lấy lịch sử xử lý (timeline) của yêu cầu SOS (`GET /sos-requests/:id/timeline`):** - **[XONG - ĐÃ NÂNG CẤP]**
+   * Endpoint tự động ưu tiên đọc từ bảng `sos_status_history` (mới). Nếu SOS cũ chưa có, fallback sang `audit_log`.
+   * **Response mẫu (mới — đầy đủ hơn):**
+     ```json
+     [
+       {
+         "id": 1,
+         "time": "2026-06-24T06:32:00.000Z",
+         "title": "SOS được tạo",
+         "desc": "Khách gửi yêu cầu khẩn cấp qua cổng web.",
+         "eventType": "CREATED",
+         "fromStatus": null,
+         "toStatus": "PENDING",
+         "teamId": null,
+         "teamName": null,
+         "changedById": null,
+         "changedByName": null,
+         "dispatchMethod": null
+       },
+       {
+         "id": 2,
+         "time": "2026-06-24T06:34:00.000Z",
+         "title": "Đã tiếp nhận & phân công",
+         "desc": "Tự động phân công đội cứu hộ #5.",
+         "eventType": "TEAM_ASSIGNED",
+         "fromStatus": "PENDING",
+         "toStatus": "DISPATCHED",
+         "teamId": 5,
+         "teamName": "Đội PCCC Quận Hải Châu",
+         "changedById": 12,
+         "changedByName": "Nguyễn Điều Phối",
+         "dispatchMethod": "AUTO"
+       }
+     ]
+     ```
+   * **Giá trị `eventType` có thể nhận:**
+
+     | eventType | Ý nghĩa |
+     |---|---|
+     | `CREATED` | SOS vừa được tạo |
+     | `STATUS_CHANGED` | Thay đổi trạng thái (ON_SITE, DISPATCHED...) |
+     | `TEAM_ASSIGNED` | Gán đội cứu hộ lần đầu |
+     | `TEAM_REASSIGNED` | Chuyển sang đội khác |
+     | `TEAM_RELEASED` | Giải phóng đội |
+     | `RESOLVED` | Hoàn thành nhiệm vụ |
+     | `CANCELLED` | Hủy yêu cầu |
+     | `QUEUED` | Xếp hàng chờ đội |
+     | `SPECIALIST_PENDING` | Chờ đội chuyên môn |
+
+5. **API lấy lịch sử trạng thái SOS (`GET /sos-requests/:id/history`):** - **[MỚI / ĐÃ XONG]**
+   * Alias của `GET /sos-requests/:id/timeline` — cùng response format.
+   * **Bảng `sos_status_history` (mới tạo)** ghi nhận **tất cả** sự kiện thay đổi trạng thái và phân công đội, kể cả:
+     - Auto-dispatch (Orchestrator tự động gán)
+     - Manual dispatch (điều phối viên gán tay)
+     - Reassign (chuyển đội)
+     - Queued / Specialist pending
+     - Handoff (đội hoàn thành ca và nhận ca tiếp theo từ queue)
+   * Endpoint yêu cầu Bearer token và permission `SOS_READ`.
+
+---
+
+## PHẦN C. TỔNG HỢP NHANH — TẤT CẢ API HIỆN ĐÃ SẴN SÀNG CHO FE
+
+> Dùng bảng dưới làm checklist khi build UI mới.
+
+| # | Endpoint | Method | Trạng thái | Ghi chú |
+|---|---|---|---|---|
+| 1 | `/rescue-teams` | GET | ✅ Sẵn sàng | Pagination + filter |
+| 2 | `/rescue-teams` | POST | ✅ Sẵn sàng | Tạo đội mới |
+| 3 | `/rescue-teams/:id` | GET | ✅ Sẵn sàng | Chi tiết đội (có email, foundingDate, baseLocationAddress...) |
+| 4 | `/rescue-teams/:id` | PATCH | ✅ Sẵn sàng | Cập nhật đội |
+| 5 | `/rescue-teams/:id` | DELETE | ✅ Sẵn sàng | Xóa đội |
+| 6 | `/rescue-teams/:id/location` | PATCH | ✅ Sẵn sàng | Cập nhật GPS |
+| 7 | `/teams/:id/members` | GET | ✅ Sẵn sàng | Danh sách thành viên |
+| 8 | `/teams/:id/members` | POST | ✅ Sẵn sàng | Thêm thành viên |
+| 9 | `/teams/:id/members/:mid/role` | PATCH | ✅ Sẵn sàng | Đổi vai trò |
+| 10 | `/teams/:id/members/:mid` | DELETE | ✅ Sẵn sàng | Xóa thành viên |
+| 11 | `/teams/leave` | POST | ✅ Sẵn sàng | Tự rời đội |
+| 12 | `/team-specializations` | GET | ✅ Sẵn sàng | Danh sách chuyên môn |
+| 13 | `/team-specializations/:id` | GET/POST/PATCH/DELETE | ✅ Sẵn sàng | CRUD chuyên môn |
+| 14 | `/teams/:id/equipments` | GET | ✅ Sẵn sàng | Danh sách thiết bị |
+| 15 | `/teams/:id/equipments` | POST | ✅ Sẵn sàng | Thêm thiết bị |
+| 16 | `/teams/:id/equipments/:eid` | PUT | ✅ Sẵn sàng | Cập nhật thiết bị |
+| 17 | `/teams/:id/equipments/:eid` | DELETE | ✅ Sẵn sàng | Xóa thiết bị |
+| 18 | `/sos-requests` | GET | ✅ Sẵn sàng | Danh sách SOS (paginate + filter) |
+| 19 | `/sos-requests` | POST | ✅ Sẵn sàng | Gửi SOS (public) |
+| 20 | `/sos-requests/:id` | GET | ✅ Sẵn sàng | Chi tiết SOS (full relations) |
+| 21 | `/sos-requests/:id/status` | PATCH | ✅ Sẵn sàng | Cập nhật trạng thái |
+| 22 | `/sos-requests/:id/assign` | PATCH | ✅ Sẵn sàng | Phân công / auto-dispatch đội |
+| 23 | `/sos-requests/:id` | DELETE | ✅ Sẵn sàng | Hủy SOS (public) |
+| 24 | `/sos-requests/:id/timeline` | GET | ✅ Sẵn sàng | **Timeline đầy đủ** (sos_status_history + fallback) |
+| 25 | `/sos-requests/:id/history` | GET | ✅ Sẵn sàng | Alias của timeline |
+| 26 | `/sos-requests/nearby` | GET | ✅ Sẵn sàng | Tìm SOS lân cận (lat/lng/radius) |
+| 27 | `/rescue-teams/performance-stats` | GET | ⏳ Chưa làm | Chưa cần |
+| 28 | `/rescue-teams/dashboard-summary` | GET | ⏳ Chưa làm | Chưa cần |
+| 29 | `/teams/:id/shifts` | GET | ⏳ Chưa làm | Chưa cần |
+
+

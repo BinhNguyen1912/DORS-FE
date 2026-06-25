@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Save, Loader2, Info } from 'lucide-react';
 import { rescueTeamApi, locationApi } from '../../apis';
-import { useRef, useCallback } from 'react';
 import { ROUTES } from '../../constants';
 import { cn } from '../../lib/utils';
 import type { Province, AdministrativeUnit } from '../../types';
 import { useAuthStore, toast } from '../../stores';
 import ImageUpload from '../../components/common/ImageUpload';
 import LocationPickerMap from '../../components/rescue-team/LocationPickerMap';
+import AddressAutocomplete from '../../components/common/AddressAutocomplete';
 
 // Zod validation schema - provinceId/adminUnitId are optional when coordinates are provided
 const rescueTeamSchema = z
@@ -24,6 +24,7 @@ const rescueTeamSchema = z
     logoUrl: z.string().optional(),
     latitude: z.string().optional(),
     longitude: z.string().optional(),
+    baseLocationAddress: z.string().optional(),
     specializationIds: z.array(z.number()),
   })
   .refine(
@@ -60,6 +61,7 @@ export default function RescueTeamCreatePage() {
   const [loadingSpecializations, setLoadingSpecializations] = useState(false);
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
   const resolveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [addressText, setAddressText] = useState('');
 
   const navigate = useNavigate();
 
@@ -90,6 +92,11 @@ export default function RescueTeamCreatePage() {
   const provinceIdStr = watch('provinceId');
   const provinceId = provinceIdStr ? Number(provinceIdStr) : undefined;
   const selectedSpecs = watch('specializationIds') || [];
+
+  const selectedProvinceName = useMemo(() => {
+    if (!provinceId) return '';
+    return provinces.find((p) => p.id === provinceId)?.name || '';
+  }, [provinceId, provinces]);
 
   // Auto-resolve province/ward from GPS coordinates after user picks on map
   const handleMapLocationChange = useCallback(
@@ -224,6 +231,9 @@ export default function RescueTeamCreatePage() {
       // Only send province/adminUnit if explicitly selected
       if (data.provinceId) submitData.provinceId = Number(data.provinceId);
       if (data.adminUnitId) submitData.adminUnitId = Number(data.adminUnitId);
+
+      // Address text (trụ sở)
+      if (data.baseLocationAddress) submitData.baseLocationAddress = data.baseLocationAddress;
 
       // Construct GeoJSON point if coordinates are provided (backend resolves ids from coords if needed)
       if (data.latitude && data.longitude) {
@@ -405,6 +415,32 @@ export default function RescueTeamCreatePage() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Address Autocomplete */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-100 dark:border-gray-700 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-0.5 h-4 bg-indigo-500 rounded-full" />
+            <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Vị trí đội cứu hộ</span>
+          </div>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-normal">
+            Nhập địa chỉ trụ sở để tự động điền tọa độ và cập nhật bản đồ.
+          </p>
+          <AddressAutocomplete
+            value={addressText}
+            onTextChange={setAddressText}
+            provinceName={selectedProvinceName}
+            onChange={(result) => {
+              setAddressText(result.address);
+              setValue('baseLocationAddress', result.address);
+              handleMapLocationChange(String(result.lat), String(result.lng));
+            }}
+            placeholder={
+              selectedProvinceName
+                ? `Nhập địa chỉ thuộc ${selectedProvinceName}...`
+                : 'Ví dụ: 65/15 đường 339, Phường Bình Trưng Tây, TP.HCM'
+            }
+          />
         </div>
 
         {/* Location Coordinates Card with Interactive Map */}

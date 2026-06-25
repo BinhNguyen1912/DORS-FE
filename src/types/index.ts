@@ -117,6 +117,7 @@ export interface RescueTeam {
   adminUnitId?: number;
   maxCapacity?: number;
   location?: any;
+  currentLocation?: any;
   baseLocation?: any;
   specializationIds?: number[];
   missionsCount?: number;
@@ -126,6 +127,10 @@ export interface RescueTeam {
   leader?: User | null;
   leaderCitizenName?: string;
   specializations?: any[];
+  email?: string;
+  foundingDate?: string;
+  baseLocationAddress?: string;
+  coverageAreaSize?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -169,6 +174,9 @@ export interface SosRequest {
   specialistType?: string;
   pendingSince?: string;
   assignedTeamId?: number;
+  assignedTeam?: RescueTeam | null;
+  source?: string;
+  resolutionNotes?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -46,6 +46,24 @@
     .glow-dot {
       box-shadow: 0 0 12px currentColor;
     }
+    
+    /* Custom Global Loader */
+    .loader {
+      width: 45px;
+      aspect-ratio: .75;
+      --c: no-repeat linear-gradient(var(--loader-color, currentColor) 0 0);
+      background: 
+        var(--c) 0%   50%,
+        var(--c) 50%  50%,
+        var(--c) 100% 50%;
+      background-size: 20% 60%;
+      animation: l9 1s infinite;
+      display: inline-block;
+    }
+    @keyframes l9 {
+      33% {background-position: 0% 0%  ,50% 100%,100% 0%  }
+      66% {background-position: 0% 100%,50% 0%  ,100% 100%}
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col custom-scroll">
@@ -308,7 +326,7 @@
                   <img id="image-preview" src="" alt="Preview" class="hidden w-full h-full object-cover">
                   <div id="image-placeholder" class="text-[10px] text-slate-500 italic text-center">Chưa có ảnh</div>
                   <div id="upload-spinner" class="hidden absolute inset-0 bg-slate-950/80 flex items-center justify-center">
-                    <i data-lucide="loader-2" class="w-5 h-5 animate-spin text-red-500"></i>
+                    <div class="loader text-red-500" style="width: 24px;"></div>
                   </div>
                   <button type="button" id="btn-clear-image" class="hidden absolute top-1 right-1 p-0.5 bg-red-600/80 hover:bg-red-600 rounded text-white transition">
                     <i data-lucide="x" class="w-3.5 h-3.5"></i>

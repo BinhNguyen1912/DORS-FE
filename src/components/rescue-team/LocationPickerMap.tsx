@@ -32,6 +32,7 @@ export default function LocationPickerMap({
 
   const [mapSearch, setMapSearch] = useState('');
   const [isSearchingMap, setIsSearchingMap] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   // Initialize Map
   useEffect(() => {
@@ -50,6 +51,7 @@ export default function LocationPickerMap({
     }).addTo(map);
 
     mapRef.current = map;
+    setMapLoaded(true);
 
     const getIcon = () => {
       return L.divIcon({
@@ -89,6 +91,7 @@ export default function LocationPickerMap({
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
+        setMapLoaded(false);
       }
     };
   }, []);
@@ -107,6 +110,46 @@ export default function LocationPickerMap({
       }
     }
   }, [latitude, longitude]);
+
+  // Fit map to province bounds and restrict scrolling when provinceId changes
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded) return;
+
+    if (!provinceId) {
+      mapRef.current.setMaxBounds(undefined);
+      return;
+    }
+
+    const selectedProvince = provinces.find((p) => p.id === provinceId)?.name;
+    if (!selectedProvince) return;
+
+    const fetchProvinceBounds = async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            selectedProvince + ', Việt Nam'
+          )}&limit=1`
+        );
+        const data = await response.json();
+        if (data && data.length > 0 && data[0].boundingbox) {
+          const bbox = data[0].boundingbox;
+          const southWest = L.latLng(parseFloat(bbox[0]), parseFloat(bbox[2]));
+          const northEast = L.latLng(parseFloat(bbox[1]), parseFloat(bbox[3]));
+          // Pad bounds by 5% for better panning experience near borders
+          const bounds = L.latLngBounds(southWest, northEast).pad(0.05);
+
+          if (mapRef.current) {
+            mapRef.current.fitBounds(bounds);
+            mapRef.current.setMaxBounds(bounds);
+          }
+        }
+      } catch (err) {
+        console.error('Lỗi khi lấy giới hạn địa lý của tỉnh:', err);
+      }
+    };
+
+    fetchProvinceBounds();
+  }, [provinceId, provinces, mapLoaded]);
 
   // Geocode when Province / Ward changes
   useEffect(() => {

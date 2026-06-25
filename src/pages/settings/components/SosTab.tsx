@@ -3,6 +3,24 @@ import { Save } from 'lucide-react';
 import { toast } from '../../../stores';
 import { settingsApi } from '../../../apis';
 
+const teamTypeLabels: Record<string, string> = {
+  DAN_PHONG: 'Dân phòng',
+  PCCC: 'PCCC',
+  QUAN_SU: 'Quân sự',
+  TINH_NGUYEN: 'Tình nguyện',
+  Y_TE: 'Y tế',
+  TONG_HOP: 'Tổng hợp',
+};
+
+const sosLabels: Record<string, string> = {
+  FLOOD: 'Lũ lụt',
+  FIRE_FIGHTING: 'Hỏa hoạn',
+  TRAFFIC_ACCIDENT: 'Tai nạn',
+  MEDICAL_EMERGENCY: 'Cấp cứu y tế',
+  NATURAL_DISASTER: 'Thiên tai sạt lở',
+  OTHER: 'Khác',
+};
+
 export default function SosTab() {
   // SOS States
   const [expiryTime, setExpiryTime] = useState(120); // minutes
@@ -24,6 +42,9 @@ export default function SosTab() {
   const [mediumTime, setMediumTime] = useState(60);
   const [lowTime, setLowTime] = useState(120);
 
+  // Skill Mapping State
+  const [skillMapping, setSkillMapping] = useState<Record<string, Record<string, number>>>({});
+
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -42,6 +63,17 @@ export default function SosTab() {
         if (data['severity.high']) setHighTime(parseInt(data['severity.high'], 10) || 30);
         if (data['severity.medium']) setMediumTime(parseInt(data['severity.medium'], 10) || 60);
         if (data['severity.low']) setLowTime(parseInt(data['severity.low'], 10) || 120);
+        
+        if (data['dispatch.skill_mapping']) {
+          try {
+            const parsed = JSON.parse(data['dispatch.skill_mapping']);
+            if (typeof parsed === 'object' && parsed !== null) {
+              setSkillMapping(parsed);
+            }
+          } catch (err) {
+            console.error('Error parsing dispatch.skill_mapping:', err);
+          }
+        }
       } catch (err) {
         console.error('Error loading SOS settings:', err);
       }
@@ -63,6 +95,7 @@ export default function SosTab() {
         'dispatch.prioritize_nearest': String(prioritizeNearest),
         'dispatch.prioritize_specialty': String(prioritizeSpecialty),
         'dispatch.allow_inter_province': String(allowInterProvince),
+        'dispatch.skill_mapping': JSON.stringify(skillMapping),
         'severity.critical': String(criticalTime),
         'severity.high': String(highTime),
         'severity.medium': String(mediumTime),
@@ -256,6 +289,83 @@ export default function SosTab() {
                 />
                 <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500" />
               </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Nhóm Ma trận Tương thích Chuyên môn (Skill Mismatch Matrix) */}
+        <div className="space-y-4 pt-2">
+          <h3 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider select-none border-b border-slate-50 dark:border-slate-800 pb-1">
+            Ma trận tương thích chuyên môn (Auto-Dispatch Skill Mapping)
+          </h3>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold leading-relaxed">
+            Thiết lập độ tương thích giữa Loại sự cố SOS (Hàng) và Loại đội cứu hộ (Cột). Điểm số từ <code className="text-emerald-500 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1 py-0.5 rounded">0.0</code> (Phù hợp hoàn hảo) đến <code className="text-red-500 font-extrabold bg-red-50 dark:bg-red-950/20 px-1 py-0.5 rounded">1.0</code> (Không phù hợp). 
+            Hệ thống dựa vào điểm số này để trừ điểm ưu tiên khi tự động chọn đội.
+          </p>
+
+          <div className="border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-gray-900">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-xs text-left min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-50/60 dark:bg-gray-800 border-b border-slate-100 dark:border-slate-750 font-bold select-none">
+                    <th className="px-4 py-3 text-black dark:text-white w-[180px]">
+                      Loại sự cố / SOS
+                    </th>
+                    {Object.entries(teamTypeLabels).map(([code, label]) => (
+                      <th key={code} className="px-3 py-3 text-center text-black dark:text-white min-w-[90px]">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                  {Object.entries(sosLabels).map(([sosCode, sosLabel]) => (
+                    <tr key={sosCode} className="hover:bg-slate-50/20 dark:hover:bg-gray-800/40">
+                      <td className="px-4 py-3 font-bold text-black dark:text-white">
+                        {sosLabel}
+                      </td>
+                      {Object.keys(teamTypeLabels).map((teamCode) => {
+                        const val = skillMapping[sosCode]?.[teamCode] ?? 1.0;
+                        
+                        // Dynamically determine color coding class
+                        let colorClass = "bg-red-50/70 border-red-200 text-red-700 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30";
+                        if (val <= 0.01) {
+                          colorClass = "bg-emerald-50/80 border-emerald-200 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30";
+                        } else if (val <= 0.31) {
+                          colorClass = "bg-blue-50/80 border-blue-200 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30";
+                        } else if (val <= 0.71) {
+                          colorClass = "bg-amber-50/80 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30";
+                        }
+
+                        return (
+                          <td key={teamCode} className="px-3 py-2 text-center">
+                            <input
+                              type="number"
+                              min={0}
+                              max={1}
+                              step={0.1}
+                              value={val}
+                              onChange={(e) => {
+                                const newval = parseFloat(parseFloat(e.target.value).toFixed(2));
+                                if (!isNaN(newval) && newval >= 0 && newval <= 1) {
+                                  setSkillMapping(prev => ({
+                                    ...prev,
+                                    [sosCode]: {
+                                      ...(prev[sosCode] || {}),
+                                      [teamCode]: newval
+                                    }
+                                  }));
+                                }
+                              }}
+                              className={`w-14 text-center px-1.5 py-1 text-xs font-bold rounded-lg border focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all ${colorClass}`}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

@@ -24,6 +24,8 @@ import { menuItems } from '../config/menu';
 import Header from '../components/common/Header';
 import ToastContainer from '../components/common/ToastContainer';
 import { authApi } from '../apis';
+import { useSocket } from '../providers/SocketProvider';
+import { DISPATCH_EVENTS, NOTIFICATION_EVENTS } from '../constants/websocket.constant';
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -43,6 +45,51 @@ export default function MainLayout() {
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     'Danh mục': true,
   });
+
+  const { dispatchSocket, notificationSocket } = useSocket();
+
+  // Global socket listener for rescue notifications
+  useEffect(() => {
+    if (!dispatchSocket) return;
+
+    const handleNewSos = (sos: any) => {
+      console.log('📡 [WS Global] New SOS received:', sos);
+      if (location.pathname !== ROUTES.DISASTER_LIST) {
+        toast.warning(`🚨 SOS MỚI: Yêu cầu từ ${sos.requesterName || 'Người dân'} (SĐT: ${sos.requesterPhone || 'Chưa cập nhật'}) tại ${sos.addressDetail || sos.adminUnit?.name || 'Vị trí hiện trường'}`);
+      }
+    };
+
+    const handleNoTeam = (payload: { sosId: number; message: string }) => {
+      console.log('📡 [WS Global] No team available:', payload);
+      if (location.pathname !== ROUTES.DISASTER_LIST) {
+        toast.error(`⚠️ BÁO ĐỘNG: SOS-2024-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
+      }
+    };
+
+    dispatchSocket.on(DISPATCH_EVENTS.SOS_CREATED, handleNewSos);
+    dispatchSocket.on(DISPATCH_EVENTS.SOS_NO_TEAM, handleNoTeam);
+
+    return () => {
+      dispatchSocket.off(DISPATCH_EVENTS.SOS_CREATED, handleNewSos);
+      dispatchSocket.off(DISPATCH_EVENTS.SOS_NO_TEAM, handleNoTeam);
+    };
+  }, [dispatchSocket, location.pathname]);
+
+  // Global socket listener for push notifications
+  useEffect(() => {
+    if (!notificationSocket) return;
+
+    const handlePushNotification = (notification: any) => {
+      console.log('📡 [WS Global] Notification received:', notification);
+      toast.info(`🔔 ${notification.title || 'Thông báo mới'}: ${notification.message || ''}`);
+    };
+
+    notificationSocket.on(NOTIFICATION_EVENTS.PUSH, handlePushNotification);
+
+    return () => {
+      notificationSocket.off(NOTIFICATION_EVENTS.PUSH, handlePushNotification);
+    };
+  }, [notificationSocket]);
   const toggleMenu = (label: string) => {
     setExpandedMenus(prev => ({ ...prev, [label]: !prev[label] }));
   };

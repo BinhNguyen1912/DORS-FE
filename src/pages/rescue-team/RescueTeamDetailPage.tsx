@@ -18,6 +18,8 @@ import { cn } from '../../lib/utils';
 import type { Province, AdministrativeUnit, RescueTeamMember, User } from '../../types';
 import { toast } from '../../stores';
 import ConfirmDeleteModal from '../../components/common/ConfirmDeleteModal';
+import Loader from '../../components/common/Loader';
+import RescueEquipmentsTab from './components/RescueEquipmentsTab';
 
 const statusColors = {
   AVAILABLE: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
@@ -66,6 +68,10 @@ export default function RescueTeamDetailPage() {
   const [editLatitude, setEditLatitude] = useState('');
   const [editLongitude, setEditLongitude] = useState('');
   const [editSpecializationIds, setEditSpecializationIds] = useState<number[]>([]);
+  const [editEmail, setEditEmail] = useState('');
+  const [editFoundingDate, setEditFoundingDate] = useState('');
+  const [editBaseLocationAddress, setEditBaseLocationAddress] = useState('');
+  const [editCoverageAreaSize, setEditCoverageAreaSize] = useState<number | ''>('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSpecDropdownOpen, setIsSpecDropdownOpen] = useState(false);
   const [specSearch, setSpecSearch] = useState('');
@@ -224,6 +230,10 @@ export default function RescueTeamDetailPage() {
         setEditLatitude(String(team.baseLocation.coordinates[1]));
       }
       setEditSpecializationIds(team.specializations?.map((s: any) => s.id) || []);
+      setEditEmail(team.email || '');
+      setEditFoundingDate(team.foundingDate ? new Date(team.foundingDate).toISOString().split('T')[0] : '');
+      setEditBaseLocationAddress(team.baseLocationAddress || '');
+      setEditCoverageAreaSize(team.coverageAreaSize !== undefined && team.coverageAreaSize !== null ? team.coverageAreaSize : '');
     }
   }, [team]);
 
@@ -262,6 +272,10 @@ export default function RescueTeamDetailPage() {
         status: editStatus,
         maxCapacity: Number(editMaxCapacity),
         specializationIds: editSpecializationIds,
+        email: editEmail || null,
+        foundingDate: editFoundingDate ? new Date(editFoundingDate).toISOString() : null,
+        baseLocationAddress: editBaseLocationAddress || null,
+        coverageAreaSize: editCoverageAreaSize !== '' ? Number(editCoverageAreaSize) : null,
       };
 
       if (editLatitude && editLongitude) {
@@ -285,9 +299,13 @@ export default function RescueTeamDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
-      </div>
+      <Loader
+        layout="block"
+        size="md"
+        colorClass="text-amber-500"
+        text="Đang tải chi tiết đội cứu hộ..."
+        className="min-h-[400px]"
+      />
     );
   }
 
@@ -447,6 +465,54 @@ export default function RescueTeamDetailPage() {
                       <option key={w.id} value={w.id}>{w.name}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Email liên lạc</label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="Ví dụ: pccc.dn01@cuuho.vn"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                  />
+                </div>
+
+                {/* Ngày Thành Lập */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Ngày thành lập</label>
+                  <input
+                    type="date"
+                    value={editFoundingDate}
+                    onChange={(e) => setEditFoundingDate(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                  />
+                </div>
+
+                {/* Địa chỉ trụ sở */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Địa chỉ trụ sở (Văn phòng)</label>
+                  <input
+                    type="text"
+                    value={editBaseLocationAddress}
+                    onChange={(e) => setEditBaseLocationAddress(e.target.value)}
+                    placeholder="Ví dụ: 15 Lê Duẩn, Hải Châu, Đà Nẵng"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                  />
+                </div>
+
+                {/* Diện tích phạm vi quản lý */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Phạm vi quản lý (km²)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={editCoverageAreaSize}
+                    onChange={(e) => setEditCoverageAreaSize(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="Ví dụ: 12.5"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+                  />
                 </div>
 
                 {/* Vĩ Độ (Latitude) */}
@@ -632,19 +698,23 @@ export default function RescueTeamDetailPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-slate-100 dark:border-gray-700">
                   <div className="space-y-1">
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">{RESCUE_TEXTS.DETAIL_COVERAGE_AREA}</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">P. Hòa Cường, Q. Hải Châu</p>
+                    <p className="text-sm font-normal text-gray-900 dark:text-white truncate" title={team.baseLocationAddress || 'Chưa cập nhật'}>
+                      {team.baseLocationAddress || 'Chưa cập nhật'}
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">{RESCUE_TEXTS.COL_MEMBERS}</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">12/15 thành viên</p>
+                    <p className="text-sm font-normal text-gray-900 dark:text-white">
+                      {members.length}/{team.maxCapacity || 10} thành viên
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">{RESCUE_TEXTS.STATS_MISSIONS_RUNNING}</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">{team.missionsCount || 2} nhiệm vụ</p>
+                    <p className="text-sm font-normal text-gray-900 dark:text-white">{team.missionsCount || 2} nhiệm vụ</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">{RESCUE_TEXTS.STATS_EFFICIENCY}</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">75% hiệu suất</p>
+                    <p className="text-sm font-normal text-gray-900 dark:text-white">75% hiệu suất</p>
                   </div>
                 </div>
               </div>
@@ -680,31 +750,35 @@ export default function RescueTeamDetailPage() {
                       <div className="divide-y divide-slate-100 dark:divide-gray-700 text-xs">
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.COL_TYPE}</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{typeLabel}</span>
+                          <span className="font-normal text-black dark:text-white">{typeLabel}</span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_FOUNDING_DATE}</span>
-                          <span className="font-bold text-gray-900 dark:text-white">15/03/2020</span>
+                          <span className="font-normal text-black dark:text-white">
+                            {team.foundingDate ? new Date(team.foundingDate).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
+                          </span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_LEADER}</span>
-                          <span className="font-bold text-gray-900 dark:text-white">
+                          <span className="font-normal text-black dark:text-white">
                             {team.leader?.fullName || team.leaderCitizenName || 'Chưa có đội trưởng'}
                           </span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_PHONE}</span>
-                          <span className="font-bold text-gray-950 dark:text-white">
+                          <span className="font-normal text-black dark:text-white">
                             {team.leader?.phone || team.leaderPhone || 'Chưa có'}
                           </span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_EMAIL}</span>
-                          <span className="font-bold text-gray-900 dark:text-white">pccc.dn01@cuuho.vn</span>
+                          <span className="font-normal text-black dark:text-white">{team.email || 'Chưa cập nhật'}</span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_MAX_CAPACITY}</span>
-                          <span className="font-bold text-gray-900 dark:text-white">15 thành viên</span>
+                          <span className="font-normal text-black dark:text-white">
+                            {team.maxCapacity ? `${team.maxCapacity} thành viên` : 'Chưa giới hạn'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -718,22 +792,28 @@ export default function RescueTeamDetailPage() {
                             <MapPin size={12} className="text-amber-500" />
                             {RESCUE_TEXTS.DETAIL_BASE_LOCATION}
                           </span>
-                          <span className="font-bold text-gray-900 dark:text-white pl-4">15 Lê Duẩn, P. Hòa Cường, Q. Hải Châu</span>
+                          <span className="font-normal text-black dark:text-white pl-4">
+                            {team.baseLocationAddress || 'Chưa cập nhật'}
+                          </span>
                         </div>
                         <div className="py-2.5 flex flex-col gap-1">
                           <span className="text-gray-500 font-semibold flex items-center gap-1.5">
                             <MapPin size={12} className="text-blue-500" />
                             {RESCUE_TEXTS.DETAIL_CURRENT_LOCATION}
                           </span>
-                          <span className="font-bold text-gray-900 dark:text-white pl-4">16 Lê Duẩn, P. Hòa Cường, Q. Hải Châu</span>
+                          <span className="font-normal text-black dark:text-white pl-4">
+                            {team.currentLocation?.coordinates || team.location?.coordinates ? `${(team.currentLocation?.coordinates?.[1] ?? team.location?.coordinates?.[1]).toFixed(6)}, ${(team.currentLocation?.coordinates?.[0] ?? team.location?.coordinates?.[0]).toFixed(6)}` : 'Chưa có tọa độ real-time'}
+                          </span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_COVERAGE_AREA}</span>
-                          <span className="font-bold text-gray-900 dark:text-white">12.5 km²</span>
+                          <span className="font-normal text-black dark:text-white">
+                            {team.coverageAreaSize ? `${team.coverageAreaSize} km²` : 'Chưa cập nhật'}
+                          </span>
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_COVERAGE_RADIUS}</span>
-                          <span className="font-bold text-indigo-500 hover:underline cursor-pointer">Xem trên bản đồ</span>
+                          <span className="font-normal text-indigo-500 hover:underline cursor-pointer">Xem trên bản đồ</span>
                         </div>
                       </div>
                     </div>
@@ -1118,12 +1198,15 @@ export default function RescueTeamDetailPage() {
                 )}
 
                 {/* General Mock Fallback tabs */}
-                {['equipment', 'stats', 'history', 'shift'].includes(activeTab) && (
+                {['stats', 'history', 'shift'].includes(activeTab) && (
                   <div className="py-12 text-center text-gray-400 dark:text-gray-500">
                     <Sliders className="mx-auto mb-2 text-gray-300" size={32} />
                     <p className="text-xs font-bold">Dữ liệu phân tích đang được cập nhật...</p>
                     <p className="text-[10px] text-gray-400 mt-1">Hệ thống đang đồng bộ dữ liệu với trạm chỉ huy trung tâm.</p>
                   </div>
+                )}
+                {activeTab === 'equipment' && (
+                  <RescueEquipmentsTab teamId={Number(id)} />
                 )}
               </div>
             </>

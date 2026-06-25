@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Edit, MapPin, Users, Heart, AlertTriangle } from 'lucide-react';
 import { householdApi } from '../../apis';
 import { ROUTES } from '../../constants';
+import Loader from '../../components/common/Loader';
 
 export default function HouseholdDetailPage() {
   const { id } = useParams();
@@ -14,9 +15,13 @@ export default function HouseholdDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
-      </div>
+      <Loader
+        layout="block"
+        size="md"
+        colorClass="text-indigo-650"
+        text="Đang tải chi tiết hộ dân..."
+        className="min-h-[400px]"
+      />
     );
   }
 

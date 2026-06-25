@@ -3,6 +3,7 @@ import { ROUTES } from './constants';
 import { useAuthStore } from './stores';
 import { FEATURE_FLAGS } from './config/featureFlags';
 import UnderConstructionPage from './pages/under-construction/UnderConstructionPage';
+import { SocketProvider } from './providers/SocketProvider';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -85,7 +86,9 @@ export const router = createBrowserRouter([
     path: '/',
     element: (
       <ProtectedRoute>
-        <MainLayout />
+        <SocketProvider>
+          <MainLayout />
+        </SocketProvider>
       </ProtectedRoute>
     ),
     children: [

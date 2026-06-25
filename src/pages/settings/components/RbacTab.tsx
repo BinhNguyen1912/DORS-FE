@@ -176,16 +176,13 @@ export default function RbacTab() {
                 key={r.code}
                 className={`p-4 border rounded-2xl flex flex-col gap-2 transition-all hover:shadow-sm bg-white dark:bg-gray-900 border-slate-100 dark:border-slate-800`}
               >
-                <div className="flex items-center justify-between">
-                  <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg border ${r.color}`}>
-                    {r.code}
-                  </span>
+                <div className="flex items-center justify-end">
                   <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase">
                     {r.level}
                   </span>
                 </div>
                 <h4 className="text-xs font-extrabold text-black dark:text-white">
-                  {r.name}
+                  {r.name} - [{r.code}]
                 </h4>
                 <p className="text-[11px] text-gray-500 dark:text-gray-450 leading-relaxed font-medium">
                   {r.description}

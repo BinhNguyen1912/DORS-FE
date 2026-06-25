@@ -26,6 +26,7 @@ import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
 import { useSocket } from '../../providers/SocketProvider';
 import { DISPATCH_EVENTS } from '../../constants/websocket.constant';
+import SosDetailModal from './components/SosDetailModal';
 
 // Inject custom CSS to override Leaflet default white styles to fit the clean light theme
 const injectStyles = `
@@ -133,6 +134,7 @@ export default function DisasterListPage() {
 
   // States for Map details
   const [selectedSosId, setSelectedSosId] = useState<number | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
 
@@ -290,7 +292,9 @@ export default function DisasterListPage() {
   // Parse SOS requests from API
   const parsedSosRequests = useMemo(() => {
     if (!dbSosList || !Array.isArray(dbSosList)) return [];
-    return dbSosList.map((sos: any) => {
+    return dbSosList
+      .filter((sos: any) => sos.status !== 'RESOLVED' && sos.status !== 'CANCELLED')
+      .map((sos: any) => {
       let lat = defaultCenter[0];
       let lng = defaultCenter[1];
       if (sos.location?.coordinates && Array.isArray(sos.location.coordinates)) {
@@ -330,9 +334,10 @@ export default function DisasterListPage() {
     return dbTeamsList.data.map((team: any) => {
       let lat = defaultCenter[0];
       let lng = defaultCenter[1];
-      if (team.location?.coordinates && Array.isArray(team.location.coordinates)) {
-        lng = team.location.coordinates[0];
-        lat = team.location.coordinates[1];
+      const loc = team.currentLocation || team.baseLocation || team.location;
+      if (loc?.coordinates && Array.isArray(loc.coordinates)) {
+        lng = loc.coordinates[0];
+        lat = loc.coordinates[1];
       }
 
       return {
@@ -502,6 +507,8 @@ export default function DisasterListPage() {
     layersGroupRef.current = L.layerGroup().addTo(map);
 
     const mapEl = mapContainerRef.current;
+    if (!mapEl) return;
+
     const handlePopupClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.classList.contains('verify-sos-btn-popup')) {
@@ -509,6 +516,14 @@ export default function DisasterListPage() {
         if (idAttr) {
           const id = parseInt(idAttr, 10);
           handleVerifySos(id);
+          map.closePopup();
+        }
+      } else if (target.classList.contains('view-sos-detail-btn-popup')) {
+        const idAttr = target.getAttribute('data-id');
+        if (idAttr) {
+          const id = parseInt(idAttr, 10);
+          setSelectedSosId(id);
+          setIsDetailModalOpen(true);
           map.closePopup();
         }
       }
@@ -697,7 +712,7 @@ export default function DisasterListPage() {
             <p class="mb-1 text-gray-750"><strong>Trạng thái:</strong> <span class="font-bold">${statusText}</span>${equipmentText}</p>
             <p class="mb-1 text-[11px] text-gray-500"><strong>Thời gian:</strong> ${sos.time}</p>
             <p class="mb-2.5 text-[11px] text-gray-650 font-medium"><strong>Mô tả:</strong> ${sos.description}</p>
-            <div class="flex items-center gap-1.5 mt-1">
+            <div class="flex flex-col gap-1.5 mt-1">
               ${sos.status === 'PENDING' ? `
                 <button class="verify-sos-btn-popup w-full px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold transition-all shadow cursor-pointer" data-id="${sos.id}">
                   Kích hoạt Điều phối v6
@@ -707,6 +722,9 @@ export default function DisasterListPage() {
                   ✓ ĐÃ DUYỆT ĐIỀU PHỐI
                 </div>
               `}
+              <button class="view-sos-detail-btn-popup w-full px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-700 dark:text-gray-300 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold transition-all cursor-pointer text-center" data-id="${sos.id}">
+                Xem chi tiết
+              </button>
             </div>
           </div>
         `;
@@ -1282,14 +1300,23 @@ export default function DisasterListPage() {
                                 </span>
                               )}
                             </div>
-                            {sos.status === 'PENDING' && (
+                            <div className="flex gap-1.5 ml-auto">
                               <button onClick={(e) => {
                                 e.stopPropagation();
-                                handleVerifySos(sos.id);
-                              }} className="px-1.5 py-0.5 bg-red-650 hover:bg-red-700 text-white rounded text-[8px] font-extrabold uppercase transition">
-                                Điều phối
+                                setSelectedSosId(sos.id);
+                                setIsDetailModalOpen(true);
+                              }} className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30 rounded text-[8px] font-extrabold uppercase transition">
+                                Chi tiết
                               </button>
-                            )}
+                              {sos.status === 'PENDING' && (
+                                <button onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVerifySos(sos.id);
+                                }} className="px-1.5 py-0.5 bg-red-650 hover:bg-red-700 text-white rounded text-[8px] font-extrabold uppercase transition">
+                                  Điều phối
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1456,14 +1483,23 @@ export default function DisasterListPage() {
                               </span>
                             )}
                           </div>
-                          {sos.status === 'PENDING' && (
+                          <div className="flex gap-1.5 ml-auto">
                             <button onClick={(e) => {
                               e.stopPropagation();
-                              handleVerifySos(sos.id);
-                            }} className="px-2 py-0.5 bg-red-650 hover:bg-red-700 text-white rounded text-[8px] font-extrabold uppercase transition">
-                              Điều phối
+                              setSelectedSosId(sos.id);
+                              setIsDetailModalOpen(true);
+                            }} className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 text-indigo-650 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30 rounded text-[8px] font-extrabold uppercase transition">
+                              Chi tiết
                             </button>
-                          )}
+                            {sos.status === 'PENDING' && (
+                              <button onClick={(e) => {
+                                e.stopPropagation();
+                                handleVerifySos(sos.id);
+                              }} className="px-2 py-0.5 bg-red-650 hover:bg-red-700 text-white rounded text-[8px] font-extrabold uppercase transition">
+                                Điều phối
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1854,6 +1890,14 @@ export default function DisasterListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {isDetailModalOpen && selectedSosId && (
+        <SosDetailModal
+          id={selectedSosId}
+          isOpen={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+        />
       )}
     </div>
   );

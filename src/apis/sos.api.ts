@@ -70,4 +70,9 @@ export const sosApi = {
     const resData = response.data?.data !== undefined ? response.data.data : response.data;
     return Array.isArray(resData) ? resData : [];
   },
+
+  getTimeline: async (id: number): Promise<any[]> => {
+    const response = await api.get<any>(`/sos-requests/${id}/timeline`);
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
 };

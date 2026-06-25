@@ -9,3 +9,5 @@ export { userApi } from './user.api';
 export { roleApi } from './role.api';
 export { settingsApi } from './settings.api';
 export { sosApi } from './sos.api';
+export { rescueEquipmentApi } from './rescue-equipment.api';
+export type { RescueEquipment } from './rescue-equipment.api';

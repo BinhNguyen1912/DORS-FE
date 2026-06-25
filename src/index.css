@@ -121,3 +121,23 @@ code {
   animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Custom Global Loader */
+.loader {
+  width: 45px;
+  aspect-ratio: .75;
+  --c: no-repeat linear-gradient(var(--loader-color, currentColor) 0 0);
+  background: 
+    var(--c) 0%   50%,
+    var(--c) 50%  50%,
+    var(--c) 100% 50%;
+  background-size: 20% 60%;
+  animation: l9 1s infinite;
+  display: inline-block;
+}
+
+@keyframes l9 {
+  33% {background-position: 0% 0%  ,50% 100%,100% 0%  }
+  66% {background-position: 0% 100%,50% 0%  ,100% 100%}
+}
+
+
