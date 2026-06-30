@@ -11,7 +11,7 @@ export const ROUTES = {
   HOUSEHOLD_CREATE: '/household/create',
   HOUSEHOLD_DETAIL: '/household/:id',
   RESCUE_TEAM: '/rescue-team',
-  RESCUE_TEAM_LIST: '/rescue-team/list',
+  RESCUE_TEAM_LIST: '/rescue-team/',
   RESCUE_TEAM_DASHBOARD: '/rescue-team/dashboard',
   RESCUE_TEAM_CREATE: '/rescue-team/create',
   RESCUE_TEAM_DETAIL: '/rescue-team/:id',
@@ -26,3 +26,5 @@ export const ROUTES = {
   ROLE_LIST: '/categories/roles',
   SETTINGS: '/settings',
 } as const;
+
+export * from './provinceCenters';

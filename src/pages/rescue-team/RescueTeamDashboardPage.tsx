@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rescueTeamApi, locationApi } from '../../apis';
-import { ROUTES } from '../../constants';
+import { ROUTES, getProvinceCenterByCode } from '../../constants';
 import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
 import StatsSummaryCards from '../../components/rescue-team/StatsSummaryCards';
 import RescueTeamDashboardMap from '../../components/rescue-team/RescueTeamDashboardMap';
 import RescueTeamListPanel from '../../components/rescue-team/RescueTeamListPanel';
+
 
 const injectStyles = `
   .custom-theme-popup .leaflet-popup-content-wrapper {
@@ -58,7 +59,7 @@ export default function RescueTeamDashboardPage() {
   const queryClient = useQueryClient();
 
   // Fetch Provinces to map the user's provinceId to a center
-  const { data: provinces } = useQuery({
+  const { data: provinces, error: provincesError } = useQuery({
     queryKey: ['provinces'],
     queryFn: () => locationApi.getAllProvinces(),
   });
@@ -68,17 +69,27 @@ export default function RescueTeamDashboardPage() {
     return provinces.find((p) => p.id === user.provinceId);
   }, [provinces, user?.provinceId]);
 
-  const provinceName = currentProvince?.name || 'Đà Nẵng';
+
+
+  // Cảnh báo người dùng nếu lỗi tải dữ liệu hành chính hoặc cấu hình tỉnh thành không khớp
+  useEffect(() => {
+    if (provincesError) {
+      toast.error('Lỗi: Không thể kết nối với dịch vụ bản đồ hành chính của hệ thống.');
+    }
+  }, [provincesError]);
+
+  useEffect(() => {
+    if (provinces && provinces.length > 0 && user?.provinceId) {
+      const found = provinces.some(p => p.id === user.provinceId);
+      if (!found) {
+        toast.error(`Cảnh báo: Tài khoản thuộc mã tỉnh không hợp lệ (ID: ${user.provinceId}). Bản đồ tự động chuyển hướng về TP. Hồ Chí Minh.`);
+      }
+    }
+  }, [provinces, user?.provinceId]);
 
   const defaultCenter = useMemo((): [number, number] => {
-    const n = provinceName.toLowerCase();
-    if (n.includes('đà nẵng')) return [16.0544, 108.2022];
-    if (n.includes('quảng nam')) return [15.567, 108.15];
-    if (n.includes('huế') || n.includes('thừa thiên')) return [16.46, 107.59];
-    if (n.includes('hà nội')) return [21.0285, 105.8542];
-    if (n.includes('hồ chí minh') || n.includes('sài gòn')) return [10.823, 106.6296];
-    return [16.0544, 108.2022]; // Default Da Nang
-  }, [provinceName]);
+    return getProvinceCenterByCode(currentProvince?.code, currentProvince?.name);
+  }, [currentProvince]);
 
   // Load database rescue teams filtered by user's provinceId
   const { data: dbData, isLoading } = useQuery({
@@ -160,7 +171,9 @@ export default function RescueTeamDashboardPage() {
         teamType: typeMap[team.teamType] || 'TONG_HOP',
         status: (statusMap[team.status] || 'AVAILABLE') as any,
         address,
-        memberCount: team.maxCapacity ? `0/${team.maxCapacity}` : '15/20',
+        memberCount: `${
+          (team as any).members ? (team as any).members.filter((m: any) => m.isActive).length : 0
+        }/${team.maxCapacity || 20}`,
         activeMissions: team.missionsCount || 0,
         logoUrl: team.logoUrl,
         isDb: true,
@@ -251,6 +264,8 @@ export default function RescueTeamDashboardPage() {
       setSelectedTeamId(team.id);
     }, 50);
   };
+
+
 
   return (
     <div className="space-y-4">

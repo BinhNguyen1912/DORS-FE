@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Search, MapPin, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from '../../stores';
+import { locationApi } from '../../apis';
 import type { Province, AdministrativeUnit } from '../../types';
 
 interface LocationPickerMapProps {
@@ -14,6 +15,7 @@ interface LocationPickerMapProps {
   adminUnitId?: string;
   provinces: Province[];
   wards: AdministrativeUnit[];
+  showSearch?: boolean;
 }
 
 export default function LocationPickerMap({
@@ -25,6 +27,7 @@ export default function LocationPickerMap({
   adminUnitId,
   provinces,
   wards,
+  showSearch = true,
 }: LocationPickerMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -38,12 +41,13 @@ export default function LocationPickerMap({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const initialLat = latitude ? Number(latitude) : 16.0544;
-    const initialLng = longitude ? Number(longitude) : 108.2022;
+    const initialLat = latitude ? Number(latitude) : 10.823;
+    const initialLng = longitude ? Number(longitude) : 106.6296;
 
     const map = L.map(mapContainerRef.current, {
       zoomControl: true,
       attributionControl: false,
+      preferCanvas: true,
     }).setView([initialLat, initialLng], 13);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -125,12 +129,7 @@ export default function LocationPickerMap({
 
     const fetchProvinceBounds = async () => {
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            selectedProvince + ', Việt Nam'
-          )}&limit=1`
-        );
-        const data = await response.json();
+        const data = await locationApi.geocode(selectedProvince + ', Việt Nam', 1);
         if (data && data.length > 0 && data[0].boundingbox) {
           const bbox = data[0].boundingbox;
           const southWest = L.latLng(parseFloat(bbox[0]), parseFloat(bbox[2]));
@@ -164,12 +163,7 @@ export default function LocationPickerMap({
 
     const autoGeocode = async () => {
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            searchQuery
-          )}&limit=1`
-        );
-        const data = await response.json();
+        const data = await locationApi.geocode(searchQuery, 1);
         if (data && data.length > 0) {
           const lat = parseFloat(data[0].lat);
           const lon = parseFloat(data[0].lon);
@@ -191,12 +185,7 @@ export default function LocationPickerMap({
     if (!mapSearch.trim()) return;
     setIsSearchingMap(true);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          mapSearch
-        )}&limit=1`
-      );
-      const data = await response.json();
+      const data = await locationApi.geocode(mapSearch, 1);
       if (data && data.length > 0) {
         const lat = parseFloat(data[0].lat);
         const lon = parseFloat(data[0].lon);
@@ -228,30 +217,32 @@ export default function LocationPickerMap({
       </div>
 
       {/* Map Search Box */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Nhập địa điểm để tìm kiếm trên bản đồ (Ví dụ: Phường Hòa Khánh Nam, Liên Chiểu)..."
-          value={mapSearch}
-          onChange={(e) => setMapSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleSearchLocation();
-            }
-          }}
-          className="flex-1 px-3.5 py-2 rounded-xl text-xs border border-gray-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-        />
-        <button
-          type="button"
-          onClick={handleSearchLocation}
-          disabled={isSearchingMap}
-          className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:bg-slate-100 disabled:text-gray-400 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer border border-indigo-100"
-        >
-          {isSearchingMap ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
-          <span>Tìm</span>
-        </button>
-      </div>
+      {showSearch && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Nhập địa điểm để tìm kiếm trên bản đồ (Ví dụ: Phường Hòa Khánh Nam, Liên Chiểu)..."
+            value={mapSearch}
+            onChange={(e) => setMapSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSearchLocation();
+              }
+            }}
+            className="flex-1 px-3.5 py-2 rounded-xl text-xs border border-gray-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          />
+          <button
+            type="button"
+            onClick={handleSearchLocation}
+            disabled={isSearchingMap}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:bg-slate-100 disabled:text-gray-400 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer border border-indigo-100"
+          >
+            {isSearchingMap ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+            <span>Tìm</span>
+          </button>
+        </div>
+      )}
 
       {/* Interactive Map */}
       <div className="relative h-[300px] w-full rounded-xl overflow-hidden border border-slate-150 dark:border-gray-700 z-10">

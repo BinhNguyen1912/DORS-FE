@@ -23,10 +23,10 @@ export const FEATURE_FLAGS: Record<string, boolean> = {
 
   // Disasters module
   [ROUTES.DISASTER_LIST]: true,
-  [ROUTES.DISASTER_DETAIL]: false,
+  [ROUTES.DISASTER_DETAIL]: true,
 
   // Donations module
-  [ROUTES.DONATION_LIST]: false,
-  [ROUTES.DONATION_CAMPAIGN]: false,
+  [ROUTES.DONATION_LIST]: true,
+  [ROUTES.DONATION_CAMPAIGN]: true,
   [ROUTES.SETTINGS]: true,
 };

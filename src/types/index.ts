@@ -60,6 +60,7 @@ export interface AuthResponse {
 export interface LoginRequest {
   identifier: string;
   password: string;
+  provinceId: number;
 }
 
 export interface RegisterRequest {

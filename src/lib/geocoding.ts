@@ -1,3 +1,5 @@
+import { locationApi } from '../apis';
+
 /**
  * Geocoding adapter — hỗ trợ Goong Maps và Nominatim (fallback).
  * Cấu hình qua .env:
@@ -90,12 +92,7 @@ interface NominatimResult {
 }
 
 async function searchNominatim(query: string): Promise<GeocodingResult[]> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=vn&limit=6&addressdetails=1`;
-  const res = await fetch(url, {
-    headers: { 'Accept-Language': 'vi', 'User-Agent': 'RescueSystemApp/1.0' },
-  });
-  if (!res.ok) throw new Error('Nominatim API error');
-  const data: NominatimResult[] = await res.json();
+  const data = (await locationApi.geocode(query, 6)) as NominatimResult[];
 
   return data.map((item) => {
     const parts = item.display_name.split(', ');
@@ -120,14 +117,18 @@ async function searchNominatim(query: string): Promise<GeocodingResult[]> {
 export async function searchAddress(query: string, provinceName?: string): Promise<GeocodingResult[]> {
   if (!query || query.trim().length < 3) return [];
 
-  const provider = (import.meta.env.VITE_GEOCODING_PROVIDER || 'goong').toLowerCase();
+  const provider = (import.meta.env.VITE_GEOCODING_PROVIDER || 'nominatim').toLowerCase();
 
   // Thêm tên tỉnh/thành phố vào cuối query để khoanh vùng kết quả tìm kiếm tốt hơn
   const finalQuery = provinceName ? `${query}, ${provinceName}` : query;
 
   try {
     if (provider === 'goong') {
-      return await searchGoong(finalQuery);
+      const apiKey = import.meta.env.VITE_GOONG_API_KEY;
+      if (apiKey && apiKey !== 'your_goong_api_key_here') {
+        return await searchGoong(finalQuery);
+      }
+      console.warn('[Geocoding] Goong API key chưa được cấu hình. Tự động chuyển hướng sang Nominatim.');
     }
     // Fallback to Nominatim
     return await searchNominatim(finalQuery);

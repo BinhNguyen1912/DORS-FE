@@ -175,7 +175,9 @@ export default function RescueTeamListPage() {
         teamType: typeMap[team.teamType] || 'TONG_HOP',
         status: (statusMap[team.status] || 'AVAILABLE') as any,
         address,
-        memberCount: team.maxCapacity ? `12/${team.maxCapacity}` : '15/20', // mockup current vs max
+        memberCount: `${
+          (team as any).members ? (team as any).members.filter((m: any) => m.isActive).length : 0
+        }/${team.maxCapacity || 20}`,
         activeMissions: team.missionsCount || 0,
         logoUrl: team.logoUrl,
       };

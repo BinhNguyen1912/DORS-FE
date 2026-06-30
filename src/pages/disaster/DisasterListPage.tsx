@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -19,13 +20,16 @@ import {
   ChevronDown,
   ChevronRight,
   X,
-  Plus
+  Plus,
+  Zap,
+  LayoutGrid
 } from 'lucide-react';
-import { rescueTeamApi, locationApi, sosApi } from '../../apis';
+import { rescueTeamApi, locationApi, sosApi, routingApi } from '../../apis';
 import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
 import { useSocket } from '../../providers/SocketProvider';
 import { DISPATCH_EVENTS } from '../../constants/websocket.constant';
+import { getProvinceCenterByCode } from '../../constants';
 import SosDetailModal from './components/SosDetailModal';
 
 // Inject custom CSS to override Leaflet default white styles to fit the clean light theme
@@ -54,20 +58,23 @@ const injectStyles = `
     background: none !important;
     border: none !important;
   }
+  
+  /* Fullscreen map helper styles */
+  .has-fullscreen-map aside,
+  .has-fullscreen-map header,
+  .has-fullscreen-map .layout-mobile-topbar {
+    display: none !important;
+  }
+  .has-fullscreen-map main {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
 `;
 
-// Helper to determine province centers
-const getProvinceCenter = (name: string): [number, number] => {
-  const n = name.toLowerCase();
-  if (n.includes('đà nẵng')) return [16.0544, 108.2022];
-  if (n.includes('quảng nam')) return [15.567, 108.15];
-  if (n.includes('huế') || n.includes('thừa thiên')) return [16.46, 107.59];
-  if (n.includes('hà nội')) return [21.0285, 105.8542];
-  if (n.includes('hồ chí minh') || n.includes('sài gòn')) return [10.823, 106.6296];
-  return [16.0544, 108.2022]; // Default Da Nang
-};
+
 
 export default function DisasterListPage() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const { dispatchSocket } = useSocket();
@@ -76,6 +83,7 @@ export default function DisasterListPage() {
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
   const [showStatsOverlay, setShowStatsOverlay] = useState(true);
+  const [showBottomDashboard, setShowBottomDashboard] = useState(false);
   const [selectedSeverity, setSelectedSeverity] = useState('Tất cả');
   const [selectedTeamStatus, setSelectedTeamStatus] = useState('Tất cả');
 
@@ -89,9 +97,10 @@ export default function DisasterListPage() {
   const [newTrappedPeopleCount, setNewTrappedPeopleCount] = useState(1);
   const [newRequiresEquipment, setNewRequiresEquipment] = useState(false);
   const [newSpecialNeedsTags, setNewSpecialNeedsTags] = useState<string[]>([]);
-  const [newLatitude, setNewLatitude] = useState(16.0544);
-  const [newLongitude, setNewLongitude] = useState(108.2022);
+  const [newLatitude, setNewLatitude] = useState(10.823);
+  const [newLongitude, setNewLongitude] = useState(106.6296);
   const [isPickingLocation, setIsPickingLocation] = useState(false);
+  const [routesCache, setRoutesCache] = useState<Record<string, { primary: [number, number][]; dijkstra: [number, number][] | null }>>({});
 
   const resetCreateForm = () => {
     setNewRequesterName('');
@@ -130,6 +139,7 @@ export default function DisasterListPage() {
   const [showTeams, setShowTeams] = useState(true);
   const [showVehicles, setShowVehicles] = useState(true);
   const [showFloodZones, setShowFloodZones] = useState(true);
+  const [showResolvedSos, setShowResolvedSos] = useState(false);
   const [showCommandStations, setShowCommandStations] = useState(true);
 
   // States for Map details
@@ -137,15 +147,42 @@ export default function DisasterListPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [showUserLocation, setShowUserLocation] = useState(true);
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+
+  useEffect(() => {
+    if (isMapFullscreen) {
+      document.documentElement.classList.add('has-fullscreen-map');
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.documentElement.classList.remove('has-fullscreen-map');
+      document.body.classList.remove('overflow-hidden');
+    }
+    return () => {
+      document.documentElement.classList.remove('has-fullscreen-map');
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [isMapFullscreen]);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layersGroupRef = useRef<L.LayerGroup | null>(null);
+  const markersGroupRef = useRef<L.LayerGroup | null>(null);
+  const markersMapRef = useRef<Map<string, L.Marker>>(new Map());
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const [activeTileType, setActiveTileType] = useState<'streets' | 'satellite' | 'terrain'>('streets');
+  const [performanceMode, setPerformanceMode] = useState(false);
 
   // 1. Fetch Provinces to map the user's provinceId to a readable name
-  const { data: provinces } = useQuery({
+  const { data: provinces, error: provincesError } = useQuery({
     queryKey: ['provinces'],
     queryFn: () => locationApi.getAllProvinces(),
   });
@@ -155,8 +192,26 @@ export default function DisasterListPage() {
     return provinces.find(p => p.id === user.provinceId);
   }, [provinces, user?.provinceId]);
 
-  const provinceName = currentProvince?.name || 'Đà Nẵng';
-  const defaultCenter = useMemo(() => getProvinceCenter(provinceName), [provinceName]);
+  const provinceName = currentProvince?.name;
+  const defaultCenter = useMemo(() => {
+    return getProvinceCenterByCode(currentProvince?.code, currentProvince?.name);
+  }, [currentProvince]);
+
+  // Cảnh báo người dùng nếu lỗi tải dữ liệu hành chính hoặc cấu hình tỉnh thành không khớp
+  useEffect(() => {
+    if (provincesError) {
+      toast.error('Lỗi: Không thể kết nối với dịch vụ bản đồ hành chính của hệ thống.');
+    }
+  }, [provincesError]);
+
+  useEffect(() => {
+    if (provinces && provinces.length > 0 && user?.provinceId) {
+      const found = provinces.some(p => p.id === user.provinceId);
+      if (!found) {
+        toast.error(`Cảnh báo: Tài khoản thuộc mã tỉnh không hợp lệ (ID: ${user.provinceId}). Bản đồ tự động chuyển hướng về TP. Hồ Chí Minh.`);
+      }
+    }
+  }, [provinces, user?.provinceId]);
 
   // 2. Fetch SOS Requests and Teams exclusively from database
   const { data: dbSosList } = useQuery({
@@ -170,12 +225,14 @@ export default function DisasterListPage() {
   });
 
   // 📡 Real-time WebSockets integration for SOS dispatch updates
+
+  // 📡 Real-time WebSockets integration for SOS dispatch updates
   useEffect(() => {
     if (!dispatchSocket) return;
 
     const handleNewSos = (sos: any) => {
       console.log('📡 [WS] New SOS received:', sos);
-      
+
       // Update the React Query cache: ['db-sos-requests', user?.provinceId]
       queryClient.setQueryData<any[]>(['db-sos-requests', user?.provinceId], (oldData) => {
         const list = oldData || [];
@@ -189,7 +246,7 @@ export default function DisasterListPage() {
 
     const handleSosStatusUpdated = (payload: { sosId: number; status: string; assignedTeamId?: number; distanceMeters?: number }) => {
       console.log('📡 [WS] SOS status updated:', payload);
-      
+
       // Update the React Query cache: ['db-sos-requests', user?.provinceId]
       queryClient.setQueryData<any[]>(['db-sos-requests', user?.provinceId], (oldData) => {
         if (!oldData) return [];
@@ -217,7 +274,7 @@ export default function DisasterListPage() {
         CANCELLED: 'Đã hủy',
       };
       const label = statusLabels[payload.status] || payload.status;
-      
+
       if (payload.status === 'RESOLVED') {
         toast.success(`✓ SOS-2024-${payload.sosId} đã được xử lý thành công!`);
       } else if (payload.status === 'CANCELLED') {
@@ -272,8 +329,9 @@ export default function DisasterListPage() {
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
-    
+
     const handleMapClick = (e: L.LeafletMouseEvent) => {
+      setShowBottomDashboard(false);
       if (isPickingLocation) {
         setNewLatitude(e.latlng.lat);
         setNewLongitude(e.latlng.lng);
@@ -282,7 +340,7 @@ export default function DisasterListPage() {
         toast.success(`Đã chọn vị trí hiện trường: ${e.latlng.lng.toFixed(5)}, ${e.latlng.lat.toFixed(5)}`);
       }
     };
-    
+
     map.on('click', handleMapClick);
     return () => {
       map.off('click', handleMapClick);
@@ -293,40 +351,51 @@ export default function DisasterListPage() {
   const parsedSosRequests = useMemo(() => {
     if (!dbSosList || !Array.isArray(dbSosList)) return [];
     return dbSosList
-      .filter((sos: any) => sos.status !== 'RESOLVED' && sos.status !== 'CANCELLED')
+      .filter((sos: any) => {
+        if (sos.status === 'CANCELLED') return false;
+        if (sos.status === 'RESOLVED' && !showResolvedSos) return false;
+        return true;
+      })
       .map((sos: any) => {
-      let lat = defaultCenter[0];
-      let lng = defaultCenter[1];
-      if (sos.location?.coordinates && Array.isArray(sos.location.coordinates)) {
-        lng = sos.location.coordinates[0];
-        lat = sos.location.coordinates[1];
-      } else if (sos.lat && sos.lng) {
-        lat = sos.lat;
-        lng = sos.lng;
-      }
+        let lat = defaultCenter[0];
+        let lng = defaultCenter[1];
+        if (sos.location?.coordinates && Array.isArray(sos.location.coordinates)) {
+          lng = sos.location.coordinates[0];
+          lat = sos.location.coordinates[1];
+        } else if (sos.lat && sos.lng) {
+          lat = sos.lat;
+          lng = sos.lng;
+        }
 
-      return {
-        id: sos.id,
-        code: `SOS-2024-${sos.id}`,
-        severity: (sos.severity || 'MEDIUM') as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
-        lat,
-        lng,
-        location: sos.adminUnit?.name
-          ? `${sos.adminUnit.name}, ${provinceName}`
-          : (sos.description || 'Hiện trường SOS'),
-        time: new Date(sos.createdAt || sos.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(sos.createdAt || sos.created_at).toLocaleDateString('vi-VN'),
-        sender: sos.requesterName || 'Người dân',
-        phone: sos.requesterPhone || 'Chưa cập nhật',
-        description: sos.description || 'Yêu cầu cứu trợ khẩn cấp',
-        status: (sos.status || 'PENDING') as 'PENDING' | 'PENDING_SPECIALIST' | 'DISPATCHED' | 'ON_SITE' | 'RESOLVED' | 'CANCELLED',
-        trappedCount: sos.trappedPeopleCount || 1,
-        requiresEquipment: !!sos.requiresEquipment,
-        specialistPending: !!sos.specialistPending,
-        specialistType: sos.specialistType || '',
-        assignedTeamId: sos.assignedTeamId,
-      };
-    });
-  }, [dbSosList, defaultCenter, provinceName]);
+        // Find assigned team name
+        const assignedTeam = sos.assignedTeamId && dbTeamsList?.data
+          ? (dbTeamsList.data as any[]).find((t: any) => t.id === sos.assignedTeamId)
+          : null;
+
+        return {
+          id: sos.id,
+          code: `SOS-2024-${sos.id}`,
+          severity: (sos.severity || 'MEDIUM') as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
+          lat,
+          lng,
+          location: sos.adminUnit?.name
+            ? `${sos.adminUnit.name}, ${provinceName}`
+            : (sos.description || 'Hiện trường SOS'),
+          time: new Date(sos.createdAt || sos.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(sos.createdAt || sos.created_at).toLocaleDateString('vi-VN'),
+          sender: sos.requesterName || 'Người dân',
+          phone: sos.requesterPhone || 'Chưa cập nhật',
+          description: sos.description || 'Yêu cầu cứu trợ khẩn cấp',
+          status: (sos.status || 'PENDING') as 'PENDING' | 'PENDING_SPECIALIST' | 'DISPATCHED' | 'ON_SITE' | 'RESOLVED' | 'CANCELLED',
+          trappedCount: sos.trappedPeopleCount || 1,
+          requiresEquipment: !!sos.requiresEquipment,
+          specialistPending: !!sos.specialistPending,
+          specialistType: sos.specialistType || '',
+          assignedTeamId: sos.assignedTeamId,
+          assignedTeamName: assignedTeam?.name || null,
+          requestType: sos.requestType || 'OTHER',
+        };
+      });
+  }, [dbSosList, defaultCenter, provinceName, showResolvedSos, dbTeamsList]);
 
   // Parse Teams from API
   const parsedTeams = useMemo(() => {
@@ -354,6 +423,33 @@ export default function DisasterListPage() {
       };
     });
   }, [dbTeamsList, defaultCenter, provinceName]);
+
+  // Lists for bottom monitoring dashboard
+  const availableTeams = useMemo(() => {
+    return parsedTeams.filter(t => t.status === 'AVAILABLE' || t.status === 'STANDBY');
+  }, [parsedTeams]);
+
+  const activeTeams = useMemo(() => {
+    return parsedTeams.filter(t => t.status === 'BUSY' || t.status === 'ON_DUTY' || t.status === 'DISPATCHED');
+  }, [parsedTeams]);
+
+  const teamActiveSos = useMemo(() => {
+    const map = new Map<number, any>();
+    parsedSosRequests.forEach(sos => {
+      if (sos.assignedTeamId && sos.status !== 'RESOLVED' && sos.status !== 'CANCELLED') {
+        map.set(sos.assignedTeamId, sos);
+      }
+    });
+    return map;
+  }, [parsedSosRequests]);
+
+  const newSosRequests = useMemo(() => {
+    return parsedSosRequests.filter(s => s.status === 'PENDING' || s.status === 'PENDING_SPECIALIST');
+  }, [parsedSosRequests]);
+
+  const activeSosRequests = useMemo(() => {
+    return parsedSosRequests.filter(s => s.status === 'DISPATCHED' || s.status === 'ON_SITE');
+  }, [parsedSosRequests]);
 
   // Filters logic
   const filteredSosRequests = useMemo(() => {
@@ -390,7 +486,6 @@ export default function DisasterListPage() {
       return true;
     });
   }, [parsedTeams, selectedTeamStatus]);
-
 
   // Auto-dispatch v6 mutation
   const assignTeamMutation = useMutation({
@@ -492,12 +587,18 @@ export default function DisasterListPage() {
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
+      preferCanvas: true,
     }).setView(defaultCenter, 12);
 
-    // Load CartoDB Positron style map tiles (OSM-based clean white styling)
-    const layer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
+    // Load map tiles (Standard OSM for light, Dark Matter for dark)
+    const isDarkInitial = document.documentElement.classList.contains('dark');
+    const defaultTileUrl = isDarkInitial
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+    const layer = L.tileLayer(defaultTileUrl, {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      subdomains: 'abc',
       maxZoom: 20
     }).addTo(map);
 
@@ -505,6 +606,7 @@ export default function DisasterListPage() {
 
     mapRef.current = map;
     layersGroupRef.current = L.layerGroup().addTo(map);
+    markersGroupRef.current = L.layerGroup().addTo(map);
 
     const mapEl = mapContainerRef.current;
     if (!mapEl) return;
@@ -549,9 +651,11 @@ export default function DisasterListPage() {
       map.removeLayer(tileLayerRef.current);
     }
 
-    let url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-    let attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
-    let subdomains = 'abcd';
+    let url = isDark
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    let attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+    let subdomains = 'abc';
 
     if (activeTileType === 'satellite') {
       // High resolution Google Satellite map tiles
@@ -571,17 +675,20 @@ export default function DisasterListPage() {
     }).addTo(map);
 
     tileLayerRef.current = newLayer;
-  }, [activeTileType]);
+  }, [activeTileType, isDark]);
 
   // Handle invalidateSize on fullscreen toggle
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
 
-    // Call Leaflet invalidateSize after viewport layout reflows
-    setTimeout(() => {
-      map.invalidateSize({ animate: true });
+    const timer = setTimeout(() => {
+      if (mapRef.current && (map as any)._container) {
+        map.invalidateSize({ animate: true });
+      }
     }, 150);
+
+    return () => clearTimeout(timer);
   }, [isMapFullscreen, showSidebar]);
 
   // Re-center map when default province center changes
@@ -591,30 +698,55 @@ export default function DisasterListPage() {
     }
   }, [defaultCenter, userLocation]);
 
-  // Redraw layers on map state updates
+  // Redraw layers on map state updates (Optimized with Canvas, Marker Reconciliation & Performance Mode)
   useEffect(() => {
-    if (!mapRef.current || !layersGroupRef.current) return;
+    if (!mapRef.current || !layersGroupRef.current || !markersGroupRef.current) return;
 
     const group = layersGroupRef.current;
+    const markersGroup = markersGroupRef.current;
+    const currentMarkers = markersMapRef.current;
+    const activeKeys = new Set<string>();
+
+    // Clear vector lines and polygons on layersGroup (very fast with preferCanvas)
     group.clearLayers();
 
-    // User location blue dot
-    if (userLocation) {
+    // 1. User Location Marker
+    if (userLocation && showUserLocation) {
+      const key = 'user-location';
+      activeKeys.add(key);
+
       const selfIcon = L.divIcon({
-        html: `
-          <div class="relative flex items-center justify-center">
-            <div class="absolute w-8 h-8 bg-blue-500 rounded-full opacity-50 animate-ping"></div>
-            <div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg"></div>
-          </div>
-        `,
+        html: performanceMode
+          ? `
+            <div class="relative flex items-center justify-center">
+              <div class="absolute w-8 h-8 bg-blue-500 rounded-full opacity-20"></div>
+              <div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg"></div>
+            </div>
+          `
+          : `
+            <div class="relative flex items-center justify-center">
+              <div class="absolute w-8 h-8 bg-blue-500 rounded-full opacity-50 animate-ping"></div>
+              <div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg"></div>
+            </div>
+          `,
         className: 'custom-div-icon',
         iconSize: [16, 16],
         iconAnchor: [8, 8],
       });
 
-      const userMarker = L.marker(userLocation, { icon: selfIcon })
-        .bindPopup('<p class="text-xs font-bold text-gray-800 p-1">Vị trí hiện tại của bạn</p>', { className: 'custom-theme-popup' });
-      group.addLayer(userMarker);
+      const popupContent = '<p class="text-xs font-bold text-gray-800 p-1">Vị trí hiện tại của bạn</p>';
+
+      if (currentMarkers.has(key)) {
+        const marker = currentMarkers.get(key)!;
+        marker.setLatLng(userLocation);
+        marker.setIcon(selfIcon);
+        marker.setPopupContent(popupContent);
+      } else {
+        const marker = L.marker(userLocation, { icon: selfIcon })
+          .bindPopup(popupContent, { className: 'custom-theme-popup' });
+        markersGroup.addLayer(marker);
+        currentMarkers.set(key, marker);
+      }
     }
 
     // Custom pins definitions
@@ -622,50 +754,100 @@ export default function DisasterListPage() {
       const pingBg = severity === 'CRITICAL' ? 'bg-red-500' : severity === 'HIGH' ? 'bg-amber-500' : 'bg-blue-500';
       let iconBg = severity === 'CRITICAL' ? 'bg-red-600' : severity === 'HIGH' ? 'bg-amber-600' : 'bg-blue-600';
       let outerBorder = 'border border-white';
-      
-      if (status === 'PENDING_SPECIALIST') {
-        iconBg = 'bg-purple-600';
-        outerBorder = 'border-2 border-purple-400 animate-pulse';
-      } else if (status === 'RESOLVED') {
-        iconBg = 'bg-gray-400';
+
+      // Determine animation
+      let animateClass = '';
+      if (!performanceMode) {
+        if (status === 'PENDING_SPECIALIST') {
+          iconBg = 'bg-purple-650';
+          outerBorder = 'border-2 border-purple-400 animate-pulse';
+        } else if (severity === 'CRITICAL' && status === 'PENDING') {
+          animateClass = 'animate-ping';
+        }
+      } else {
+        if (status === 'PENDING_SPECIALIST') {
+          iconBg = 'bg-purple-650';
+          outerBorder = 'border-2 border-purple-400';
+        }
       }
+
+      if (status === 'RESOLVED') {
+        iconBg = 'bg-slate-400 dark:bg-slate-600';
+      }
+
+      const glowColor = severity === 'CRITICAL'
+        ? 'drop-shadow-[0_0_8px_rgba(220,38,38,0.75)]'
+        : severity === 'HIGH'
+          ? 'drop-shadow-[0_0_8px_rgba(245,158,11,0.75)]'
+          : 'drop-shadow-[0_0_8px_rgba(59,130,246,0.75)]';
+
+      const pingDiv = animateClass
+        ? `<div class="absolute w-8 h-8 ${pingBg} rounded-full opacity-40 ${animateClass}"></div>`
+        : `<div class="absolute w-8 h-8 ${pingBg} rounded-full opacity-15"></div>`;
 
       return L.divIcon({
         html: `
-          <div class="relative flex items-center justify-center">
-            <div class="absolute w-8 h-8 ${pingBg} rounded-full opacity-40 animate-ping"></div>
-            <div class="w-5.5 h-5.5 ${iconBg} text-white rounded-full flex items-center justify-center shadow-lg ${outerBorder} text-[8px] font-black tracking-tight">SOS</div>
-          </div>
-        `,
+            <div class="relative flex items-center justify-center ${glowColor}">
+              ${pingDiv}
+              <div class="w-6.5 h-6.5 ${iconBg} text-white rounded-full flex items-center justify-center shadow-lg ${outerBorder} text-[9px] font-black tracking-tight select-none">
+                SOS
+              </div>
+            </div>
+          `,
         className: 'custom-div-icon',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
       });
     };
 
     const getTeamIcon = (type: string, status: string) => {
       const isBusy = status === 'BUSY' || status === 'ON_DUTY';
       const isMoving = status === 'DISPATCHED';
-      const baseColor = type === 'PCCC' ? 'bg-orange-500' : type === 'Y_TE' ? 'bg-green-500' : 'bg-sky-500';
-      const outerRing = isBusy ? 'border-2 border-red-500' : isMoving ? 'border-2 border-blue-500' : 'border border-white';
+
+      let gradientClass = 'from-blue-500 to-indigo-650';
+      let glowClass = 'drop-shadow-[0_0_6px_rgba(59,130,246,0.55)]';
+      let emoji = '🛡';
+
+      if (type === 'PCCC') {
+        gradientClass = 'from-orange-500 to-red-650';
+        glowClass = 'drop-shadow-[0_0_6px_rgba(249,115,22,0.65)]';
+        emoji = '🚒';
+      } else if (type === 'Y_TE') {
+        gradientClass = 'from-emerald-400 to-teal-650';
+        glowClass = 'drop-shadow-[0_0_6px_rgba(16,185,129,0.65)]';
+        emoji = '⚕';
+      }
+
+      let outerRing = 'border border-white shadow';
+      if (isBusy) {
+        outerRing = 'ring-2 ring-red-500 ring-offset-1 dark:ring-offset-gray-900 border border-white';
+      } else if (isMoving) {
+        outerRing = 'ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-900 border border-white';
+      }
+
+      const pulseDiv = (!performanceMode && (isBusy || isMoving))
+        ? `<div class="absolute w-7 h-7 bg-white dark:bg-gray-900 rounded-full opacity-15 animate-pulse"></div>`
+        : '';
+
       return L.divIcon({
         html: `
-          <div class="relative flex items-center justify-center">
-            <div class="absolute w-7 h-7 ${baseColor} rounded-full opacity-25 animate-pulse"></div>
-            <div class="w-5 h-5 ${baseColor} text-white rounded-full flex items-center justify-center shadow-md ${outerRing} text-[10px] font-bold">
-              ${type === 'PCCC' ? '🚒' : type === 'Y_TE' ? '⚕' : '🛡'}
+            <div class="relative flex items-center justify-center ${glowClass}">
+              ${pulseDiv}
+              <div class="w-6.5 h-6.5 bg-gradient-to-br ${gradientClass} text-white rounded-full flex items-center justify-center shadow-md ${outerRing} text-xs font-bold select-none">
+                ${emoji}
+              </div>
             </div>
-          </div>
-        `,
+          `,
         className: 'custom-div-icon',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
       });
     };
 
-    // Draw Flood Zones
+    // Draw Flood Zones (polygons drawn on Canvas)
     if (showFloodZones) {
       const geojsonLayer = L.geoJSON(floodZonesGeoJSON as any, {
+        interactive: false,
         style: (feature) => {
           const sev = feature?.properties?.severity;
           let color = '#3b82f6';
@@ -677,75 +859,127 @@ export default function DisasterListPage() {
           return {
             color: color,
             fillColor: color,
-            weight: 1.5,
-            opacity: 0.8,
-            fillOpacity: 0.16,
-            dashArray: '3, 5',
+            weight: 2,
+            opacity: 0.9,
+            fillOpacity: 0.18,
+            lineJoin: 'round',
           };
         }
       });
       group.addLayer(geojsonLayer);
     }
 
-    // Draw SOS Points
+    // Draw SOS Points (reconciled)
     if (showSos) {
       filteredSosRequests.forEach((sos) => {
-        const marker = L.marker([sos.lat, sos.lng], { icon: getSosIcon(sos.severity, sos.status) });
+        const key = `sos-${sos.id}`;
+        activeKeys.add(key);
+
+        const icon = getSosIcon(sos.severity, sos.status);
 
         const statusText = sos.status === 'PENDING' ? 'Chờ xử lý' :
-                           sos.status === 'PENDING_SPECIALIST' ? 'Đợi đội chuyên môn (Queue)' :
-                           sos.status === 'DISPATCHED' ? 'Đang di chuyển' :
-                           sos.status === 'ON_SITE' ? 'Đã tiếp cận' : 'Hoàn thành';
-                           
+          sos.status === 'PENDING_SPECIALIST' ? 'Đợi đội chuyên môn (Queue)' :
+            sos.status === 'DISPATCHED' ? 'Đang di chuyển' :
+              sos.status === 'ON_SITE' ? 'Đã tiếp cận' : 'Hoàn thành';
+
         const equipmentText = sos.requiresEquipment ? '<span class="text-purple-650 font-bold ml-1">🚨 (Yêu cầu thiết bị)</span>' : '';
 
+        // Build status badge colors for popup
+        const popupStatusColors: Record<string, string> = {
+          PENDING: 'background:#fef3c7;color:#92400e;border:1px solid #fde68a',
+          PENDING_SPECIALIST: 'background:#f3e8ff;color:#7c3aed;border:1px solid #ddd6fe',
+          DISPATCHED: 'background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe',
+          ON_SITE: 'background:#ccfbf1;color:#0f766e;border:1px solid #99f6e4',
+          RESOLVED: 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0',
+        };
+        const popupSeverityColors: Record<string, string> = {
+          CRITICAL: 'background:#fef2f2;color:#dc2626;border:1px solid #fecaca',
+          HIGH: 'background:#fff7ed;color:#ea580c;border:1px solid #fed7aa',
+          MEDIUM: 'background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe',
+          LOW: 'background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0',
+        };
+        const assignedTeamHtml = sos.assignedTeamName
+          ? `<div style="margin-top:4px;padding:4px 6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:10px;color:#1e40af;font-weight:700;">🚒 Đội: ${sos.assignedTeamName}</div>`
+          : '';
+
         const popupContent = `
-          <div class="p-2 w-56 text-left font-sans text-xs">
-            <div class="flex items-center justify-between border-b border-slate-200 pb-1.5 mb-2">
-              <span class="font-extrabold text-[#ef4444]">${sos.code}</span>
-              <span class="px-1.5 py-0.2 bg-red-50 text-red-600 border border-red-200 rounded font-black text-[9px] uppercase">
-                ${sos.severity === 'CRITICAL' ? 'Nguy hiểm' : 'Cảnh báo'}
-              </span>
-            </div>
-            <p class="mb-1 text-gray-750"><strong>Người gửi:</strong> ${sos.sender}</p>
-            <p class="mb-1 text-gray-750"><strong>Liên hệ:</strong> ${sos.phone}</p>
-            <p class="mb-1 text-gray-750"><strong>Trạng thái:</strong> <span class="font-bold">${statusText}</span>${equipmentText}</p>
-            <p class="mb-1 text-[11px] text-gray-500"><strong>Thời gian:</strong> ${sos.time}</p>
-            <p class="mb-2.5 text-[11px] text-gray-650 font-medium"><strong>Mô tả:</strong> ${sos.description}</p>
-            <div class="flex flex-col gap-1.5 mt-1">
-              ${sos.status === 'PENDING' ? `
-                <button class="verify-sos-btn-popup w-full px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold transition-all shadow cursor-pointer" data-id="${sos.id}">
-                  Kích hoạt Điều phối v6
+            <div style="padding:8px;width:240px;text-align:left;font-family:sans-serif;font-size:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
+                <span style="font-weight:900;color:#ef4444;font-size:13px;">${sos.code}</span>
+                <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:900;text-transform:uppercase;${popupSeverityColors[sos.severity] || ''}">
+                  ${sos.severity === 'CRITICAL' ? 'Nguy kịch' : sos.severity === 'HIGH' ? 'Cao' : sos.severity === 'MEDIUM' ? 'Trung bình' : 'Thấp'}
+                </span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <span style="padding:2px 8px;border-radius:6px;font-size:9px;font-weight:800;text-transform:uppercase;${popupStatusColors[sos.status] || ''}">
+                  ${statusText}
+                </span>
+                <span style="font-size:10px;color:#94a3b8;font-weight:600;">⏱ ${sos.time}</span>
+              </div>
+              <div style="font-size:11px;color:#475569;line-height:1.5;">
+                <div><strong>👤 Người gửi:</strong> ${sos.sender}</div>
+                <div><strong>📞 Liên hệ:</strong> ${sos.phone}</div>
+                <div><strong>📋 Loại:</strong> ${(sos as any).requestType || 'N/A'}${equipmentText}</div>
+                <div><strong>👥 Người gặp nạn:</strong> ${sos.trappedCount} người</div>
+              </div>
+              <div style="margin-top:4px;font-size:10px;color:#64748b;font-style:italic;background:#f8fafc;padding:4px 6px;border-radius:6px;border:1px solid #f1f5f9;">
+                ${sos.description}
+              </div>
+              ${assignedTeamHtml}
+              <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+                ${sos.status === 'PENDING' ? `
+                  <button class="verify-sos-btn-popup" data-id="${sos.id}" style="width:100%;padding:5px 8px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:10px;font-weight:800;cursor:pointer;text-align:center;">
+                    ⚡ Kích hoạt Điều phối v6
+                  </button>
+                ` : sos.status === 'RESOLVED' ? `
+                  <div style="text-align:center;width:100%;font-weight:800;color:#16a34a;font-size:10px;text-transform:uppercase;padding:5px 0;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:6px;">
+                    ✓ ĐÃ HOÀN THÀNH
+                  </div>
+                ` : `
+                  <div style="text-align:center;width:100%;font-weight:800;color:#2563eb;font-size:10px;text-transform:uppercase;padding:5px 0;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;">
+                    ✓ ĐÃ DUYỆT ĐIỀU PHỐI
+                  </div>
+                `}
+                <button class="view-sos-detail-btn-popup" data-id="${sos.id}" style="width:100%;padding:5px 8px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:6px;font-size:10px;font-weight:800;cursor:pointer;text-align:center;">
+                  📋 Xem chi tiết đầy đủ
                 </button>
-              ` : `
-                <div class="text-[10px] text-center w-full font-bold text-green-600 dark:text-green-400 uppercase py-1 border border-green-200 bg-green-50 rounded">
-                  ✓ ĐÃ DUYỆT ĐIỀU PHỐI
-                </div>
-              `}
-              <button class="view-sos-detail-btn-popup w-full px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-700 dark:text-gray-300 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-bold transition-all cursor-pointer text-center" data-id="${sos.id}">
-                Xem chi tiết
-              </button>
+              </div>
             </div>
-          </div>
-        `;
+          `;
 
-        marker.bindPopup(popupContent, {
-          className: 'custom-theme-popup',
-          maxWidth: 300,
-        });
+        if (currentMarkers.has(key)) {
+          const marker = currentMarkers.get(key)!;
+          marker.setLatLng([sos.lat, sos.lng]);
+          marker.setIcon(icon);
+          marker.setPopupContent(popupContent);
+          marker.setZIndexOffset(500);
+        } else {
+          const marker = L.marker([sos.lat, sos.lng], {
+            icon,
+            zIndexOffset: 500,
+          });
+          marker.bindPopup(popupContent, {
+            className: 'custom-theme-popup',
+            maxWidth: 300,
+          });
 
-        marker.on('click', () => {
-          setSelectedSosId(sos.id);
-        });
+          marker.on('click', () => {
+            setSelectedSosId(sos.id);
+          });
 
-        group.addLayer(marker);
+          markersGroup.addLayer(marker);
+          currentMarkers.set(key, marker);
+        }
       });
     }
 
-    // Draw Rescue Teams
+    // Draw Rescue Teams (reconciled)
     if (showTeams) {
       filteredTeams.forEach((team) => {
-        const marker = L.marker([team.lat, team.lng], { icon: getTeamIcon(team.teamType, team.status) });
+        const key = `team-${team.id}`;
+        activeKeys.add(key);
+
+        const icon = getTeamIcon(team.teamType, team.status);
 
         const typeLabels: Record<string, string> = {
           PCCC: 'Đội PCCC & CNCH',
@@ -761,50 +995,103 @@ export default function DisasterListPage() {
           OFF_DUTY: 'Ngoại tuyến'
         };
 
-        marker.bindPopup(`
-          <div class="p-2 w-48 text-left font-sans text-xs">
-            <h4 class="font-extrabold text-gray-800 mb-1">${team.name}</h4>
-            <p class="text-gray-500 mb-0.5">${typeLabels[team.teamType] || team.teamType}</p>
-            <p class="text-[11px] text-gray-500 mb-1.5">Liên hệ: ${team.phone}</p>
-            <span class="px-2 py-0.5 text-[9px] font-bold rounded bg-slate-100 text-gray-700 border border-slate-200">
-              Trạng thái: ${statusLabels[team.status] || team.status}
-            </span>
-          </div>
-        `, { className: 'custom-theme-popup' });
+        const popupContent = `
+            <div class="p-2 w-48 text-left font-sans text-xs">
+              <h4 class="font-extrabold text-gray-800 mb-1">${team.name}</h4>
+              <p class="text-gray-500 mb-0.5">${typeLabels[team.teamType] || team.teamType}</p>
+              <p class="text-[11px] text-gray-500 mb-1.5">Liên hệ: ${team.phone}</p>
+              <span class="px-2 py-0.5 text-[9px] font-bold rounded bg-slate-100 text-gray-700 border border-slate-200">
+                Trạng thái: ${statusLabels[team.status] || team.status}
+              </span>
+            </div>
+          `;
 
-        group.addLayer(marker);
+        if (currentMarkers.has(key)) {
+          const marker = currentMarkers.get(key)!;
+          marker.setLatLng([team.lat, team.lng]);
+          marker.setIcon(icon);
+          marker.setPopupContent(popupContent);
+          marker.setZIndexOffset(1000);
+        } else {
+          const marker = L.marker([team.lat, team.lng], {
+            icon,
+            zIndexOffset: 1000,
+          });
+          marker.bindPopup(popupContent, { className: 'custom-theme-popup' });
+          markersGroup.addLayer(marker);
+          currentMarkers.set(key, marker);
+        }
       });
     }
 
-    // Draw route dashed lines matching active coordinates in DB
+    // Clean up markers that are no longer active
+    for (const [key, marker] of currentMarkers.entries()) {
+      if (!activeKeys.has(key)) {
+        markersGroup.removeLayer(marker);
+        currentMarkers.delete(key);
+      }
+    }
+
+    // Vẽ tuyến đường đi thực tế né tránh các vùng ngập lụt (polylines drawn on Canvas)
     if (showSos && showTeams) {
-      filteredSosRequests.forEach((sos) => {
+      parsedSosRequests.forEach((sos) => {
         if (sos.status === 'DISPATCHED' || sos.status === 'ON_SITE') {
           const matchedTeamId = (dbSosList || []).find((s: any) => s.id === sos.id)?.assignedTeamId;
           if (matchedTeamId) {
-            const team = filteredTeams.find(t => t.id === matchedTeamId);
+            const team = parsedTeams.find((t) => t.id === matchedTeamId);
             if (team) {
-              const line = L.polyline([[team.lat, team.lng], [sos.lat, sos.lng]], {
-                color: '#3b82f6',
-                weight: 1.5,
-                dashArray: '4, 6',
-                opacity: 0.85,
-              });
-              group.addLayer(line);
+              const floodZonesCount = floodZonesGeoJSON?.features?.length || 0;
+              const cacheKey = `${team.id}-${sos.id}-${floodZonesCount}`;
+              const route = routesCache[cacheKey];
+
+              if (route) {
+                // 1. Vẽ đường chính thức (OpenRouteService) - nét liền màu xanh dương, dầy hơn
+                const primaryLine = L.polyline(route.primary, {
+                  color: '#3b82f6',
+                  weight: 3.5,
+                  opacity: 0.9,
+                  lineJoin: 'round',
+                  interactive: false,
+                });
+                group.addLayer(primaryLine);
+
+                // 2. Vẽ đường đối chứng học thuật (Dijkstra) - nét đứt màu cam nếu có
+                if (route.dijkstra) {
+                  const dijkstraLine = L.polyline(route.dijkstra, {
+                    color: '#f59e0b',
+                    weight: 2.5,
+                    dashArray: '5, 8',
+                    opacity: 0.85,
+                    lineJoin: 'round',
+                    interactive: false,
+                  });
+                  group.addLayer(dijkstraLine);
+                }
+              } else {
+                // Fallback vẽ đường chim bay trong lúc đang tải tuyến đường thực tế
+                const fallbackLine = L.polyline([[team.lat, team.lng], [sos.lat, sos.lng]], {
+                  color: '#3b82f6',
+                  weight: 1.5,
+                  dashArray: '4, 6',
+                  opacity: 0.5,
+                  interactive: false,
+                });
+                group.addLayer(fallbackLine);
+              }
             }
           }
         }
       });
     }
-  }, [showFloodZones, showSos, showTeams, filteredSosRequests, filteredTeams, userLocation, floodZonesGeoJSON, dbSosList]);
+  }, [showFloodZones, showSos, showTeams, filteredSosRequests, filteredTeams, userLocation, showUserLocation, floodZonesGeoJSON, dbSosList, routesCache, performanceMode]);
 
   // Center/Zoom map on a specific SOS click from side panel
   const handleSelectSos = (sos: any) => {
     setSelectedSosId(sos.id);
     if (mapRef.current) {
       mapRef.current.setView([sos.lat, sos.lng], 14, { animate: true });
-      if (layersGroupRef.current) {
-        layersGroupRef.current.eachLayer((layer: any) => {
+      if (markersGroupRef.current) {
+        markersGroupRef.current.eachLayer((layer: any) => {
           if (layer instanceof L.Marker && layer.getLatLng().lat === sos.lat && layer.getLatLng().lng === sos.lng) {
             layer.openPopup();
           }
@@ -888,6 +1175,56 @@ export default function DisasterListPage() {
       floodArea: `${floodArea} km²`
     };
   }, [parsedSosRequests]);
+
+  // Tự động gọi API lấy tọa độ đường đi thực tế né tránh các vùng ngập lụt
+  useEffect(() => {
+    if (!showSos || !showTeams || !dbSosList || !parsedTeams) return;
+
+    const activeMissions = parsedSosRequests.filter(
+      (s) => s.status === 'DISPATCHED' || s.status === 'ON_SITE',
+    );
+
+    activeMissions.forEach(async (sos) => {
+      const matchedTeamId = (dbSosList || []).find((s: any) => s.id === sos.id)?.assignedTeamId;
+      if (!matchedTeamId) return;
+      const team = parsedTeams.find((t) => t.id === matchedTeamId);
+      if (!team) return;
+
+      const floodZonesCount = floodZonesGeoJSON?.features?.length || 0;
+      const cacheKey = `${team.id}-${sos.id}-${floodZonesCount}`;
+      if (routesCache[cacheKey]) return; // Đã lưu trong cache
+
+      try {
+        const result = await routingApi.calculateRoute(
+          { latitude: team.lat, longitude: team.lng },
+          { latitude: sos.lat, longitude: sos.lng },
+          floodZonesGeoJSON?.features || [],
+          'car',
+        );
+
+        if (result.isIsolated) {
+          toast.warning(`Cảnh báo: Hiện trường ${sos.code} bị cô lập đường bộ! Đề xuất điều phối xuồng/ca-nô.`);
+        }
+
+        const primaryLatLngs = result.primary.coordinates.map(
+          (c) => [c.latitude, c.longitude] as [number, number],
+        );
+        const dijkstraLatLngs = result.dijkstra
+          ? result.dijkstra.coordinates.map((c) => [c.latitude, c.longitude] as [number, number])
+          : null;
+
+        setRoutesCache((prev) => ({
+          ...prev,
+          [cacheKey]: {
+            primary: primaryLatLngs,
+            dijkstra: dijkstraLatLngs,
+          },
+        }));
+      } catch (err) {
+        console.error(`Lỗi định tuyến giữa đội ${team.id} và SOS ${sos.id}:`, err);
+      }
+    });
+  }, [showSos, showTeams, parsedSosRequests, parsedTeams, dbSosList, floodZonesGeoJSON, routesCache]);
 
   return (
     <div className="-m-4 lg:-m-5 p-4 lg:p-6 bg-white dark:bg-gray-950 text-gray-800 dark:text-gray-150 flex-1 min-h-[calc(100vh-3.5rem)] flex flex-col gap-4 font-sans text-left overflow-y-auto no-scrollbar select-none relative">
@@ -981,7 +1318,7 @@ export default function DisasterListPage() {
           className={cn(
             "border rounded-2xl flex flex-col relative overflow-hidden transition-all duration-300 shadow-sm",
             isMapFullscreen
-              ? "absolute inset-0 z-[50] bg-white dark:bg-gray-950 border-slate-200 dark:border-slate-800 p-4 h-full w-full rounded-none"
+              ? "fixed inset-0 z-[9999] bg-white dark:bg-gray-950 p-4 h-screen w-screen rounded-none"
               : showSidebar
                 ? "lg:col-span-9 bg-white dark:bg-gray-800 border-slate-100 dark:border-gray-700 p-3 h-[680px]"
                 : "lg:col-span-12 bg-white dark:bg-gray-800 border-slate-100 dark:border-gray-700 p-3 h-[680px]"
@@ -1054,6 +1391,21 @@ export default function DisasterListPage() {
             >
               <Filter size={16} />
             </button>
+            <button
+              className={cn(
+                "p-2.5 border rounded-xl shadow transition duration-200 cursor-pointer",
+                performanceMode
+                  ? "bg-yellow-50 dark:bg-yellow-950/40 border-yellow-200 dark:border-yellow-850 text-yellow-600 dark:text-yellow-400"
+                  : "bg-white dark:bg-gray-900 border-slate-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800"
+              )}
+              onClick={() => {
+                setPerformanceMode(!performanceMode);
+                toast.info(!performanceMode ? "Đã bật Chế độ hiệu năng (Tắt hiệu ứng nhấp nháy)" : "Đã tắt Chế độ hiệu năng (Bật lại hiệu ứng nhấp nháy)");
+              }}
+              title={performanceMode ? "Tắt Chế độ hiệu năng (Bật hoạt ảnh)" : "Bật Chế độ hiệu năng (Tắt hoạt ảnh, tối ưu FPS)"}
+            >
+              <Zap size={16} className={performanceMode ? "fill-yellow-400 text-yellow-500" : ""} />
+            </button>
             {isMapFullscreen && (
               <button
                 className={cn(
@@ -1068,12 +1420,38 @@ export default function DisasterListPage() {
                 <Activity size={16} />
               </button>
             )}
+            {isMapFullscreen && (
+              <button
+                className={cn(
+                  "p-2.5 border rounded-xl shadow transition duration-200 cursor-pointer",
+                  showBottomDashboard
+                    ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-850 text-blue-600 dark:text-blue-400"
+                    : "bg-white dark:bg-gray-900 border-slate-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800"
+                )}
+                onClick={() => setShowBottomDashboard(!showBottomDashboard)}
+                title="Bảng giám sát trực tuyến"
+              >
+                <LayoutGrid size={16} />
+              </button>
+            )}
+            <button
+              className={cn(
+                "p-2.5 border rounded-xl shadow transition duration-200 cursor-pointer",
+                showUserLocation
+                  ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-850 text-blue-600 dark:text-blue-400"
+                  : "bg-white dark:bg-gray-900 border-slate-200 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800"
+              )}
+              onClick={() => setShowUserLocation(!showUserLocation)}
+              title={showUserLocation ? "Ẩn vị trí hiện tại" : "Hiện vị trí hiện tại"}
+            >
+              <Compass size={16} />
+            </button>
             <button
               className="p-2.5 bg-white dark:bg-gray-900 hover:bg-slate-50 dark:hover:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-xl text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white shadow transition cursor-pointer"
               onClick={requestUserLocation}
-              title="Vị trí của tôi"
+              title="Định vị lại vị trí của tôi"
             >
-              <Compass size={16} />
+              <Compass className="rotate-45 text-blue-500" size={16} />
             </button>
             <hr className="border-slate-200 dark:border-slate-700 my-0.5" />
 
@@ -1253,6 +1631,14 @@ export default function DisasterListPage() {
                           <input type="checkbox" checked={showFloodZones} onChange={(e) => setShowFloodZones(e.target.checked)} className="rounded border-gray-300 dark:border-slate-700 text-blue-500 focus:ring-0 w-3 h-3" />
                           <span>Vùng ngập lụt</span>
                         </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input type="checkbox" checked={showUserLocation} onChange={(e) => setShowUserLocation(e.target.checked)} className="rounded border-gray-300 dark:border-slate-700 text-blue-500 focus:ring-0 w-3 h-3" />
+                          <span>Vị trí của tôi</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer col-span-2">
+                          <input type="checkbox" checked={showResolvedSos} onChange={(e) => setShowResolvedSos(e.target.checked)} className="rounded border-gray-300 dark:border-slate-700 text-emerald-500 focus:ring-0 w-3 h-3" />
+                          <span>SOS đã hoàn thành</span>
+                        </label>
                       </div>
                     </div>
                   </div>
@@ -1322,6 +1708,211 @@ export default function DisasterListPage() {
                       );
                     })
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BOTTOM DASHBOARD OVERLAY IN FULLSCREEN */}
+          {isMapFullscreen && showBottomDashboard && (
+            <div
+              className={cn(
+                "absolute bottom-6 left-6 bg-white/95 dark:bg-gray-900/95 border border-slate-200 dark:border-slate-750 shadow-2xl rounded-2xl p-4 z-[1002] flex flex-col h-[320px] backdrop-blur transition-all duration-300 text-left text-gray-800 dark:text-white",
+                showSidebar ? "right-[360px]" : "right-24"
+              )}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2 mb-3">
+                <div className="flex items-center gap-2 select-none font-sans">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Bảng giám sát cứu hộ trực tuyến</h4>
+                </div>
+                <button
+                  onClick={() => setShowBottomDashboard(false)}
+                  className="p-1 hover:bg-slate-100 dark:hover:bg-gray-750 text-gray-400 hover:text-gray-800 dark:hover:text-white rounded transition cursor-pointer"
+                  title="Đóng bảng giám sát"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Grid 4 columns separated by vertical divider lines */}
+              <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] gap-x-3 flex-1 min-h-0 overflow-hidden">
+                {/* Column 1: ĐỘI ĐANG RẢNH */}
+                <div className="flex flex-col min-h-0">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80 mb-2 flex-shrink-0 select-none">
+                    <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase">ĐỘI ĐANG RẢNH</span>
+                    <span className="text-[9px] font-bold text-gray-450 dark:text-gray-500 uppercase">{availableTeams.length} đội</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto pr-1 no-scrollbar space-y-2 pb-2">
+                    {availableTeams.length === 0 ? (
+                      <div className="py-8 text-center text-[10px] font-semibold text-gray-400">Không có đội khả dụng</div>
+                    ) : (
+                      availableTeams.map((team) => (
+                        <div key={team.id} className="flex flex-col gap-1.5 p-2 bg-slate-50/60 dark:bg-gray-800/40 rounded-xl hover:bg-slate-100/50 dark:hover:bg-gray-800/70 transition duration-155">
+                          <div className="flex items-center justify-between gap-2 min-w-0">
+                            <span className="font-extrabold text-[10.5px] text-gray-800 dark:text-slate-200 truncate">{team.name}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900/30 flex-shrink-0">Sẵn sàng</span>
+                          </div>
+                          
+                          {/* Bottom Row */}
+                          <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100/30 dark:border-slate-800/30">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">{team.distanceText.replace('Cách ', '')}</span>
+                              <div className="flex items-center gap-1.5 text-[9px] text-gray-400 dark:text-gray-500">
+                                <span className="flex items-center gap-0.5"><Users size={9} /> {(team as any).members ? (team as any).members.filter((m: any) => m.isActive).length : 0}</span>
+                                <span className="flex items-center gap-0.5"><Truck size={9} /> {(team.id % 3) + 1}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
+                              className="text-[9px] font-bold text-indigo-650 hover:underline dark:text-indigo-400 cursor-pointer"
+                            >
+                              Chi tiết
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Divider 1 */}
+                <div className="w-px bg-slate-200 dark:bg-slate-800/80 self-stretch my-2" />
+
+                {/* Column 2: ĐỘI ĐÃ TIẾP NHẬN */}
+                <div className="flex flex-col min-h-0">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80 mb-2 flex-shrink-0 select-none">
+                    <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase">ĐỘI ĐÃ TIẾP NHẬN</span>
+                    <span className="text-[9px] font-bold text-gray-450 dark:text-gray-500 uppercase">{activeTeams.length} đội</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto pr-1 no-scrollbar space-y-2 pb-2">
+                    {activeTeams.length === 0 ? (
+                      <div className="py-8 text-center text-[10px] font-semibold text-gray-400">Không có đội đang bận</div>
+                    ) : (
+                      activeTeams.map((team) => {
+                        const activeSos = teamActiveSos.get(team.id);
+                        return (
+                          <div key={team.id} className="flex flex-col gap-1.5 p-2 bg-slate-50/60 dark:bg-gray-800/40 rounded-xl hover:bg-slate-100/50 dark:hover:bg-gray-800/70 transition duration-155">
+                            <div className="flex items-center justify-between gap-2 min-w-0">
+                              <span className="font-extrabold text-[10.5px] text-gray-800 dark:text-slate-200 truncate">{team.name}</span>
+                              <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-250 dark:border-blue-900/30 flex-shrink-0">
+                                {activeSos?.status === 'DISPATCHED' ? 'Di chuyển' : activeSos?.status === 'ON_SITE' ? 'Tiếp cận' : 'Đang xử lý'}
+                              </span>
+                            </div>
+                            
+                            {/* Bottom Row */}
+                            <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100/30 dark:border-slate-800/30">
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">{team.distanceText.replace('Cách ', '')}</span>
+                                <span className="text-[9px] font-extrabold text-red-500 truncate max-w-[80px]">{activeSos?.code || 'SOS-2024'}</span>
+                              </div>
+                              <button
+                                onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
+                                className="text-[9px] font-bold text-indigo-650 hover:underline dark:text-indigo-400 cursor-pointer"
+                              >
+                                Chi tiết
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Divider 2 */}
+                <div className="w-px bg-slate-200 dark:bg-slate-800/80 self-stretch my-2" />
+
+                {/* Column 3: SOS MỚI */}
+                <div className="flex flex-col min-h-0">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80 mb-2 flex-shrink-0 select-none">
+                    <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase">SOS MỚI</span>
+                    <span className="text-[9px] font-bold text-gray-450 dark:text-gray-500 uppercase">{newSosRequests.length} sự cố</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto pr-1 no-scrollbar space-y-2 pb-2">
+                    {newSosRequests.length === 0 ? (
+                      <div className="py-8 text-center text-[10px] font-semibold text-gray-400">Không có SOS mới</div>
+                    ) : (
+                      newSosRequests.map((sos) => (
+                        <div key={sos.id} onClick={() => handleSelectSos(sos)} className="flex flex-col gap-1 p-2 bg-slate-50/60 dark:bg-gray-800/40 rounded-xl hover:bg-slate-100/50 dark:hover:bg-gray-800/70 cursor-pointer transition duration-155">
+                          <div className="flex items-center justify-between gap-2 min-w-0">
+                            <span className="font-extrabold text-[10.5px] text-red-500 flex-shrink-0">{sos.code}</span>
+                            <span className={cn(
+                              "px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase border flex-shrink-0",
+                              sos.severity === 'CRITICAL' ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/30' :
+                              sos.severity === 'HIGH' ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/30' :
+                              'bg-yellow-50 text-yellow-600 border-yellow-250 dark:bg-yellow-950/40 dark:text-yellow-400 dark:border-yellow-900/30'
+                            )}>
+                              {sos.severity === 'CRITICAL' ? 'Nguy kịch' : sos.severity === 'HIGH' ? 'Khẩn cấp' : 'Trung bình'}
+                            </span>
+                          </div>
+                          <p className="text-[9.5px] text-gray-650 dark:text-slate-350 truncate text-left">{sos.location}</p>
+
+                          {/* Bottom Row */}
+                          <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100/30 dark:border-slate-800/30">
+                            <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">
+                              {Math.min(15, Math.max(1, (sos.id % 7) * 1.8 + 0.9)).toFixed(1)} km
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(ROUTES.DISASTER_DETAIL.replace(':id', String(sos.id)));
+                              }}
+                              className="text-[9px] font-bold text-indigo-650 hover:underline dark:text-indigo-400 cursor-pointer"
+                            >
+                              Chi tiết
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Divider 3 */}
+                <div className="w-px bg-slate-200 dark:bg-slate-800/80 self-stretch my-2" />
+
+                {/* Column 4: SOS ĐANG TIẾP NHẬN */}
+                <div className="flex flex-col min-h-0">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80 mb-2 flex-shrink-0 select-none">
+                    <span className="text-[10px] font-black text-gray-900 dark:text-white uppercase">SOS ĐANG TIẾP NHẬN</span>
+                    <span className="text-[9px] font-bold text-gray-450 dark:text-gray-500 uppercase">{activeSosRequests.length} sự cố</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto pr-1 no-scrollbar space-y-2 pb-2">
+                    {activeSosRequests.length === 0 ? (
+                      <div className="py-8 text-center text-[10px] font-semibold text-gray-400">Không có SOS đang xử lý</div>
+                    ) : (
+                      activeSosRequests.map((sos) => (
+                        <div key={sos.id} onClick={() => handleSelectSos(sos)} className="flex flex-col gap-1 p-2 bg-slate-50/60 dark:bg-gray-800/40 rounded-xl hover:bg-slate-100/50 dark:hover:bg-gray-800/70 cursor-pointer transition duration-155">
+                          <div className="flex items-center justify-between gap-2 min-w-0">
+                            <span className="font-extrabold text-[10.5px] text-red-500 flex-shrink-0">{sos.code}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-250 dark:border-blue-900/30 flex-shrink-0">
+                              {sos.status === 'DISPATCHED' ? 'Di chuyển' : 'Tiếp cận'}
+                            </span>
+                          </div>
+                          <div className="text-[9.5px] text-gray-650 dark:text-slate-350 truncate text-left flex justify-between gap-2">
+                            <span className="font-extrabold text-slate-700 dark:text-slate-350 truncate">{sos.assignedTeamName || 'Chưa gán'}</span>
+                          </div>
+
+                          {/* Bottom Row */}
+                          <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100/30 dark:border-slate-800/30">
+                            <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">
+                              {Math.min(10, Math.max(1, (sos.id % 5) * 1.5 + 0.8)).toFixed(1)} km
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(ROUTES.DISASTER_DETAIL.replace(':id', String(sos.id)));
+                              }}
+                              className="text-[9px] font-bold text-indigo-650 hover:underline dark:text-indigo-400 cursor-pointer"
+                            >
+                              Chi tiết
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1429,9 +2020,17 @@ export default function DisasterListPage() {
                         <input type="checkbox" checked={showFloodZones} onChange={(e) => setShowFloodZones(e.target.checked)} className="rounded border-gray-300 dark:border-slate-700 text-blue-500 focus:ring-0 w-3.5 h-3.5" />
                         <span>Vùng ngập lụt</span>
                       </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition col-span-2">
+                      <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition">
                         <input type="checkbox" checked={showCommandStations} onChange={(e) => setShowCommandStations(e.target.checked)} className="rounded border-gray-300 dark:border-slate-700 text-blue-500 focus:ring-0 w-3.5 h-3.5" />
                         <span>Trạm chỉ huy</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition">
+                        <input type="checkbox" checked={showUserLocation} onChange={(e) => setShowUserLocation(e.target.checked)} className="rounded border-gray-300 dark:border-slate-700 text-blue-500 focus:ring-0 w-3.5 h-3.5" />
+                        <span>Vị trí của tôi</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition col-span-2">
+                        <input type="checkbox" checked={showResolvedSos} onChange={(e) => setShowResolvedSos(e.target.checked)} className="rounded border-gray-300 dark:border-slate-700 text-emerald-500 focus:ring-0 w-3.5 h-3.5" />
+                        <span className="text-emerald-600 dark:text-emerald-400">SOS đã hoàn thành</span>
                       </label>
                     </div>
                   </div>
@@ -1691,7 +2290,7 @@ export default function DisasterListPage() {
                 <X size={16} />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)]">
               {/* Requester Information */}
               <div className="grid grid-cols-2 gap-3">
@@ -1787,7 +2386,7 @@ export default function DisasterListPage() {
                     className="w-full bg-slate-50 dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-gray-705 dark:text-gray-300 text-xs font-semibold rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-500 transition"
                   />
                 </div>
-                
+
                 {/* Requires Special Equipment Checkbox */}
                 <div className="flex items-center gap-2 pt-4">
                   <input

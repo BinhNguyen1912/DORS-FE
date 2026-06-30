@@ -110,14 +110,18 @@
           <button id="btn-save-config" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Lưu cấu hình</button>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="grid grid-cols-3 gap-3 mb-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">BACKEND API URL</label>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">BACKEND API URL</label>
             <input type="text" id="cfg-backend-url" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500" value="http://localhost:8585">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">PROVINCE ID (LỌC VÙNG)</label>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">PROVINCE ID (LỌC VÙNG)</label>
             <input type="number" id="cfg-province-id" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500" value="1">
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">TEAM ID (GIẢ LẬP ĐỘI)</label>
+            <input type="number" id="cfg-team-id" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500" value="8">
           </div>
         </div>
 
@@ -659,7 +663,12 @@
       const url = getCleanBackendUrl();
       const badge = document.getElementById('api-status-badge');
       try {
-        const res = await fetch(`${url}/sos-requests/nearby?lat=10.7&lng=106&radius=1&status=PENDING`);
+        const token = document.getElementById('cfg-jwt-token')?.value.trim();
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const res = await fetch(`${url}/sos-requests/nearby?lat=10.7&lng=106&radius=1&status=PENDING`, { headers });
         if (res.status === 200 || res.status === 401 || res.status === 403) {
           badge.className = "px-2 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1";
           badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 glow-dot"></span> Đang chạy`;
@@ -733,6 +742,14 @@
           socketId: socket.id,
           query: queryParams
         });
+
+        // Tự động tham gia phòng của đội cứu hộ nếu đang kết nối ở kênh /dispatch
+        if (ns === '/dispatch') {
+          const teamIdVal = document.getElementById('cfg-team-id').value.trim();
+          if (teamIdVal) {
+            socket.emit('join:team', { teamId: parseInt(teamIdVal, 10) });
+          }
+        }
       });
 
       socket.on('disconnect', (reason) => {
@@ -768,6 +785,26 @@
         socket.on('sos:assigned', (payload) => {
           logConsole('WS EVENT (sos:assigned)', `🤝 SOS #${payload.sosId} được gán cho Đội #${payload.teamId}`, 'success', payload);
           updateSosStatus(payload.sosId, 'ASSIGNED', payload);
+        });
+
+        socket.on('sos:offer', (payload) => {
+          logConsole('WS EVENT (sos:offer)', `📩 Nhận được lời mời cứu hộ SOS #${payload.sosId}!`, 'warning', payload);
+          showSosOffer(payload);
+        });
+
+        socket.on('sos:offer-claimed', (payload) => {
+          logConsole('WS EVENT (sos:offer-claimed)', `🔕 Lời mời cứu hộ SOS #${payload.sosId} kết thúc (Đội #${payload.assignedTeamId} nhận).`, 'info', payload);
+          removeSosOffer(payload.sosId);
+        });
+
+        socket.on('sos:claim-result', (payload) => {
+          if (payload.success) {
+            logConsole('WS EVENT (sos:claim-result)', `🎉 ${payload.message}`, 'success', payload);
+            showClaimSuccessNotification(payload.sosId, payload.message);
+          } else {
+            logConsole('WS EVENT (sos:claim-result)', `❌ Tiếp nhận thất bại: ${payload.message}`, 'error', payload);
+            showClaimFailureNotification(payload.sosId, payload.message);
+          }
         });
 
         socket.on('joined', (payload) => {
@@ -1000,10 +1037,12 @@
     async function fetchAddressSuggestions(query) {
       const suggestionsEl = document.getElementById('address-suggestions');
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=vn`;
-        const res = await fetch(url, { headers: { 'Accept-Language': 'vi' } });
+        const backendUrl = getCleanBackendUrl();
+        const url = `${backendUrl}/locations/geocode?q=${encodeURIComponent(query)}&limit=5`;
+        const res = await fetch(url);
         if (!res.ok) return;
-        const data = await res.json();
+        const json = await res.json();
+        const data = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
         
         if (data.length === 0) {
           suggestionsEl.innerHTML = '<div class="p-2 text-slate-500 italic text-center">Không tìm thấy địa chỉ phù hợp</div>';
@@ -1297,6 +1336,7 @@
       const config = {
         backendUrl: document.getElementById('cfg-backend-url').value,
         provinceId: document.getElementById('cfg-province-id').value,
+        teamId: document.getElementById('cfg-team-id').value,
         token: document.getElementById('cfg-jwt-token').value
       };
       localStorage.setItem(LS_KEY_CONFIG, JSON.stringify(config));
@@ -1320,6 +1360,7 @@
           const config = JSON.parse(configStr);
           document.getElementById('cfg-backend-url').value = config.backendUrl || 'http://localhost:8585';
           document.getElementById('cfg-province-id').value = config.provinceId || '1';
+          document.getElementById('cfg-team-id').value = config.teamId || '8';
           
           const token = config.token || '';
           document.getElementById('cfg-jwt-token').value = token;
@@ -1337,13 +1378,16 @@
       const backendUrl = getCleanBackendUrl();
       const username = document.getElementById('login-username').value;
       const password = document.getElementById('login-password').value;
+      const provinceIdVal = document.getElementById('cfg-province-id').value;
 
-      if (!username || !password) {
-        logConsole('REST AUTH', 'Vui lòng điền đầy đủ tên đăng nhập và mật khẩu!', 'error');
+      if (!username || !password || !provinceIdVal) {
+        logConsole('REST AUTH', 'Vui lòng điền đầy đủ tên đăng nhập, mật khẩu và Province ID!', 'error');
         return;
       }
 
-      logConsole('REST AUTH', `Đang đăng nhập tài khoản "${username}"...`, 'info');
+      const provinceId = Number(provinceIdVal);
+
+      logConsole('REST AUTH', `Đang đăng nhập tài khoản "${username}" với Tỉnh ID ${provinceId}...`, 'info');
 
       try {
         const response = await fetch(`${backendUrl}/auth/login`, {
@@ -1351,7 +1395,7 @@
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ identifier: username, password })
+          body: JSON.stringify({ identifier: username, password, provinceId })
         });
 
         if (!response.ok) {
@@ -1493,6 +1537,113 @@
       
       setInterval(checkBackendHealth, 15000);
     });
+    // -------------------------------------------------------------
+    // HYBRID DISPATCH CLIENT-SIDE INTERACTION HELPERS
+    // -------------------------------------------------------------
+    function showSosOffer(offer) {
+      const container = document.getElementById('sos-offers-container');
+      if (!container) return;
+
+      if (document.getElementById(`offer-${offer.sosId}`)) return;
+
+      const card = document.createElement('div');
+      card.id = `offer-${offer.sosId}`;
+      card.className = "bg-slate-900/95 border-2 border-amber-500 rounded-2xl p-4 shadow-2xl relative overflow-hidden transition-all duration-300 transform translate-y-0 glow-dot text-slate-100 flex flex-col space-y-3";
+
+      let remaining = offer.timeoutSeconds || 30;
+
+      card.innerHTML = `
+        <div class="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+        <div class="flex justify-between items-start">
+          <div class="flex items-center space-x-1.5 text-amber-400 font-bold text-sm">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            <span>MỜI TIẾP NHẬN SOS!</span>
+          </div>
+          <div id="countdown-${offer.sosId}" class="w-8 h-8 rounded-full border-2 border-amber-500 flex items-center justify-center font-mono font-bold text-xs text-amber-400 animate-pulse">
+            ${remaining}
+          </div>
+        </div>
+        <div class="text-xs space-y-1">
+          <div>• Yêu cầu SOS: <b class="text-slate-300">#${offer.sosId}</b></div>
+          <div>• Loại sự cố: <b class="text-slate-300">${offer.requestType}</b></div>
+          <div>• Mức nguy cấp: <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-red-500/20 text-red-400 border border-red-500/30">${offer.severity}</span></div>
+          <div class="truncate">• Ghi chú: <span class="italic text-slate-400">${offer.description || 'Không có'}</span></div>
+        </div>
+        <button id="btn-accept-${offer.sosId}" onclick="submitSosClaim(${offer.sosId})" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1 shadow shadow-emerald-950/20">
+          <i data-lucide="check-circle" class="w-4 h-4"></i>
+          <span>Chấp Nhận Cứu Hộ</span>
+        </button>
+      `;
+
+      container.appendChild(card);
+      lucide.createIcons();
+
+      const timer = setInterval(() => {
+        remaining--;
+        const countdownEl = document.getElementById(`countdown-${offer.sosId}`);
+        if (countdownEl) {
+          countdownEl.innerText = remaining;
+          if (remaining <= 5) {
+            countdownEl.className = "w-8 h-8 rounded-full border-2 border-red-500 flex items-center justify-center font-mono font-bold text-xs text-red-500 animate-ping";
+          }
+        }
+
+        if (remaining <= 0) {
+          clearInterval(timer);
+          removeSosOffer(offer.sosId);
+        }
+      }, 1000);
+
+      card.dataset.timerId = timer;
+    }
+
+    function removeSosOffer(sosId) {
+      const card = document.getElementById(`offer-${sosId}`);
+      if (card) {
+        if (card.dataset.timerId) {
+          clearInterval(parseInt(card.dataset.timerId, 10));
+        }
+        card.remove();
+      }
+    }
+
+    function submitSosClaim(sosId) {
+      const socket = sockets['/dispatch'];
+      const teamIdVal = document.getElementById('cfg-team-id').value.trim();
+      const btn = document.getElementById(`btn-accept-${sosId}`);
+      
+      if (!socket || !socket.connected) {
+        logConsole('SOCKET', 'Lỗi: Socket /dispatch chưa kết nối!', 'error');
+        return;
+      }
+      if (!teamIdVal) {
+        logConsole('SOCKET', 'Lỗi: Vui lòng nhập TEAM ID (GIẢ LẬP ĐỘI) trước!', 'error');
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span>Đang xử lý tiếp nhận...</span>`;
+      }
+
+      socket.emit('sos:claim', {
+        sosId: parseInt(sosId, 10),
+        teamId: parseInt(teamIdVal, 10)
+      });
+    }
+
+    function showClaimSuccessNotification(sosId, message) {
+      removeSosOffer(sosId);
+      logConsole('CLAIM SUCCESS', `🟢 SOS #${sosId} đã được gán cho đội của bạn thành công!`, 'success');
+    }
+
+    function showClaimFailureNotification(sosId, message) {
+      removeSosOffer(sosId);
+      logConsole('CLAIM FAILURE', `🔴 SOS #${sosId} tiếp nhận thất bại: ${message}`, 'error');
+    }
   </script>
+
+  <!-- Container chứa các lời mời nhận việc cứu hộ đang kích hoạt (Hybrid Dispatch Offers) -->
+  <div id="sos-offers-container" class="fixed bottom-5 right-5 z-[9999] flex flex-col space-y-3 w-80"></div>
 </body>
 </html>

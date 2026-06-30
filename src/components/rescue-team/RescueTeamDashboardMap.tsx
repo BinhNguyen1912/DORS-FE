@@ -49,6 +49,7 @@ export default function RescueTeamDashboardMap({
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
+      preferCanvas: true,
     }).setView(defaultCenter, 12);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -74,13 +75,13 @@ export default function RescueTeamDashboardMap({
     }
   }, [defaultCenter]);
 
-  // Redraw markers on the map when filteredTeams changes
+  // Redraw markers on the map when filteredTeams changes (Optimized with Reconciliation & Reduced Animations)
   useEffect(() => {
     if (!mapRef.current || !markersLayerRef.current) return;
 
     const group = markersLayerRef.current;
-    group.clearLayers();
-    markersMapRef.current.clear();
+    const currentMarkers = markersMapRef.current;
+    const activeIds = new Set<number>();
 
     const getTeamIcon = (type: string, status: string) => {
       const isBusy = status === 'BUSY' || status === 'ON_DUTY';
@@ -109,10 +110,15 @@ export default function RescueTeamDashboardMap({
       }
 
       const outerRing = isBusy ? 'border-2 border-red-500' : 'border border-white';
+      // Performance optimization: Only animate-pulse if the team is busy/on duty
+      const pulseDiv = isBusy 
+        ? `<div class="absolute w-7 h-7 ${baseColor} rounded-full opacity-25 animate-pulse"></div>`
+        : '';
+
       return L.divIcon({
         html: `
           <div class="relative flex items-center justify-center">
-            <div class="absolute w-7 h-7 ${baseColor} rounded-full opacity-25 animate-pulse"></div>
+            ${pulseDiv}
             <div class="w-6 h-6 ${baseColor} text-white rounded-full flex items-center justify-center shadow-md ${outerRing} text-[10px]">
               <i class="${iconClass}"></i>
             </div>
@@ -125,9 +131,8 @@ export default function RescueTeamDashboardMap({
     };
 
     filteredTeams.forEach((team) => {
-      const marker = L.marker([team.lat, team.lng], {
-        icon: getTeamIcon(team.teamType, team.status),
-      });
+      activeIds.add(team.id);
+      const icon = getTeamIcon(team.teamType, team.status);
 
       const typeLabels: Record<string, string> = {
         PCCC: 'Đội PCCC & CNCH',
@@ -136,8 +141,7 @@ export default function RescueTeamDashboardMap({
         TONG_HOP: 'Đội Hỗ Trợ Tổng Hợp',
       };
 
-      marker.bindPopup(
-        `
+      const popupContent = `
         <div class="p-2 w-48 text-left font-sans text-xs">
           <h4 class="font-extrabold text-gray-800 mb-1">${team.name}</h4>
           <p class="text-gray-500 mb-0.5">${typeLabels[team.teamType] || team.teamType}</p>
@@ -146,13 +150,30 @@ export default function RescueTeamDashboardMap({
             Trạng thái: ${statusLabels[team.status] || team.status}
           </span>
         </div>
-      `,
-        { className: 'custom-theme-popup' }
-      );
+      `;
 
-      group.addLayer(marker);
-      markersMapRef.current.set(team.id, marker);
+      if (currentMarkers.has(team.id)) {
+        // Re-use marker
+        const marker = currentMarkers.get(team.id)!;
+        marker.setLatLng([team.lat, team.lng]);
+        marker.setIcon(icon);
+        marker.setPopupContent(popupContent);
+      } else {
+        // Create new marker
+        const marker = L.marker([team.lat, team.lng], { icon });
+        marker.bindPopup(popupContent, { className: 'custom-theme-popup' });
+        group.addLayer(marker);
+        currentMarkers.set(team.id, marker);
+      }
     });
+
+    // Remove teams that are no longer present (filtered out)
+    for (const [id, marker] of currentMarkers.entries()) {
+      if (!activeIds.has(id)) {
+        group.removeLayer(marker);
+        currentMarkers.delete(id);
+      }
+    }
   }, [filteredTeams]);
 
   // Handle outside selection & positioning

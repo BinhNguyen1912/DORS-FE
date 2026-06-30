@@ -5,6 +5,7 @@ import { userApi, locationApi, roleApi } from '../../apis';
 import { toast, useAuthStore } from '../../stores';
 import type { User, Province, AdministrativeUnit } from '../../types';
 import api from '../../lib/axios';
+import LocationPickerMap from '../../components/rescue-team/LocationPickerMap';
 
 interface UserFormModalProps {
   isOpen: boolean;
@@ -44,6 +45,8 @@ export default function UserFormModal({
   const [adminUnitId, setAdminUnitId] = useState<number | ''>('');
   const [addressDetail, setAddressDetail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
 
   // UI States
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -117,22 +120,17 @@ export default function UserFormModal({
       
       const query = queryParts.join(', ');
       
-      let viewboxParam = '';
+      let viewboxValue: string | undefined = undefined;
       if (provinceCenter) {
         const margin = 0.8;
         const minLng = provinceCenter.lng - margin;
         const maxLng = provinceCenter.lng + margin;
         const minLat = provinceCenter.lat - margin;
         const maxLat = provinceCenter.lat + margin;
-        viewboxParam = `&viewbox=${minLng},${maxLat},${maxLng},${minLat}&bounded=1`;
+        viewboxValue = `${minLng},${maxLat},${maxLng},${minLat}`;
       }
 
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query
-        )}&limit=5&addressdetails=1${viewboxParam}`
-      );
-      const data = await response.json();
+      const data = await locationApi.geocode(query, 5, viewboxValue);
       if (Array.isArray(data)) {
         setSuggestions(data);
       } else {
@@ -178,6 +176,10 @@ export default function UserFormModal({
     const streetAddress = parts.join(' ');
     const fallbackText = suggestion.display_name.split(',')[0] || suggestion.display_name;
     setAddressDetail(streetAddress || fallbackText);
+    if (suggestion.lat && suggestion.lon) {
+      setLatitude(parseFloat(suggestion.lat).toFixed(6));
+      setLongitude(parseFloat(suggestion.lon).toFixed(6));
+    }
     setShowSuggestions(false);
   };
 
@@ -218,6 +220,13 @@ export default function UserFormModal({
         setAdminUnitId(user.adminUnitId || '');
         setAddressDetail(user.addressDetail || '');
         setAvatarUrl(user.avatarUrl || '');
+        if (user.homeLocation && user.homeLocation.coordinates) {
+          setLatitude(String(user.homeLocation.coordinates[1]));
+          setLongitude(String(user.homeLocation.coordinates[0]));
+        } else {
+          setLatitude('');
+          setLongitude('');
+        }
         if (user.dateOfBirth) {
           try {
             setDateOfBirth(new Date(user.dateOfBirth).toISOString().split('T')[0]);
@@ -240,6 +249,8 @@ export default function UserFormModal({
         setAdminUnitId('');
         setAddressDetail('');
         setAvatarUrl('');
+        setLatitude('');
+        setLongitude('');
       }
     }
   }, [isOpen, user, currentUser]);
@@ -324,6 +335,9 @@ export default function UserFormModal({
         adminUnitId: adminUnitId ? Number(adminUnitId) : null,
         addressDetail: addressDetail || null,
         avatarUrl: avatarUrl || null,
+        homeLocation: latitude && longitude 
+          ? { type: 'Point', coordinates: [Number(longitude), Number(latitude)] } 
+          : null,
       };
 
       if (!user) {
@@ -666,6 +680,23 @@ export default function UserFormModal({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Location Picker Map */}
+          <div className="space-y-2">
+            <LocationPickerMap
+              latitude={latitude}
+              longitude={longitude}
+              onChange={(lat, lng) => {
+                setLatitude(lat);
+                setLongitude(lng);
+              }}
+              provinceId={provinceId}
+              adminUnitId={String(adminUnitId)}
+              provinces={provinces}
+              wards={adminUnits}
+              showSearch={false}
+            />
           </div>
 
           {/* Footer buttons */}

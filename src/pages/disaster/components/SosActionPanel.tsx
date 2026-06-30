@@ -12,6 +12,8 @@ interface SosActionPanelProps {
   isPending: boolean;
   handleSubmit: (e: React.FormEvent) => void;
   handleCallPhone: (phone?: string) => void;
+  onAssignTeam?: () => void;
+  isAssigningTeam?: boolean;
 }
 
 export default function SosActionPanel({
@@ -25,6 +27,8 @@ export default function SosActionPanel({
   isPending,
   handleSubmit,
   handleCallPhone,
+  onAssignTeam,
+  isAssigningTeam,
 }: SosActionPanelProps) {
   return (
     <div className="border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900 overflow-hidden">
@@ -87,6 +91,25 @@ export default function SosActionPanel({
           </form>
         ) : (
           <div className="flex flex-wrap gap-3">
+            {!sos.assignedTeamId &&
+              sos.status !== 'RESOLVED' &&
+              sos.status !== 'CANCELLED' &&
+              onAssignTeam && (
+                <button
+                  type="button"
+                  onClick={onAssignTeam}
+                  disabled={isAssigningTeam}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-bold shadow cursor-pointer disabled:opacity-60"
+                >
+                  <span>
+                    {sos.status === 'PENDING_SPECIALIST'
+                      ? 'Điều phối lại (Thử lại)'
+                      : 'Kích hoạt Điều phối v6'}
+                  </span>
+                  <ChevronRight size={14} />
+                </button>
+              )}
+
             <button
               type="button"
               onClick={() => {

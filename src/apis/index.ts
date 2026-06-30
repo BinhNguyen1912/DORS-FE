@@ -11,3 +11,5 @@ export { settingsApi } from './settings.api';
 export { sosApi } from './sos.api';
 export { rescueEquipmentApi } from './rescue-equipment.api';
 export type { RescueEquipment } from './rescue-equipment.api';
+export { routingApi } from './routing.api';
+export type { RouteCoordinates, RouteResult } from './routing.api';

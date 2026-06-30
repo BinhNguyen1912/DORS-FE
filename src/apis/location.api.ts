@@ -26,4 +26,11 @@ export const locationApi = {
     });
     return response.data.data;
   },
+
+  geocode: async (query: string, limit: number = 6, viewbox?: string): Promise<any[]> => {
+    const response = await api.get<{ success: boolean; data: any[] }>('/locations/geocode', {
+      params: { q: query, limit, viewbox },
+    });
+    return response.data.data;
+  },
 };

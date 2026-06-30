@@ -11,11 +11,15 @@ export const DISPATCH_EVENTS = {
   SOS_NO_TEAM: 'sos:no-team-available',
   TEAM_ASSIGNED: 'sos:assigned',
   TEAM_REASSIGNED: 'sos:reassigned',
+  SOS_OFFER: 'sos:offer',
+  SOS_OFFER_CLAIMED: 'sos:offer-claimed',
+  SOS_CLAIM_RESULT: 'sos:claim-result',
 
   // Client -> Server
   JOIN_PROVINCE_ROOM: 'join:province',
   JOIN_TEAM_ROOM: 'join:team',
   UPDATE_TEAM_LOCATION: 'team:update-location',
+  SOS_CLAIM: 'sos:claim',
 } as const;
 
 export const NOTIFICATION_EVENTS = {

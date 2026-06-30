@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rescue Team Dashboard — Phòng Chỉ Huy Đội Cứu Hộ</title>
+
+  <!-- Font & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Socket.io Client CDN -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at top left, #0f172a, #020617);
+      color: #f8fafc;
+    }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 4px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .glow-dot { box-shadow: 0 0 12px currentColor; }
+    .loader {
+      width: 45px; aspect-ratio: .75;
+      --c: no-repeat linear-gradient(var(--loader-color, currentColor) 0 0);
+      background: var(--c) 0% 50%, var(--c) 50% 50%, var(--c) 100% 50%;
+      background-size: 20% 60%;
+      animation: l9 1s infinite; display: inline-block;
+    }
+    @keyframes l9 {
+      33% { background-position: 0% 0%, 50% 100%, 100% 0% }
+      66% { background-position: 0% 100%, 50% 0%, 100% 100% }
+    }
+    @keyframes pulse-border {
+      0%, 100% { border-color: rgba(245, 158, 11, 0.6); }
+      50% { border-color: rgba(245, 158, 11, 1); }
+    }
+    .animate-pulse-border { animation: pulse-border 1.5s ease-in-out infinite; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-3px); }
+      75% { transform: translateX(3px); }
+    }
+    .animate-shake { animation: shake 0.3s ease-in-out 3; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col custom-scroll">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-[1000]">
+    <div class="flex items-center space-x-3">
+      <div class="p-2 bg-emerald-600/20 rounded-lg text-emerald-500 border border-emerald-500/30 glow-dot">
+        <i data-lucide="shield" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
+          Rescue Team Dashboard
+        </h1>
+        <p class="text-xs text-slate-400">Phòng Chỉ Huy Đội Cứu Hộ — Tiếp nhận & Cập nhật trạng thái nhiệm vụ</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-2 text-xs">
+        <span class="text-slate-400">Trạng thái:</span>
+        <span id="api-status-badge" class="px-2 py-0.5 rounded-full font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center space-x-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping mr-1"></span> Đang kiểm tra...
+        </span>
+      </div>
+      <div id="team-badge" class="hidden px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"></div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 p-6 overflow-auto">
+
+    <!-- Left Column: Auth + Team Info + Active Mission -->
+    <section class="xl:col-span-5 flex flex-col gap-6 overflow-y-auto pr-2 custom-scroll">
+
+      <!-- Panel 1: Login & Connection -->
+      <div class="glass-card rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="log-in" class="w-5 h-5 text-cyan-400"></i>
+            <h2 class="font-semibold text-slate-200">Đăng nhập Đội trưởng</h2>
+          </div>
+          <span id="login-status" class="text-xs text-slate-500">Chưa đăng nhập</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">BACKEND URL</label>
+            <input type="text" id="cfg-backend-url" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-cyan-500" value="http://localhost:8585">
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">PROVINCE ID</label>
+            <input type="number" id="cfg-province-id" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-cyan-500" value="1">
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">TEAM ID (tự nhận)</label>
+            <input type="number" id="cfg-team-id" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-bold text-emerald-400" value="" placeholder="Tự tìm từ token" readonly>
+          </div>
+        </div>
+
+        <!-- Login Form -->
+        <div class="p-3.5 bg-slate-900/40 rounded-xl border border-slate-800 mb-3">
+          <span class="text-xs font-semibold text-cyan-300 flex items-center mb-3">
+            <i data-lucide="key" class="w-4 h-4 mr-1.5 text-amber-400"></i> Đăng nhập bằng tài khoản Đội trưởng
+          </span>
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-400 mb-1">TÀI KHOẢN</label>
+              <input type="text" id="login-username" placeholder="toan.dv@resident.vn" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-slate-400 mb-1">MẬT KHẨU</label>
+              <input type="password" id="login-password" placeholder="••••••••" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+          <button id="btn-do-login" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition flex items-center justify-center shadow-md shadow-cyan-950/20">
+            <i data-lucide="log-in" class="w-3.5 h-3.5 mr-1.5"></i> Đăng nhập & Kết nối WebSocket
+          </button>
+        </div>
+
+        <!-- Team Info (shown after login) -->
+        <div id="team-info-panel" class="hidden p-3.5 bg-emerald-950/20 rounded-xl border border-emerald-500/20">
+          <div class="flex items-center space-x-2 text-emerald-400 font-semibold mb-2 text-xs">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span>THÔNG TIN ĐỘI CỨU HỘ CỦA BẠN</span>
+          </div>
+          <div id="team-info-content" class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-slate-300">
+            <!-- dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Socket Status -->
+        <div class="flex items-center justify-between mt-3 p-2.5 bg-slate-950/50 rounded-lg border border-slate-800">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs text-slate-400">WS /dispatch:</span>
+            <span id="ws-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-600 glow-dot"></span>
+            <span id="ws-status-text" class="text-[10px] text-slate-500">Chưa kết nối</span>
+          </div>
+          <button id="btn-reconnect" class="hidden text-[10px] px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded transition">Kết nối lại</button>
+        </div>
+      </div>
+
+      <!-- Panel 2: Active Mission Details & Status Update -->
+      <div class="glass-card rounded-2xl p-5 shadow-2xl relative overflow-hidden flex-1 flex flex-col">
+        <div class="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
+        <div class="flex items-center space-x-2 mb-4">
+          <i data-lucide="activity" class="w-5 h-5 text-rose-400 animate-pulse"></i>
+          <h2 class="font-semibold text-slate-200">Nhiệm vụ đang thực hiện</h2>
+        </div>
+
+        <div id="mission-content" class="flex-1 flex flex-col">
+          <!-- Standby state (default) -->
+          <div id="mission-standby" class="flex-1 flex flex-col items-center justify-center text-center py-12">
+            <div class="relative mb-4">
+              <div class="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-500 animate-pulse">
+                <i data-lucide="shield" class="w-8 h-8"></i>
+              </div>
+              <div class="absolute inset-0 w-16 h-16 border-2 border-emerald-500 rounded-full animate-ping opacity-25"></div>
+            </div>
+            <h3 class="text-base font-extrabold text-slate-200 uppercase tracking-wider">Đang ở chế độ sẵn sàng</h3>
+            <p class="text-xs text-slate-400 mt-2 max-w-xs">Đội của bạn chưa có nhiệm vụ. Hãy duy trì kết nối để nhận lời mời cứu hộ khẩn cấp.</p>
+          </div>
+
+          <!-- Active mission (hidden by default) -->
+          <div id="mission-active" class="hidden flex-1 flex flex-col space-y-4 overflow-y-auto custom-scroll">
+            <!-- Mission Header -->
+            <div class="bg-rose-950/30 border border-rose-500/20 rounded-xl p-4">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-2">
+                  <i data-lucide="activity" class="w-5 h-5 text-rose-500 animate-pulse"></i>
+                  <span id="mission-title" class="text-sm font-extrabold text-rose-400 uppercase">NHIỆM VỤ #</span>
+                </div>
+                <span id="mission-severity-badge" class="px-2 py-0.5 text-[10px] font-extrabold rounded-full uppercase border"></span>
+              </div>
+              <span id="mission-status-badge" class="inline-block px-2.5 py-0.5 text-[10px] font-extrabold rounded-full uppercase border mb-2"></span>
+            </div>
+
+            <!-- Mission Details -->
+            <div class="space-y-2.5 text-xs">
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-900/40 rounded-lg p-3 border border-slate-800">
+                  <span class="text-[10px] text-slate-400 font-semibold block mb-1">Người yêu cầu</span>
+                  <span id="mission-requester" class="text-sm font-bold text-slate-100">—</span>
+                </div>
+                <div class="bg-slate-900/40 rounded-lg p-3 border border-slate-800">
+                  <span class="text-[10px] text-slate-400 font-semibold block mb-1">Số điện thoại</span>
+                  <button id="mission-phone-btn" onclick="callPhone()" class="text-sm font-bold text-cyan-400 hover:text-cyan-300 flex items-center space-x-1">
+                    <i data-lucide="phone" class="w-3.5 h-3.5"></i>
+                    <span id="mission-phone">—</span>
+                  </button>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-900/40 rounded-lg p-3 border border-slate-800">
+                  <span class="text-[10px] text-slate-400 font-semibold block mb-1">Loại sự cố</span>
+                  <span id="mission-type" class="text-sm font-bold text-slate-100 uppercase">—</span>
+                </div>
+                <div class="bg-slate-900/40 rounded-lg p-3 border border-slate-800">
+                  <span class="text-[10px] text-slate-400 font-semibold block mb-1">Số người gặp nạn</span>
+                  <span id="mission-trapped" class="text-sm font-bold text-amber-400">—</span>
+                </div>
+              </div>
+              <div class="bg-slate-900/40 rounded-lg p-3 border border-slate-800">
+                <span class="text-[10px] text-slate-400 font-semibold block mb-1">Mô tả tình huống</span>
+                <p id="mission-description" class="text-xs text-slate-300 italic">—</p>
+              </div>
+            </div>
+
+            <!-- Status Update Actions -->
+            <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 space-y-3 mt-auto">
+              <h4 class="text-xs font-extrabold text-slate-200 uppercase flex items-center space-x-1.5">
+                <i data-lucide="radio" class="w-4 h-4 text-cyan-500"></i>
+                <span>Cập nhật tiến trình</span>
+              </h4>
+
+              <!-- ON_SITE button -->
+              <div id="action-onsite" class="hidden">
+                <p class="text-[10px] text-slate-400 mb-2">Đội của bạn đã được phân công. Xác nhận khi tiếp cận hiện trường:</p>
+                <button onclick="updateMissionStatus('ON_SITE')" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold transition flex items-center justify-center space-x-1.5 shadow-md shadow-blue-950/20">
+                  <i data-lucide="map-pin" class="w-4 h-4"></i>
+                  <span>ĐÃ TIẾP CẬN HIỆN TRƯỜNG</span>
+                </button>
+              </div>
+
+              <!-- RESOLVED form -->
+              <div id="action-resolved" class="hidden space-y-3">
+                <div>
+                  <label class="text-[10px] font-semibold text-slate-400 block mb-1">Ghi chú kết quả ứng cứu (Bắt buộc)</label>
+                  <textarea id="resolution-notes" rows="3" placeholder="Mô tả kết quả, tình trạng nạn nhân, số người đã cứu..." class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-emerald-500 custom-scroll"></textarea>
+                </div>
+                <button onclick="updateMissionStatus('RESOLVED')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white rounded-xl text-xs font-extrabold transition flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-950/20">
+                  <i data-lucide="check-circle" class="w-4 h-4"></i>
+                  <span>HOÀN THÀNH NHIỆM VỤ CỨU HỘ</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Right Column: Event Console + Active Offers -->
+    <section class="xl:col-span-7 flex flex-col gap-6 overflow-hidden">
+
+      <!-- SOS Offers Feed -->
+      <div class="glass-card rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[250px]">
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-3 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="bell-ring" class="w-5 h-5 text-amber-400"></i>
+            <span class="font-semibold text-slate-200">Lời mời cứu hộ khẩn cấp (Live SOS Offers)</span>
+          </div>
+          <span id="offer-count-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">0</span>
+        </div>
+        <div id="offers-list" class="flex-1 p-4 overflow-y-auto custom-scroll space-y-3">
+          <div class="flex flex-col items-center justify-center py-10 text-center">
+            <i data-lucide="inbox" class="w-10 h-10 text-slate-700 mb-3"></i>
+            <p class="text-xs text-slate-500 font-semibold">Chưa có lời mời cứu hộ nào</p>
+            <p class="text-[10px] text-slate-600 mt-1">Khi có SOS phát sinh, hệ thống sẽ tự động gửi thông báo đến đội của bạn</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Missions History / Assigned to Team -->
+      <div class="glass-card rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[200px]">
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-3 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="clipboard-list" class="w-5 h-5 text-indigo-400"></i>
+            <span class="font-semibold text-slate-200">Lịch sử nhiệm vụ (Đã gán cho đội)</span>
+          </div>
+          <button onclick="loadTeamMissions()" class="text-[10px] px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/20 rounded transition flex items-center">
+            <i data-lucide="refresh-cw" class="w-3 h-3 mr-1"></i> Tải lại
+          </button>
+        </div>
+        <div id="missions-history-list" class="flex-1 p-4 overflow-y-auto custom-scroll space-y-2">
+          <div class="text-xs text-slate-500 italic text-center py-6">Đăng nhập để xem lịch sử nhiệm vụ</div>
+        </div>
+      </div>
+
+      <!-- Realtime Event Logger Console -->
+      <div class="glass-card rounded-2xl shadow-2xl h-[250px] flex flex-col overflow-hidden">
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-3 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="terminal" class="w-5 h-5 text-indigo-400"></i>
+            <span class="font-semibold text-slate-200 font-mono">Bảng sự kiện thời gian thực</span>
+          </div>
+          <button id="btn-clear-console" class="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded transition flex items-center">
+            <i data-lucide="ban" class="w-3.5 h-3.5 mr-1"></i> Xóa
+          </button>
+        </div>
+        <div id="socket-console" class="flex-1 p-4 bg-slate-950/90 font-mono text-xs overflow-y-auto space-y-2.5 custom-scroll text-slate-300">
+          <div class="text-slate-500 italic">[00:00:00] Chào mừng đến Phòng Chỉ Huy Cứu Hộ. Đang chờ đăng nhập...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Map Section: Route Visualization -->
+    <section id="map-section" class="col-span-12 hidden">
+      <div class="glass-card rounded-2xl shadow-2xl overflow-hidden">
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-3 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="map" class="w-5 h-5 text-emerald-400"></i>
+            <span class="font-semibold text-slate-200">Bản đồ tuyến đường</span>
+          </div>
+          <div class="flex items-center space-x-3 text-[10px]">
+            <span class="flex items-center space-x-1"><span class="w-3 h-0.5 bg-blue-500 rounded"></span><span class="text-slate-400">Tuyến chính</span></span>
+            <span class="flex items-center space-x-1"><span class="w-3 h-0.5 bg-amber-500 rounded" style="border-bottom: 2px dashed #f59e0b;"></span><span class="text-slate-400">Dijkstra</span></span>
+          </div>
+        </div>
+        <div id="route-map" class="w-full h-[350px] bg-slate-950"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    lucide.createIcons();
+
+    // ==================== STATE ====================
+    let dispatchSocket = null;
+    let jwtToken = '';
+    let currentUser = null;
+    let currentTeam = null;
+    let activeMission = null;  // SOS currently assigned
+    const activeOffers = {};   // sosId -> { offer, timer }
+    const LS_KEY = 'rescue_team_dashboard_config';
+
+    // ==================== HELPERS ====================
+    function getBackendUrl() {
+      let url = document.getElementById('cfg-backend-url').value.trim();
+      return url.endsWith('/') ? url.slice(0, -1) : url;
+    }
+
+    function logConsole(source, message, type = 'log', data = null) {
+      const el = document.getElementById('socket-console');
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'border-l-2 pl-3 py-1 flex flex-col space-y-1';
+
+      const colors = {
+        success: { border: 'border-emerald-500', text: 'text-emerald-400 font-bold' },
+        error:   { border: 'border-red-500',     text: 'text-red-400 font-bold' },
+        warning: { border: 'border-amber-500',   text: 'text-amber-400 font-bold' },
+        info:    { border: 'border-indigo-400',   text: 'text-indigo-400' },
+        log:     { border: 'border-slate-700',    text: 'text-slate-400' },
+      };
+      const c = colors[type] || colors.log;
+      entry.className += ` ${c.border}`;
+      entry.innerHTML = `<div class="flex items-start text-xs">[${time}] <span class="${c.text} ml-1">${source}</span>: <span class="text-slate-200 ml-1">${message}</span></div>`;
+
+      if (data) {
+        const details = document.createElement('details');
+        details.className = 'mt-1 text-[11px] bg-slate-900/80 p-2 rounded border border-slate-800 text-slate-400 cursor-pointer overflow-x-auto';
+        details.innerHTML = `<summary class="outline-none hover:text-slate-300">Xem payload (JSON)</summary><pre class="mt-1 font-mono text-[10px] text-slate-300 whitespace-pre">${JSON.stringify(data, null, 2)}</pre>`;
+        entry.appendChild(details);
+      }
+      el.appendChild(entry);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function decodeJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+        return JSON.parse(jsonPayload);
+      } catch { return null; }
+    }
+
+    async function apiFetch(path, options = {}) {
+      const url = getBackendUrl();
+      const headers = { 'Content-Type': 'application/json', ...options.headers };
+      if (jwtToken) headers['Authorization'] = `Bearer ${jwtToken}`;
+      const res = await fetch(`${url}${path}`, { ...options, headers });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      return json.data !== undefined ? json.data : json;
+    }
+
+    // ==================== BACKEND HEALTH ====================
+    async function checkHealth() {
+      const badge = document.getElementById('api-status-badge');
+      try {
+        const res = await fetch(`${getBackendUrl()}/sos-requests/nearby?lat=10.7&lng=106&radius=1&status=PENDING`);
+        if (res.status === 200 || res.status === 401 || res.status === 403) {
+          badge.className = "px-2 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1";
+          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 glow-dot"></span> API hoạt động`;
+          return;
+        }
+      } catch {}
+      badge.className = "px-2 py-0.5 rounded-full font-medium bg-red-500/20 text-red-400 border border-red-500/30 flex items-center space-x-1";
+      badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-red-400 mr-1 glow-dot"></span> Không kết nối`;
+    }
+
+    // ==================== LOGIN ====================
+    document.getElementById('btn-do-login').addEventListener('click', async () => {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+      const provinceId = parseInt(document.getElementById('cfg-province-id').value) || 1;
+
+      if (!username || !password) {
+        logConsole('AUTH', 'Vui lòng nhập tài khoản và mật khẩu!', 'error');
+        return;
+      }
+
+      logConsole('AUTH', `Đang đăng nhập "${username}"...`, 'info');
+
+      try {
+        const data = await apiFetch('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ identifier: username, password, provinceId }),
+          headers: {} // clear auth for login
+        });
+
+        jwtToken = data.accessToken || data.token;
+        if (!jwtToken) throw new Error('Không nhận được JWT token');
+
+        const payload = decodeJwt(jwtToken);
+        currentUser = {
+          id: payload.sub || payload.userId,
+          email: payload.email,
+          fullName: payload.fullName || payload.name || username,
+          phone: payload.phone || payload.phoneNumber || '',
+          provinceId: payload.provinceId || provinceId,
+          roleId: payload.roleId,
+        };
+
+        document.getElementById('cfg-province-id').value = currentUser.provinceId;
+        document.getElementById('login-status').innerHTML = `<span class="text-emerald-400 font-semibold">✓ ${currentUser.fullName}</span>`;
+
+        logConsole('AUTH', `🟢 Đăng nhập thành công! User ID: ${currentUser.id}, Tỉnh: ${currentUser.provinceId}`, 'success', currentUser);
+
+        // Save config
+        saveConfig();
+
+        // Find team
+        await findMyTeam();
+
+        // Connect WebSocket
+        connectDispatchSocket();
+
+        // Load missions
+        await loadTeamMissions();
+
+      } catch (err) {
+        logConsole('AUTH', `🔴 Đăng nhập thất bại: ${err.message}`, 'error');
+      }
+    });
+
+    // ==================== FIND MY TEAM ====================
+    async function findMyTeam() {
+      if (!currentUser) return;
+      logConsole('TEAM', 'Đang tìm kiếm đội cứu hộ của bạn...', 'info');
+
+      try {
+        const data = await apiFetch(`/rescue-teams?page=1&limit=100&provinceId=${currentUser.provinceId}`);
+        const teams = data.items || data.data || (Array.isArray(data) ? data : []);
+
+        currentTeam = teams.find(t =>
+          t.leaderId === currentUser.id ||
+          (t.leader && t.leader.id === currentUser.id) ||
+          t.leaderName === currentUser.fullName
+        );
+
+        if (!currentTeam) {
+          logConsole('TEAM', '⚠️ Không tìm thấy đội cứu hộ nào liên kết với tài khoản này. Bạn có thể cần nhập Team ID thủ công.', 'warning');
+          document.getElementById('cfg-team-id').removeAttribute('readonly');
+          document.getElementById('cfg-team-id').placeholder = 'Nhập thủ công';
+          return;
+        }
+
+        document.getElementById('cfg-team-id').value = currentTeam.id;
+        logConsole('TEAM', `🟢 Tìm thấy đội: ${currentTeam.name} (ID: ${currentTeam.id})`, 'success', currentTeam);
+
+        // Show team info
+        const panel = document.getElementById('team-info-panel');
+        const content = document.getElementById('team-info-content');
+        panel.classList.remove('hidden');
+
+        const leaderName = currentTeam.leader?.fullName || currentTeam.leaderName || currentUser.fullName;
+        const leaderPhone = currentTeam.leader?.phone || currentTeam.leaderPhone || currentUser.phone;
+
+        content.innerHTML = `
+          <div>• Tên đội: <b class="text-emerald-300">${currentTeam.name}</b></div>
+          <div>• ID: <b class="text-emerald-300">${currentTeam.id}</b></div>
+          <div>• Loại đội: <b class="text-emerald-300">${currentTeam.teamType}</b></div>
+          <div>• Trạng thái: <b class="text-emerald-300">${currentTeam.status}</b></div>
+          <div>• Đội trưởng: <b class="text-emerald-300">${leaderName}</b></div>
+          <div>• SĐT: <b class="text-emerald-300">${leaderPhone}</b></div>
+        `;
+        lucide.createIcons();
+
+        // Header badge
+        const badge = document.getElementById('team-badge');
+        badge.textContent = `Đội: ${currentTeam.name}`;
+        badge.classList.remove('hidden');
+
+      } catch (err) {
+        logConsole('TEAM', `🔴 Lỗi tìm đội: ${err.message}`, 'error');
+      }
+    }
+
+    // ==================== WEBSOCKET ====================
+    function connectDispatchSocket() {
+      const backendUrl = getBackendUrl();
+      const provinceId = document.getElementById('cfg-province-id').value || '1';
+      const teamId = document.getElementById('cfg-team-id').value;
+
+      if (dispatchSocket && dispatchSocket.connected) {
+        logConsole('WS', 'Đã kết nối rồi, đang ngắt kết nối cũ...', 'info');
+        dispatchSocket.disconnect();
+      }
+
+      logConsole('WS', `Đang kết nối /dispatch tại ${backendUrl}...`, 'info');
+
+      dispatchSocket = io(`${backendUrl}/dispatch`, {
+        query: { provinceId, role: 'TEAM_LEADER' },
+        auth: jwtToken ? { token: `Bearer ${jwtToken}` } : undefined,
+        extraHeaders: jwtToken ? { Authorization: `Bearer ${jwtToken}` } : undefined,
+        transports: ['websocket'],
+        forceNew: true
+      });
+
+      const dot = document.getElementById('ws-status-dot');
+      const txt = document.getElementById('ws-status-text');
+      const reconnBtn = document.getElementById('btn-reconnect');
+
+      dispatchSocket.on('connect', () => {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 glow-dot";
+        txt.className = "text-[10px] text-emerald-400 font-semibold";
+        txt.textContent = `Đã kết nối (${dispatchSocket.id})`;
+        reconnBtn.classList.add('hidden');
+        logConsole('WS', `🟢 Kết nối /dispatch thành công! ID: ${dispatchSocket.id}`, 'success');
+
+        // Join team room
+        if (teamId) {
+          dispatchSocket.emit('join:team', { teamId: parseInt(teamId, 10) });
+          logConsole('WS', `Đã gửi join:team cho Team ${teamId}`, 'info');
+        }
+      });
+
+      dispatchSocket.on('joined', (payload) => {
+        logConsole('WS', `⚡ Đã tham gia phòng: ${payload.room}`, 'success', payload);
+      });
+
+      dispatchSocket.on('disconnect', (reason) => {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-red-500 glow-dot";
+        txt.className = "text-[10px] text-red-400 font-semibold";
+        txt.textContent = `Mất kết nối: ${reason}`;
+        reconnBtn.classList.remove('hidden');
+        logConsole('WS', `🔴 Mất kết nối: ${reason}`, 'error');
+      });
+
+      dispatchSocket.on('connect_error', (err) => {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-red-500 glow-dot";
+        txt.className = "text-[10px] text-red-400";
+        txt.textContent = `Lỗi: ${err.message}`;
+        logConsole('WS', `⚠️ Lỗi kết nối: ${err.message}`, 'error');
+      });
+
+      // ---- DISPATCH EVENTS ----
+      dispatchSocket.on('sos:offer', (offer) => {
+        logConsole('WS sos:offer', `📩 Lời mời cứu hộ SOS #${offer.sosId}!`, 'warning', offer);
+        showOffer(offer);
+      });
+
+      dispatchSocket.on('sos:offer-claimed', (payload) => {
+        logConsole('WS sos:offer-claimed', `🔕 SOS #${payload.sosId} đã được nhận bởi Đội #${payload.assignedTeamId}`, 'info', payload);
+        removeOffer(payload.sosId);
+        loadTeamMissions(); // refresh
+      });
+
+      dispatchSocket.on('sos:claim-result', (result) => {
+        if (result.success) {
+          logConsole('WS sos:claim-result', `🎉 ${result.message}`, 'success', result);
+          removeOffer(result.sosId);
+          loadTeamMissions();
+        } else {
+          logConsole('WS sos:claim-result', `❌ ${result.message}`, 'error', result);
+        }
+      });
+
+      dispatchSocket.on('sos:assigned', (payload) => {
+        logConsole('WS sos:assigned', `🚒 Được gán nhiệm vụ SOS #${payload.sosId}`, 'success', payload);
+        removeOffer(payload.sosId);
+        loadTeamMissions();
+      });
+
+      dispatchSocket.on('sos:created', (sos) => {
+        logConsole('WS sos:created', `📣 SOS mới tạo: #${sos.id} bởi ${sos.requesterName || 'N/A'}`, 'info', sos);
+      });
+
+      dispatchSocket.on('sos:status-updated', (payload) => {
+        logConsole('WS sos:status-updated', `🔄 SOS #${payload.sosId} → ${payload.status}`, 'info', payload);
+        if (activeMission && activeMission.id === payload.sosId) {
+          loadTeamMissions();
+        }
+      });
+    }
+
+    document.getElementById('btn-reconnect').addEventListener('click', () => {
+      connectDispatchSocket();
+    });
+
+    // ==================== SOS OFFERS ====================
+    function showOffer(offer) {
+      // Prevent duplicates
+      if (activeOffers[offer.sosId]) return;
+
+      const container = document.getElementById('offers-list');
+      // Remove empty state
+      if (container.querySelector('[data-lucide="inbox"]')) {
+        container.innerHTML = '';
+      }
+
+      const remaining = offer.timeoutSeconds || 30;
+      const card = document.createElement('div');
+      card.id = `offer-card-${offer.sosId}`;
+      card.className = "bg-slate-900/95 border-2 border-amber-500 animate-pulse-border rounded-2xl p-4 shadow-2xl overflow-hidden text-slate-100 space-y-3 animate-shake";
+
+      card.innerHTML = `
+        <div class="flex justify-between items-start">
+          <div class="flex items-center space-x-2 text-amber-400 font-bold text-sm">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+            <span>🔔 MỜI NHẬN CA CỨU HỘ!</span>
+          </div>
+          <div id="countdown-${offer.sosId}" class="min-w-[36px] h-9 rounded-full border-2 border-amber-500 flex items-center justify-center font-mono font-extrabold text-sm text-amber-400 animate-pulse">
+            ${remaining}
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div>• SOS ID: <b class="text-slate-200">#${offer.sosId}</b></div>
+          <div>• Loại: <b class="text-slate-200">${offer.requestType || 'N/A'}</b></div>
+          <div>• Mức nguy cấp: <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-red-500/20 text-red-400 border border-red-500/30">${offer.severity || 'HIGH'}</span></div>
+          <div>• Tọa độ: <b class="text-slate-200">${(offer.latitude || 0).toFixed(4)}, ${(offer.longitude || 0).toFixed(4)}</b></div>
+        </div>
+        ${offer.description ? `<div class="text-[10px] text-slate-400 italic bg-slate-950/50 p-2 rounded-lg border border-slate-800 truncate">📝 ${offer.description}</div>` : ''}
+        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+          <div id="progress-${offer.sosId}" class="bg-amber-500 h-full transition-all duration-1000 rounded-full" style="width: 100%"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="dismissOffer(${offer.sosId})" class="py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-bold transition">
+            BỎ QUA
+          </button>
+          <button id="btn-claim-${offer.sosId}" onclick="claimOffer(${offer.sosId})" class="py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold transition flex items-center justify-center space-x-1 shadow shadow-emerald-950/20">
+            <i data-lucide="check-circle" class="w-4 h-4"></i>
+            <span>NHẬN CỨU HỘ</span>
+          </button>
+        </div>
+      `;
+
+      container.prepend(card);
+      lucide.createIcons();
+
+      let secondsLeft = remaining;
+      const timer = setInterval(() => {
+        secondsLeft--;
+        const countdownEl = document.getElementById(`countdown-${offer.sosId}`);
+        const progressEl = document.getElementById(`progress-${offer.sosId}`);
+        if (countdownEl) {
+          countdownEl.textContent = secondsLeft;
+          if (secondsLeft <= 5) {
+            countdownEl.className = "min-w-[36px] h-9 rounded-full border-2 border-red-500 flex items-center justify-center font-mono font-extrabold text-sm text-red-500 animate-ping";
+          }
+        }
+        if (progressEl) {
+          progressEl.style.width = `${(secondsLeft / remaining) * 100}%`;
+        }
+        if (secondsLeft <= 0) {
+          clearInterval(timer);
+          removeOffer(offer.sosId);
+        }
+      }, 1000);
+
+      activeOffers[offer.sosId] = { offer, timer };
+      updateOfferCount();
+    }
+
+    function removeOffer(sosId) {
+      if (activeOffers[sosId]) {
+        clearInterval(activeOffers[sosId].timer);
+        delete activeOffers[sosId];
+      }
+      const card = document.getElementById(`offer-card-${sosId}`);
+      if (card) card.remove();
+      updateOfferCount();
+
+      // Show empty state if none left
+      const container = document.getElementById('offers-list');
+      if (Object.keys(activeOffers).length === 0 && container.children.length === 0) {
+        container.innerHTML = `
+          <div class="flex flex-col items-center justify-center py-10 text-center">
+            <i data-lucide="inbox" class="w-10 h-10 text-slate-700 mb-3"></i>
+            <p class="text-xs text-slate-500 font-semibold">Chưa có lời mời cứu hộ nào</p>
+            <p class="text-[10px] text-slate-600 mt-1">Khi có SOS phát sinh, hệ thống sẽ tự động gửi thông báo đến đội của bạn</p>
+          </div>
+        `;
+        lucide.createIcons();
+      }
+    }
+
+    function dismissOffer(sosId) {
+      logConsole('USER', `Đã bỏ qua lời mời SOS #${sosId}`, 'info');
+      removeOffer(sosId);
+    }
+
+    function claimOffer(sosId) {
+      const teamId = parseInt(document.getElementById('cfg-team-id').value);
+      if (!dispatchSocket || !dispatchSocket.connected) {
+        logConsole('CLAIM', 'Socket chưa kết nối!', 'error');
+        return;
+      }
+      if (!teamId) {
+        logConsole('CLAIM', 'Chưa có Team ID!', 'error');
+        return;
+      }
+
+      const btn = document.getElementById(`btn-claim-${sosId}`);
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Đang xử lý...</span>';
+      }
+
+      logConsole('CLAIM', `⚡ Gửi sos:claim cho SOS #${sosId} từ Team #${teamId}`, 'info');
+      dispatchSocket.emit('sos:claim', { sosId, teamId });
+    }
+
+    function updateOfferCount() {
+      const badge = document.getElementById('offer-count-badge');
+      const count = Object.keys(activeOffers).length;
+      if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    // ==================== MISSIONS ====================
+    async function loadTeamMissions() {
+      const teamId = document.getElementById('cfg-team-id').value;
+      if (!teamId || !jwtToken) return;
+
+      try {
+        const data = await apiFetch(`/sos-requests?provinceId=${currentUser?.provinceId || 1}&limit=50`);
+        const allSos = data.items || data.data || (Array.isArray(data) ? data : []);
+
+        // Find missions assigned to my team
+        const teamIdNum = parseInt(teamId);
+        const myMissions = allSos.filter(s => s.assignedTeamId === teamIdNum);
+
+        // Find active mission (DISPATCHED or ON_SITE)
+        const active = myMissions.find(s => s.status === 'DISPATCHED' || s.status === 'ON_SITE');
+
+        // Render history
+        renderMissionHistory(myMissions);
+
+        // Render active mission panel
+        if (active) {
+          activeMission = active;
+          showActiveMission(active);
+        } else {
+          activeMission = null;
+          hideActiveMission();
+        }
+      } catch (err) {
+        logConsole('MISSIONS', `Lỗi tải danh sách nhiệm vụ: ${err.message}`, 'error');
+      }
+    }
+
+    function showActiveMission(sos) {
+      document.getElementById('mission-standby').classList.add('hidden');
+      document.getElementById('mission-active').classList.remove('hidden');
+
+      document.getElementById('mission-title').textContent = `NHIỆM VỤ SOS-#${sos.id}`;
+
+      // Severity badge
+      const sevBadge = document.getElementById('mission-severity-badge');
+      const sevColors = {
+        CRITICAL: 'bg-red-500/20 text-red-400 border-red-500/30',
+        HIGH: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+        MEDIUM: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        LOW: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      };
+      sevBadge.className = `px-2 py-0.5 text-[10px] font-extrabold rounded-full uppercase border ${sevColors[sos.severity] || sevColors.MEDIUM}`;
+      sevBadge.textContent = sos.severity || 'N/A';
+
+      // Status badge
+      const statBadge = document.getElementById('mission-status-badge');
+      const statColors = {
+        DISPATCHED: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        ON_SITE: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      };
+      const statLabels = {
+        DISPATCHED: 'Đã điều phối — Đang di chuyển',
+        ON_SITE: 'Đã tiếp cận hiện trường',
+      };
+      statBadge.className = `inline-block px-2.5 py-0.5 text-[10px] font-extrabold rounded-full uppercase border ${statColors[sos.status] || ''}`;
+      statBadge.textContent = statLabels[sos.status] || sos.status;
+
+      // Details
+      document.getElementById('mission-requester').textContent = sos.requesterName || 'Không rõ';
+      document.getElementById('mission-phone').textContent = sos.requesterPhone || 'Không có';
+      document.getElementById('mission-type').textContent = sos.requestType || 'N/A';
+      document.getElementById('mission-trapped').textContent = `${sos.trappedPeopleCount || 0} người`;
+      document.getElementById('mission-description').textContent = sos.description || 'Không có mô tả chi tiết.';
+
+      // Action buttons
+      if (sos.status === 'DISPATCHED') {
+        document.getElementById('action-onsite').classList.remove('hidden');
+        document.getElementById('action-resolved').classList.add('hidden');
+      } else if (sos.status === 'ON_SITE') {
+        document.getElementById('action-onsite').classList.add('hidden');
+        document.getElementById('action-resolved').classList.remove('hidden');
+      }
+
+      lucide.createIcons();
+
+      // Update map with route from team to SOS
+      updateMapRoute(sos);
+    }
+
+    function hideActiveMission() {
+      document.getElementById('mission-standby').classList.remove('hidden');
+      document.getElementById('mission-active').classList.add('hidden');
+      document.getElementById('action-onsite').classList.add('hidden');
+      document.getElementById('action-resolved').classList.add('hidden');
+    }
+
+    function renderMissionHistory(missions) {
+      const container = document.getElementById('missions-history-list');
+      if (!missions || missions.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-500 italic text-center py-6">Chưa có nhiệm vụ nào được gán cho đội</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      missions.forEach(sos => {
+        const statusColors = {
+          PENDING: 'bg-red-500/20 text-red-400 border-red-500/30',
+          DISPATCHED: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+          ON_SITE: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+          RESOLVED: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+          COMPLETED: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        };
+        const statusLabels = {
+          PENDING: 'Chờ xử lý',
+          DISPATCHED: 'Đã điều phối',
+          ON_SITE: 'Đang xử lý',
+          RESOLVED: 'Hoàn thành',
+          COMPLETED: 'Hoàn thành',
+        };
+
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between p-3 bg-slate-900/40 rounded-xl border border-slate-800 hover:border-slate-700 transition cursor-pointer';
+        card.innerHTML = `
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-extrabold ${sos.status === 'RESOLVED' || sos.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">
+              #${sos.id}
+            </div>
+            <div>
+              <p class="text-xs font-bold text-slate-200 truncate max-w-[200px]">${sos.requestType || 'SOS'} — ${sos.requesterName || 'N/A'}</p>
+              <p class="text-[10px] text-slate-500">${new Date(sos.createdAt).toLocaleString('vi-VN')}</p>
+            </div>
+          </div>
+          <span class="px-2 py-0.5 text-[9px] font-extrabold rounded-full uppercase border ${statusColors[sos.status] || 'bg-slate-500/20 text-slate-400 border-slate-500/30'}">
+            ${statusLabels[sos.status] || sos.status}
+          </span>
+        `;
+
+        // Click to view details
+        card.addEventListener('click', () => {
+          if (sos.status === 'DISPATCHED' || sos.status === 'ON_SITE') {
+            activeMission = sos;
+            showActiveMission(sos);
+          }
+        });
+
+        container.appendChild(card);
+      });
+    }
+
+    // ==================== STATUS UPDATE ====================
+    async function updateMissionStatus(newStatus) {
+      if (!activeMission) {
+        logConsole('STATUS', 'Không có nhiệm vụ đang active!', 'error');
+        return;
+      }
+
+      const body = { status: newStatus };
+      if (newStatus === 'RESOLVED') {
+        const notes = document.getElementById('resolution-notes').value.trim();
+        if (!notes) {
+          logConsole('STATUS', 'Vui lòng nhập ghi chú kết quả trước khi hoàn thành!', 'error');
+          return;
+        }
+        body.resolutionNotes = notes;
+      }
+
+      logConsole('STATUS', `Đang cập nhật SOS #${activeMission.id} → ${newStatus}...`, 'info');
+
+      try {
+        const result = await apiFetch(`/sos-requests/${activeMission.id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        });
+
+        logConsole('STATUS', `🟢 Cập nhật thành công! SOS #${activeMission.id} → ${newStatus}`, 'success', result);
+
+        if (newStatus === 'RESOLVED') {
+          document.getElementById('resolution-notes').value = '';
+          activeMission = null;
+          hideActiveMission();
+        }
+
+        // Refresh missions list
+        await loadTeamMissions();
+
+      } catch (err) {
+        logConsole('STATUS', `🔴 Lỗi cập nhật: ${err.message}`, 'error');
+      }
+    }
+
+    // Phone call helper
+    function callPhone() {
+      const phone = document.getElementById('mission-phone').textContent;
+      if (phone && phone !== '—' && phone !== 'Không có') {
+        window.open(`tel:${phone}`);
+        logConsole('PHONE', `Đang gọi: ${phone}`, 'info');
+      }
+    }
+
+    // ==================== CONFIG PERSISTENCE ====================
+    function saveConfig() {
+      const config = {
+        backendUrl: document.getElementById('cfg-backend-url').value,
+        provinceId: document.getElementById('cfg-province-id').value,
+        token: jwtToken,
+        username: document.getElementById('login-username').value,
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(config));
+    }
+
+    function loadConfig() {
+      const str = localStorage.getItem(LS_KEY);
+      if (!str) return;
+      try {
+        const config = JSON.parse(str);
+        if (config.backendUrl) document.getElementById('cfg-backend-url').value = config.backendUrl;
+        if (config.provinceId) document.getElementById('cfg-province-id').value = config.provinceId;
+        if (config.username) document.getElementById('login-username').value = config.username;
+        if (config.token) {
+          jwtToken = config.token;
+          const payload = decodeJwt(jwtToken);
+          if (payload) {
+            currentUser = {
+              id: payload.sub || payload.userId,
+              email: payload.email,
+              fullName: payload.fullName || payload.name || config.username,
+              phone: payload.phone || '',
+              provinceId: payload.provinceId || parseInt(config.provinceId),
+              roleId: payload.roleId,
+            };
+            document.getElementById('login-status').innerHTML = `<span class="text-emerald-400 font-semibold">✓ ${currentUser.fullName}</span>`;
+            logConsole('SYSTEM', 'Đã nạp lại cấu hình từ phiên trước.', 'info');
+
+            // Auto reconnect
+            setTimeout(async () => {
+              await findMyTeam();
+              connectDispatchSocket();
+              await loadTeamMissions();
+            }, 500);
+          }
+        }
+      } catch {}
+    }
+
+    // ==================== CLEAR CONSOLE ====================
+    document.getElementById('btn-clear-console').addEventListener('click', () => {
+      document.getElementById('socket-console').innerHTML = '<div class="text-slate-500 italic">[Màn hình đã được dọn sạch]</div>';
+    });
+
+    // ==================== MAP & ROUTING ====================
+    let routeMap = null;
+    let routeMarkersGroup = null;
+    let routePolylineGroup = null;
+    const routesCache = {};
+
+    function initMap() {
+      if (routeMap) return;
+
+      // Default to Ho Chi Minh City coordinates
+      routeMap = L.map('route-map').setView([10.7629, 106.6604], 13);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(routeMap);
+
+      routeMarkersGroup = L.layerGroup().addTo(routeMap);
+      routePolylineGroup = L.layerGroup().addTo(routeMap);
+
+      logConsole('MAP', 'Bản đồ Leaflet đã được khởi tạo', 'info');
+    }
+
+    async function updateMapRoute(sos) {
+      const teamId = parseInt(document.getElementById('cfg-team-id').value);
+      if (!teamId || !sos) return;
+
+      // Show map section
+      const mapSection = document.getElementById('map-section');
+      mapSection.classList.remove('hidden');
+
+      // Initialize map if not yet done
+      initMap();
+
+      // Clear previous markers and polylines
+      routeMarkersGroup.clearLayers();
+      routePolylineGroup.clearLayers();
+
+      // Get team location from currentTeam (handle various possible property names)
+      const teamLat = currentTeam?.lat || currentTeam?.latitude || currentTeam?.currentLocation?.lat || currentTeam?.currentLocation?.latitude || 0;
+      const teamLng = currentTeam?.lng || currentTeam?.longitude || currentTeam?.currentLocation?.lng || currentTeam?.currentLocation?.longitude || 0;
+      // Get SOS location (sos may have lat/lng or latitude/longitude)
+      const sosLat = sos?.lat || sos?.latitude || (sos?.location?.coordinates?.[1]) || 0;
+      const sosLng = sos?.lng || sos?.longitude || (sos?.location?.coordinates?.[0]) || 0;
+
+      if (!teamLat || !teamLng || !sosLat || !sosLng) {
+        logConsole('MAP', 'Thiếu tọa độ team hoặc SOS để vẽ tuyến đường', 'warning');
+        // Fallback: just show markers
+        if (sosLat && sosLng) {
+          L.marker([sosLat, sosLng], {
+            icon: L.divIcon({
+              html: `<div style="background:#ef4444;border-radius:50%;width:24px;height:24px;border:3px solid white;box-shadow:0 0 8px #ef4444;display:flex;align-items:center;justify-content:center;font-size:12px;">🚨</div>`,
+              className: '',
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+            })
+          }).bindPopup(`SOS #${sos.id} - ${sos.requestType || 'SOS'}`).addTo(routeMarkersGroup);
+          routeMap.setView([sosLat, sosLng], 14);
+        }
+        return;
+      }
+
+      // Add team marker (blue)
+      L.marker([teamLat, teamLng], {
+        icon: L.divIcon({
+          html: `<div style="background:#3b82f6;border-radius:50%;width:28px;height:28px;border:3px solid white;box-shadow:0 0 8px #3b82f6;display:flex;align-items:center;justify-content:center;font-size:14px;">🚒</div>`,
+          className: '',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        })
+      }).bindPopup(`Đội cứu hộ: ${currentTeam?.name || 'Đội #' + teamId}`).addTo(routeMarkersGroup);
+
+      // Add SOS marker (red)
+      L.marker([sosLat, sosLng], {
+        icon: L.divIcon({
+          html: `<div style="background:#ef4444;border-radius:50%;width:28px;height:28px;border:3px solid white;box-shadow:0 0 8px #ef4444;display:flex;align-items:center;justify-content:center;font-size:14px;">🚨</div>`,
+          className: '',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        })
+      }).bindPopup(`SOS #${sos.id} - ${sos.requestType || 'SOS'}`).addTo(routeMarkersGroup);
+
+      // Fit bounds to show both markers
+      const bounds = L.latLngBounds([[teamLat, teamLng], [sosLat, sosLng]]);
+      routeMap.fitBounds(bounds, { padding: [50, 50] });
+
+      // Draw direct dashed line as fallback immediately
+      const fallbackLine = L.polyline([[teamLat, teamLng], [sosLat, sosLng]], {
+        color: '#3b82f6',
+        weight: 2,
+        dashArray: '5, 8',
+        opacity: 0.5,
+      });
+      fallbackLine.addTo(routePolylineGroup);
+
+      // Try to calculate route via API
+      const cacheKey = `${teamId}-${sos.id}`;
+      if (routesCache[cacheKey]) {
+        drawRoutePolylines(routesCache[cacheKey]);
+        return;
+      }
+
+      logConsole('MAP', `Đang tính tuyến đường từ [${teamLat.toFixed(4)}, ${teamLng.toFixed(4)}] đến [${sosLat.toFixed(4)}, ${sosLng.toFixed(4)}]...`, 'info');
+
+      try {
+        const response = await fetch(`${getBackendUrl()}/routing/calculate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${jwtToken}`,
+          },
+          body: JSON.stringify({
+            start: { latitude: teamLat, longitude: teamLng },
+            end: { latitude: sosLat, longitude: sosLng },
+            avoidPolygons: [],
+            profile: 'car',
+          }),
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const result = await response.json();
+        const data = result.data || result;
+
+        if (data && data.primary && data.primary.coordinates) {
+          const primaryCoords = data.primary.coordinates.map(c => [c.latitude, c.longitude]);
+
+          routesCache[cacheKey] = {
+            primary: primaryCoords,
+            dijkstra: data.dijkstra ? data.dijkstra.coordinates.map(c => [c.latitude, c.longitude]) : null,
+          };
+
+          // Remove fallback line
+          routePolylineGroup.clearLayers();
+          drawRoutePolylines(routesCache[cacheKey]);
+
+          logConsole('MAP', `✅ Tuyến đường chính có ${primaryCoords.length} điểm, khoảng cách: ${data.primary.distanceKm?.toFixed(1) || '?'} km`, 'success');
+
+          if (data.isIsolated) {
+            logConsole('MAP', '⚠️ Cảnh báo: Có thể bị cô lập do ngập lụt!', 'warning');
+          }
+        }
+      } catch (err) {
+        logConsole('MAP', `Không thể tính tuyến đường: ${err.message}. Sử dụng đường chim bay.`, 'warning');
+      }
+    }
+
+    function drawRoutePolylines(route) {
+      if (!route || !routePolylineGroup) return;
+
+      // Draw primary route (blue solid line)
+      if (route.primary && route.primary.length > 0) {
+        const primaryLine = L.polyline(route.primary, {
+          color: '#3b82f6',
+          weight: 3.5,
+          opacity: 0.9,
+          lineJoin: 'round',
+          interactive: false,
+        });
+        primaryLine.addTo(routePolylineGroup);
+      }
+
+      // Draw dijkstra route (orange dashed line)
+      if (route.dijkstra && route.dijkstra.length > 0) {
+        const dijkstraLine = L.polyline(route.dijkstra, {
+          color: '#f59e0b',
+          weight: 2.5,
+          dashArray: '5, 8',
+          opacity: 0.85,
+          lineJoin: 'round',
+          interactive: false,
+        });
+        dijkstraLine.addTo(routePolylineGroup);
+      }
+    }
+
+    // ==================== STARTUP ====================
+    window.addEventListener('DOMContentLoaded', async () => {
+      loadConfig();
+      await checkHealth();
+      setInterval(checkHealth, 15000);
+    });
+  </script>
+</body>
+</html>

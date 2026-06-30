@@ -453,6 +453,7 @@ export default function RescueTeamCreatePage() {
           adminUnitId={watch('adminUnitId')}
           provinces={provinces}
           wards={wards}
+          showSearch={false}
         />
 
         {/* Specializations Card */}

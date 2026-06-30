@@ -1,28 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Eye, EyeOff, User, Lock } from 'lucide-react';
-import { authApi } from '../../apis';
+import { Loader2, Eye, EyeOff, User, Lock, MapPin } from 'lucide-react';
+import { authApi, locationApi } from '../../apis';
 import { useAuthStore, toast } from '../../stores';
 import { ROUTES } from '../../constants';
 import { cn } from '../../lib/utils';
 import { loginSchema, type LoginForm } from '../../schemas';
+import type { Province } from '../../types';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [provinces, setProvinces] = useState<Province[]>([]);
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
+
+  useEffect(() => {
+    locationApi.getAllProvinces()
+      .then(setProvinces)
+      .catch(console.error);
+  }, []);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchema) as any,
   });
 
   const onSubmit = async (data: LoginForm) => {
@@ -32,6 +40,7 @@ export default function LoginPage() {
       const response = await authApi.login({
         identifier: data.identifier,
         password: data.password,
+        provinceId: data.provinceId,
       });
       setAuth(response.user, response.accessToken);
       localStorage.setItem('access_token', response.accessToken);
@@ -66,6 +75,34 @@ export default function LoginPage() {
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <div>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none">
+              <MapPin size={20} />
+            </div>
+            <select
+              {...register('provinceId')}
+              disabled={isLoading}
+              className={cn(
+                "w-full pl-12 pr-4 py-3.5 bg-white/10 border rounded-xl text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all duration-200 cursor-pointer",
+                errors.provinceId ? "border-rose-500/60 focus:border-rose-500" : "border-white/15 focus:border-orange-500"
+              )}
+            >
+              <option value="" className="bg-slate-900 text-white">-- Chọn Tỉnh / Thành Phố --</option>
+              {provinces.map((p) => (
+                <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {errors.provinceId && (
+            <p className="text-xs text-rose-300 mt-1 font-medium pl-1">
+              {errors.provinceId.message}
+            </p>
+          )}
+        </div>
+
         <div>
           <div className="relative">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none">

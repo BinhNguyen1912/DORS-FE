@@ -54,6 +54,24 @@ export default function SosDetailModal({ id, isOpen, onClose }: SosDetailModalPr
     onError: (err: any) => toast.api(err, 'Lỗi khi cập nhật trạng thái'),
   });
 
+  // 4. Auto-dispatch retry mutation
+  const assignTeamMutation = useMutation({
+    mutationFn: () => sosApi.assignTeam(id, { teamId: null }),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['sos-request-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['sos-request-timeline', id] });
+      queryClient.invalidateQueries({ queryKey: ['db-sos-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['db-teams-all'] });
+
+      if (data?.bestTeamId) {
+        toast.success(`Đã tự động điều phối Đội ID ${data.bestTeamId} với điểm số tối ưu!`);
+      } else {
+        toast.success('Đã chạy tự động điều phối v6 thành công!');
+      }
+    },
+    onError: (err: any) => toast.api(err, 'Lỗi khi điều phối cứu hộ'),
+  });
+
   // Format date helper
   const formatDate = (dateStr?: string | Date) => {
     if (!dateStr) return '—';
@@ -141,9 +159,15 @@ export default function SosDetailModal({ id, isOpen, onClose }: SosDetailModalPr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[9999] flex items-center justify-center p-4 animate-fade-in">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[9999] flex items-center justify-center p-4 animate-fade-in"
+    >
       {/* Modal card */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-4xl shadow-xl overflow-hidden flex flex-col max-h-[92vh] text-left border border-gray-200 dark:border-gray-800">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-4xl shadow-xl overflow-hidden flex flex-col max-h-[92vh] text-left border border-gray-200 dark:border-gray-800"
+      >
 
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="px-6 pt-5 pb-4 flex-shrink-0 border-b border-gray-100 dark:border-gray-800">
@@ -221,6 +245,8 @@ export default function SosDetailModal({ id, isOpen, onClose }: SosDetailModalPr
                 isPending={updateStatusMutation.isPending}
                 handleSubmit={handleUpdateStatusSubmit}
                 handleCallPhone={handleCallPhone}
+                onAssignTeam={() => assignTeamMutation.mutate()}
+                isAssigningTeam={assignTeamMutation.isPending}
               />
             </div>
           )}
