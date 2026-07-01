@@ -4,6 +4,7 @@ import { donationApi } from '../../apis';
 import { cn } from '../../lib/utils';
 import TableSettings from '../../components/common/TableSettings';
 import type { TableColumnDef } from '../../components/common/TableSettings';
+import { RefreshCw } from 'lucide-react';
 
 const DONATION_COLUMNS: TableColumnDef[] = [
   { key: 'donor', label: 'Nhà tài trợ' },
@@ -56,7 +57,7 @@ export default function DonationListPage() {
     };
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['donations', page, status, type, searchQuery],
     queryFn: () =>
       donationApi.getAll({
@@ -99,6 +100,15 @@ export default function DonationListPage() {
           />
         </div>
         <div className="flex gap-2 w-full md:w-auto justify-end">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isLoading || isFetching}
+            className="flex items-center justify-center p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 rounded-xl transition-all shadow-sm cursor-pointer"
+            title="Làm mới dữ liệu"
+          >
+            <RefreshCw size={14} className={cn(isFetching && "animate-spin")} />
+          </button>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}

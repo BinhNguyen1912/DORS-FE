@@ -29,7 +29,7 @@ import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
 import { useSocket } from '../../providers/SocketProvider';
 import { DISPATCH_EVENTS } from '../../constants/websocket.constant';
-import { getProvinceCenterByCode } from '../../constants';
+import { getProvinceCenterByCode, ROUTES } from '../../constants';
 import SosDetailModal from './components/SosDetailModal';
 
 // Inject custom CSS to override Leaflet default white styles to fit the clean light theme
@@ -41,7 +41,10 @@ const injectStyles = `
     color: #1e293b !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
     padding: 6px !important;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  }
+  .custom-theme-popup .leaflet-popup-content {
+    margin: 6px 8px 6px 8px !important;
   }
   .custom-theme-popup .leaflet-popup-tip {
     background-color: #ffffff !important;
@@ -180,6 +183,7 @@ export default function DisasterListPage() {
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const [activeTileType, setActiveTileType] = useState<'streets' | 'satellite' | 'terrain'>('streets');
   const [performanceMode, setPerformanceMode] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // 1. Fetch Provinces to map the user's provinceId to a readable name
   const { data: provinces, error: provincesError } = useQuery({
@@ -417,7 +421,8 @@ export default function DisasterListPage() {
         teamType: team.teamType || 'TONG_HOP',
         status: team.status || 'AVAILABLE',
         activeMissions: team.missionsCount || 0,
-        phone: team.leaderPhone || 'Chưa có SĐT',
+        phone: team.leader?.phone || team.leaderPhone || team.phone || 'Chưa có SĐT',
+        leaderName: team.leader?.fullName || team.leaderCitizenName || 'Chưa cập nhật',
         address: team.adminUnit?.name ? `${team.adminUnit.name}, ${provinceName}` : (team.address || provinceName),
         distanceText: `Cách ${Math.min(25, Math.max(2, (team.id % 10) * 2.3 + 1.2)).toFixed(1)} km`,
       };
@@ -584,10 +589,21 @@ export default function DisasterListPage() {
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
+    const [lat, lng] = defaultCenter;
+    const offset = 0.35; // Bán kính giới hạn bản đồ xung quanh tâm tỉnh khoảng ~40km
+    const bounds = L.latLngBounds(
+      [lat - offset, lng - offset], // Tây Nam
+      [lat + offset, lng + offset]  // Đông Bắc
+    );
+
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
       preferCanvas: true,
+      maxBounds: bounds,
+      maxBoundsViscosity: 1.0,
+      minZoom: 10,
+      maxZoom: 18,
     }).setView(defaultCenter, 12);
 
     // Load map tiles (Standard OSM for light, Dark Matter for dark)
@@ -607,6 +623,7 @@ export default function DisasterListPage() {
     mapRef.current = map;
     layersGroupRef.current = L.layerGroup().addTo(map);
     markersGroupRef.current = L.layerGroup().addTo(map);
+    setIsMapReady(true);
 
     const mapEl = mapContainerRef.current;
     if (!mapEl) return;
@@ -639,6 +656,7 @@ export default function DisasterListPage() {
         mapRef.current.remove();
         mapRef.current = null;
       }
+      setIsMapReady(false);
     };
   }, [defaultCenter]);
 
@@ -882,7 +900,7 @@ export default function DisasterListPage() {
             sos.status === 'DISPATCHED' ? 'Đang di chuyển' :
               sos.status === 'ON_SITE' ? 'Đã tiếp cận' : 'Hoàn thành';
 
-        const equipmentText = sos.requiresEquipment ? '<span class="text-purple-650 font-bold ml-1">🚨 (Yêu cầu thiết bị)</span>' : '';
+        const equipmentText = sos.requiresEquipment ? '<span class="text-purple-650 font-bold ml-1">(Yêu cầu thiết bị)</span>' : '';
 
         // Build status badge colors for popup
         const popupStatusColors: Record<string, string> = {
@@ -899,11 +917,21 @@ export default function DisasterListPage() {
           LOW: 'background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0',
         };
         const assignedTeamHtml = sos.assignedTeamName
-          ? `<div style="margin-top:4px;padding:4px 6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:10px;color:#1e40af;font-weight:700;">🚒 Đội: ${sos.assignedTeamName}</div>`
+          ? `<div style="margin-top:4px;padding:4px 6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:10px;color:#1e40af;font-weight:700;">Đội: ${sos.assignedTeamName}</div>`
           : '';
 
+        const requestTypeLabels: Record<string, string> = {
+          FLOOD: 'Ngập lụt',
+          FIRE_FIGHTING: 'Hỏa hoạn',
+          TRAFFIC_ACCIDENT: 'Tai nạn giao thông',
+          MEDICAL_EMERGENCY: 'Y tế khẩn cấp',
+          NATURAL_DISASTER: 'Thiên tai khẩn cấp',
+          OTHER: 'Khác',
+        };
+        const requestTypeLabel = requestTypeLabels[sos.requestType] || sos.requestType || 'N/A';
+
         const popupContent = `
-            <div style="padding:8px;width:240px;text-align:left;font-family:sans-serif;font-size:12px;">
+            <div style="padding:8px;width:240px;text-align:left;font-family:inherit;font-size:12px;">
               <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
                 <span style="font-weight:900;color:#ef4444;font-size:13px;">${sos.code}</span>
                 <span style="padding:1px 6px;border-radius:4px;font-size:9px;font-weight:900;text-transform:uppercase;${popupSeverityColors[sos.severity] || ''}">
@@ -914,34 +942,34 @@ export default function DisasterListPage() {
                 <span style="padding:2px 8px;border-radius:6px;font-size:9px;font-weight:800;text-transform:uppercase;${popupStatusColors[sos.status] || ''}">
                   ${statusText}
                 </span>
-                <span style="font-size:10px;color:#94a3b8;font-weight:600;">⏱ ${sos.time}</span>
+                <span style="font-size:10px;color:#94a3b8;font-weight:600;">${sos.time}</span>
               </div>
               <div style="font-size:11px;color:#475569;line-height:1.5;">
-                <div><strong>👤 Người gửi:</strong> ${sos.sender}</div>
-                <div><strong>📞 Liên hệ:</strong> ${sos.phone}</div>
-                <div><strong>📋 Loại:</strong> ${(sos as any).requestType || 'N/A'}${equipmentText}</div>
-                <div><strong>👥 Người gặp nạn:</strong> ${sos.trappedCount} người</div>
+                <div><strong>Người gửi:</strong> ${sos.sender}</div>
+                <div><strong>Liên hệ:</strong> ${sos.phone}</div>
+                <div><strong>Loại:</strong> ${requestTypeLabel}${equipmentText}</div>
+                <div><strong>Người gặp nạn:</strong> ${sos.trappedCount} người</div>
               </div>
               <div style="margin-top:4px;font-size:10px;color:#64748b;font-style:italic;background:#f8fafc;padding:4px 6px;border-radius:6px;border:1px solid #f1f5f9;">
                 ${sos.description}
               </div>
               ${assignedTeamHtml}
               <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
-                ${sos.status === 'PENDING' ? `
+                ${(sos.status === 'PENDING' && !sos.assignedTeamId) ? `
                   <button class="verify-sos-btn-popup" data-id="${sos.id}" style="width:100%;padding:5px 8px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:10px;font-weight:800;cursor:pointer;text-align:center;">
-                    ⚡ Kích hoạt Điều phối v6
+                    Kích hoạt Điều phối v6
                   </button>
                 ` : sos.status === 'RESOLVED' ? `
                   <div style="text-align:center;width:100%;font-weight:800;color:#16a34a;font-size:10px;text-transform:uppercase;padding:5px 0;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:6px;">
-                    ✓ ĐÃ HOÀN THÀNH
+                    ĐÃ HOÀN THÀNH
                   </div>
                 ` : `
                   <div style="text-align:center;width:100%;font-weight:800;color:#2563eb;font-size:10px;text-transform:uppercase;padding:5px 0;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;">
-                    ✓ ĐÃ DUYỆT ĐIỀU PHỐI
+                    ĐÃ DUYỆT ĐIỀU PHỐI
                   </div>
                 `}
                 <button class="view-sos-detail-btn-popup" data-id="${sos.id}" style="width:100%;padding:5px 8px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:6px;font-size:10px;font-weight:800;cursor:pointer;text-align:center;">
-                  📋 Xem chi tiết đầy đủ
+                  Xem chi tiết đầy đủ
                 </button>
               </div>
             </div>
@@ -981,13 +1009,6 @@ export default function DisasterListPage() {
 
         const icon = getTeamIcon(team.teamType, team.status);
 
-        const typeLabels: Record<string, string> = {
-          PCCC: 'Đội PCCC & CNCH',
-          Y_TE: 'Đội Y Tế Cấp Cứu',
-          DAN_PHONG: 'Đội Dân Phòng Tự Quản',
-          TONG_HOP: 'Đội Hỗ Trợ Tổng Hợp'
-        };
-
         const statusLabels: Record<string, string> = {
           AVAILABLE: 'Sẵn sàng',
           BUSY: 'Đang làm nhiệm vụ',
@@ -995,14 +1016,40 @@ export default function DisasterListPage() {
           OFF_DUTY: 'Ngoại tuyến'
         };
 
+        const statusBannerColors: Record<string, string> = {
+          AVAILABLE: 'background-color:#ecfdf5; color:#059669; border:1px solid #a7f3d0;',
+          BUSY: 'background-color:#fef2f2; color:#dc2626; border:1px solid #fecaca;',
+          DISPATCHED: 'background-color:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;',
+          OFF_DUTY: 'background-color:#f8fafc; color:#64748b; border:1px solid #e2e8f0;'
+        };
+
+        const statusLabel = statusLabels[team.status] || team.status;
+        const statusBannerStyle = statusBannerColors[team.status] || statusBannerColors.AVAILABLE;
+
         const popupContent = `
-            <div class="p-2 w-48 text-left font-sans text-xs">
-              <h4 class="font-extrabold text-gray-800 mb-1">${team.name}</h4>
-              <p class="text-gray-500 mb-0.5">${typeLabels[team.teamType] || team.teamType}</p>
-              <p class="text-[11px] text-gray-500 mb-1.5">Liên hệ: ${team.phone}</p>
-              <span class="px-2 py-0.5 text-[9px] font-bold rounded bg-slate-100 text-gray-700 border border-slate-200">
-                Trạng thái: ${statusLabels[team.status] || team.status}
-              </span>
+            <div style="font-family:inherit; font-size:12px; width:220px; line-height:1.4; color:#1e293b; text-align:left; padding:4px 2px 2px 2px;">
+              <h4 style="font-size:12.5px; font-weight:800; color:#0f172a; margin:0 0 6px 0; text-transform:uppercase; letter-spacing:0.3px; line-height:1.3;">
+                ${team.name}
+              </h4>
+              <div style="font-size:11px; margin-bottom:8px; color:#475569;">
+                <div style="margin-bottom:3px;">
+                  <span style="font-weight:700; color:#64748b; margin-right:4px;">Kiểu đội:</span>
+                  <span style="font-weight:600; color:#334155;">
+                    ${team.teamType === 'PCCC' ? 'Đội PCCC & CNCH' : team.teamType === 'Y_TE' ? 'Đội Y Tế Cấp Cứu' : team.teamType === 'DAN_PHONG' ? 'Đội Dân Phòng Tự Quản' : 'Đội Hỗ Trợ Tổng Hợp'}
+                  </span>
+                </div>
+                <div style="margin-bottom:3px;">
+                  <span style="font-weight:700; color:#64748b; margin-right:4px;">ĐT:</span>
+                  <span style="font-weight:600; color:#334155;">${(team as any).leaderName || 'Chưa cập nhật'}</span>
+                </div>
+                <div style="margin-bottom:4px;">
+                  <span style="font-weight:700; color:#64748b; margin-right:4px;">SĐT:</span>
+                  <span style="font-weight:700; color:#2563eb;">${team.phone}</span>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:center; padding:5px; border-radius:6px; font-size:9.5px; font-weight:900; text-transform:uppercase; letter-spacing:0.5px; ${statusBannerStyle}">
+                ${statusLabel}
+              </div>
             </div>
           `;
 
@@ -1055,18 +1102,18 @@ export default function DisasterListPage() {
                 });
                 group.addLayer(primaryLine);
 
-                // 2. Vẽ đường đối chứng học thuật (Dijkstra) - nét đứt màu cam nếu có
-                if (route.dijkstra) {
-                  const dijkstraLine = L.polyline(route.dijkstra, {
-                    color: '#f59e0b',
-                    weight: 2.5,
-                    dashArray: '5, 8',
-                    opacity: 0.85,
-                    lineJoin: 'round',
-                    interactive: false,
-                  });
-                  group.addLayer(dijkstraLine);
-                }
+                // 2. Vẽ đường đối chứng học thuật (Dijkstra) - nét đứt màu cam nếu có (Đã tắt theo yêu cầu)
+                // if (route.dijkstra) {
+                //   const dijkstraLine = L.polyline(route.dijkstra, {
+                //     color: '#f59e0b',
+                //     weight: 2.5,
+                //     dashArray: '5, 8',
+                //     opacity: 0.85,
+                //     lineJoin: 'round',
+                //     interactive: false,
+                //   });
+                //   group.addLayer(dijkstraLine);
+                // }
               } else {
                 // Fallback vẽ đường chim bay trong lúc đang tải tuyến đường thực tế
                 const fallbackLine = L.polyline([[team.lat, team.lng], [sos.lat, sos.lng]], {
@@ -1083,7 +1130,7 @@ export default function DisasterListPage() {
         }
       });
     }
-  }, [showFloodZones, showSos, showTeams, filteredSosRequests, filteredTeams, userLocation, showUserLocation, floodZonesGeoJSON, dbSosList, routesCache, performanceMode]);
+  }, [showFloodZones, showSos, showTeams, filteredSosRequests, filteredTeams, userLocation, showUserLocation, floodZonesGeoJSON, dbSosList, routesCache, performanceMode, isMapReady]);
 
   // Center/Zoom map on a specific SOS click from side panel
   const handleSelectSos = (sos: any) => {

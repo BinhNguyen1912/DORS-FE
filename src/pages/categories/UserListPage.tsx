@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  RefreshCw,
 } from 'lucide-react';
 import { userApi, locationApi } from '../../apis';
 import { cn } from '../../lib/utils';
@@ -84,7 +85,7 @@ export default function UserListPage() {
   }, [currentUser?.provinceId]);
 
   // Fetch users (dynamically filtered by logged in user's provinceId)
-  const { data: dbData, isLoading } = useQuery({
+  const { data: dbData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['system-users', currentUser?.provinceId],
     queryFn: () => userApi.getAll({ page: 1, limit: 300, provinceId: currentUser?.provinceId }),
   });
@@ -233,6 +234,7 @@ export default function UserListPage() {
     const roleMap: Record<string, string> = {
       SYSTEM_ADMIN: 'Admin hệ thống',
       PROVINCE_ADMIN: 'Admin tỉnh',
+      RESCUE_TEAM_LEADER: 'Đội trưởng cứu hộ',
       COORDINATOR: 'Điều phối viên',
       VOLUNTEER: 'Tình nguyện viên',
       CITIZEN: 'Công dân',
@@ -245,7 +247,7 @@ export default function UserListPage() {
     if (user.userRoles && user.userRoles.length > 0) {
       const activeRoleMap = user.userRoles.find(ur => ur.isActive) || user.userRoles[0];
       if (activeRoleMap && activeRoleMap.role) {
-        return activeRoleMap.role.name;
+        return getRoleName(activeRoleMap.role.name);
       }
     }
     return getRoleName(user.role);
@@ -483,6 +485,15 @@ export default function UserListPage() {
 
             {/* Clear filters action */}
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => refetch()}
+                disabled={isLoading || isFetching}
+                className="flex items-center justify-center p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 rounded-xl transition-all shadow-sm cursor-pointer"
+                title="Làm mới dữ liệu"
+              >
+                <RefreshCw size={14} className={cn(isFetching && "animate-spin")} />
+              </button>
               <button 
                 type="button"
                 onClick={clearFilters}

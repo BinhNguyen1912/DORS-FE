@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { RefreshCw } from 'lucide-react';
 
 import { rescueTeamApi } from '../../apis';
 import { ROUTES } from '../../constants';
@@ -103,7 +104,7 @@ export default function RescueTeamListPage() {
   const queryClient = useQueryClient();
 
   // Load database rescue teams filtered by user's provinceId
-  const { data: dbData, isLoading } = useQuery({
+  const { data: dbData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['rescue-teams', user?.provinceId],
     queryFn: () => rescueTeamApi.getAll({ page: 1, limit: 100, provinceId: user?.provinceId }),
   });
@@ -270,6 +271,15 @@ export default function RescueTeamListPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isLoading || isFetching}
+            className="flex items-center justify-center p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 rounded-xl transition-all shadow-sm cursor-pointer"
+            title="Làm mới dữ liệu"
+          >
+            <RefreshCw size={14} className={cn(isFetching && "animate-spin")} />
+          </button>
           <Link
             to={ROUTES.TEAM_SPECIALIZATION_LIST}
             className="flex items-center justify-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 font-bold text-xs rounded-xl shadow-sm transition-all"

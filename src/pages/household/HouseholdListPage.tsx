@@ -5,6 +5,8 @@ import { householdApi } from '../../apis';
 import { ROUTES } from '../../constants';
 import TableSettings from '../../components/common/TableSettings';
 import type { TableColumnDef } from '../../components/common/TableSettings';
+import { RefreshCw } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 const HOUSEHOLD_COLUMNS: TableColumnDef[] = [
   { key: 'totalMembers', label: 'Tổng số thành viên' },
@@ -28,7 +30,7 @@ export default function HouseholdListPage() {
     };
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['households', page, search],
     queryFn: () => householdApi.getAll({ page, limit: 10, search }),
   });
@@ -49,6 +51,15 @@ export default function HouseholdListPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isLoading || isFetching}
+            className="flex items-center justify-center p-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 rounded-xl transition-all shadow-sm cursor-pointer"
+            title="Làm mới dữ liệu"
+          >
+            <RefreshCw size={14} className={cn(isFetching && "animate-spin")} />
+          </button>
           <Link
             to={ROUTES.HOUSEHOLD_CREATE}
             className="flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500/90 hover:bg-amber-600/90 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all"

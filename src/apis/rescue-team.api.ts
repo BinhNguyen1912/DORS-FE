@@ -8,22 +8,31 @@ export const rescueTeamApi = {
     status?: string;
     teamType?: string;
     search?: string;
-    provinceId?: number;
+    provinceId?: number | null;
   }): Promise<PaginatedResponse<RescueTeam>> => {
-    const response = await api.get<any>('/rescue-teams', { params });
+    // Loại bỏ các trường null, undefined hoặc rỗng để tránh lỗi 400 Validation ở BE
+    const cleanedParams = params ? { ...params } : {};
+    Object.keys(cleanedParams).forEach(key => {
+      const val = cleanedParams[key as keyof typeof cleanedParams];
+      if (val === null || val === undefined || (val as any) === '') {
+        delete cleanedParams[key as keyof typeof cleanedParams];
+      }
+    });
+
+    const response = await api.get<any>('/rescue-teams', { params: cleanedParams });
     const resData = response.data?.data !== undefined ? response.data.data : response.data;
-    
+
     // Map items or data arrays from the paginated backend response
-    const items = Array.isArray(resData?.items) 
-      ? resData.items 
-      : Array.isArray(resData?.data) 
-        ? resData.data 
-        : Array.isArray(resData) 
-          ? resData 
+    const items = Array.isArray(resData?.items)
+      ? resData.items
+      : Array.isArray(resData?.data)
+        ? resData.data
+        : Array.isArray(resData)
+          ? resData
           : [];
-          
-    const total = typeof resData?.total === 'number' 
-      ? resData.total 
+
+    const total = typeof resData?.total === 'number'
+      ? resData.total
       : items.length;
 
     return {
@@ -72,10 +81,18 @@ export const rescueTeamApi = {
   },
 
   getRecentSosRequests: async (params?: {
-    provinceId?: number;
+    provinceId?: number | null;
     limit?: number;
   }): Promise<any[]> => {
-    const response = await api.get<any>('/sos-requests', { params });
+    const cleanedParams = params ? { ...params } : {};
+    Object.keys(cleanedParams).forEach(key => {
+      const val = cleanedParams[key as keyof typeof cleanedParams];
+      if (val === null || val === undefined || (val as any) === '') {
+        delete cleanedParams[key as keyof typeof cleanedParams];
+      }
+    });
+
+    const response = await api.get<any>('/sos-requests', { params: cleanedParams });
     const resData = response.data?.data !== undefined ? response.data.data : response.data;
     return Array.isArray(resData?.items)
       ? resData.items

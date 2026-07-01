@@ -18,7 +18,10 @@ const injectStyles = `
     color: #1e293b !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
     padding: 6px !important;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  }
+  .custom-theme-popup .leaflet-popup-content {
+    margin: 6px 8px 6px 8px !important;
   }
   .custom-theme-popup .leaflet-popup-tip {
     background-color: #ffffff !important;
