@@ -1041,12 +1041,14 @@
       routeMarkersGroup.clearLayers();
       routePolylineGroup.clearLayers();
 
-      // Get team location from currentTeam (handle various possible property names)
-      const teamLat = currentTeam?.lat || currentTeam?.latitude || currentTeam?.currentLocation?.lat || currentTeam?.currentLocation?.latitude || 0;
-      const teamLng = currentTeam?.lng || currentTeam?.longitude || currentTeam?.currentLocation?.lng || currentTeam?.currentLocation?.longitude || 0;
-      // Get SOS location (sos may have lat/lng or latitude/longitude)
-      const sosLat = sos?.lat || sos?.latitude || (sos?.location?.coordinates?.[1]) || 0;
-      const sosLng = sos?.lng || sos?.longitude || (sos?.location?.coordinates?.[0]) || 0;
+      // Get team location from sos directly (backend now provides teamLat/teamLng)
+      // Fall back to currentTeam if not available
+      let teamLat = sos?.teamLat || currentTeam?.lat || 0;
+      let teamLng = sos?.teamLng || currentTeam?.lng || 0;
+
+      // Get SOS location (backend now provides lat/lng directly)
+      const sosLat = sos?.lat || 0;
+      const sosLng = sos?.lng || 0;
 
       if (!teamLat || !teamLng || !sosLat || !sosLng) {
         logConsole('MAP', 'Thiếu tọa độ team hoặc SOS để vẽ tuyến đường', 'warning');
@@ -1085,9 +1087,9 @@
         })
       }).bindPopup(`SOS #${sos.id} - ${sos.requestType || 'SOS'}`).addTo(routeMarkersGroup);
 
-      // Fit bounds to show both markers
+      // Fit bounds to show both markers with generous padding so markers at edge aren't cut off
       const bounds = L.latLngBounds([[teamLat, teamLng], [sosLat, sosLng]]);
-      routeMap.fitBounds(bounds, { padding: [50, 50] });
+      routeMap.fitBounds(bounds, { padding: [120, 120], maxZoom: 15 });
 
       // Draw direct dashed line as fallback immediately
       const fallbackLine = L.polyline([[teamLat, teamLng], [sosLat, sosLng]], {
