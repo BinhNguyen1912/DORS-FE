@@ -9,6 +9,7 @@ import {
   BarChart2,
   Settings,
   FolderOpen,
+  ClipboardList,
 } from 'lucide-react';
 import { ROUTES } from '../constants';
 
@@ -51,10 +52,10 @@ export const menuItems: MenuItem[] = [
     roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN', 'RESCUE_TEAM_LEADER']
   },
   {
-    label: 'Yêu cầu trợ giúp',
-    href: '#/help-requests',
-    icon: AlertTriangle,
-    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN', 'RESCUE_TEAM_LEADER']
+    label: 'Yêu cầu (Request)',
+    href: ROUTES.SOS_REQUEST_LIST,
+    icon: ClipboardList,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN']
   },
   {
     label: 'Nhân lực & Tình nguyện',
