@@ -212,7 +212,7 @@ export default function SosRequestListPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 text-left font-sans text-gray-855 dark:text-gray-200 min-h-[calc(100vh-3.5rem)] select-none">
+    <div className="flex flex-col gap-4 text-left text-gray-855 dark:text-gray-200 min-h-[calc(100vh-3.5rem)] select-none">
       {/* 2. TAB CONTROLLER BUTTONS */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6">
         <button
@@ -306,6 +306,19 @@ export default function SosRequestListPage() {
             className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-gray-855 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl focus:outline-none focus:bg-white dark:focus:bg-gray-900 transition border-0 shadow-xs"
           />
         </div>
+
+        {(statusFilter !== 'Tất cả' || severityFilter !== 'Tất cả' || searchQuery.trim() !== '') && (
+          <button
+            onClick={() => {
+              setStatusFilter('Tất cả');
+              setSeverityFilter('Tất cả');
+              setSearchQuery('');
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition select-none cursor-pointer border-0 shadow-xs"
+          >
+            <span>Xóa bộ lọc</span>
+          </button>
+        )}
 
         <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-655 dark:text-gray-300 rounded-xl text-xs font-bold shadow-xs transition border-0">
           <Download size={14} />
