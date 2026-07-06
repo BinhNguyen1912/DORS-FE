@@ -898,7 +898,7 @@ export default function DisasterListPage() {
     };
 
     // Draw Flood Zones (polygons drawn on Canvas)
-    if (showFloodZones) {
+    if (false && showFloodZones) {
       const geojsonLayer = L.geoJSON(floodZonesGeoJSON as any, {
         interactive: false,
         style: (feature) => {
