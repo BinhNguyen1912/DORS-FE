@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Save, Loader2, Info } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Info, MapPin } from 'lucide-react';
 import { rescueTeamApi, locationApi } from '../../apis';
 import { ROUTES } from '../../constants';
 import { cn } from '../../lib/utils';
@@ -92,6 +92,8 @@ export default function RescueTeamCreatePage() {
   const provinceIdStr = watch('provinceId');
   const provinceId = provinceIdStr ? Number(provinceIdStr) : undefined;
   const selectedSpecs = watch('specializationIds') || [];
+  const adminUnitId = watch('adminUnitId');
+  const isLocationInputEnabled = !!adminUnitId;
 
   const selectedProvinceName = useMemo(() => {
     if (!provinceId) return '';
@@ -243,9 +245,9 @@ export default function RescueTeamCreatePage() {
         };
       }
 
-      await rescueTeamApi.create(submitData);
-      toast.success('Tạo đội cứu hộ mới thành công!');
-      navigate(ROUTES.RESCUE_TEAM_LIST);
+      const newTeam = await rescueTeamApi.create(submitData);
+      toast.success('Tạo đội cứu hộ mới thành công! Vui lòng thêm đội trưởng và thành viên.');
+      navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(newTeam.id)) + '?tab=members&addMember=true');
     } catch (err: any) {
       toast.api(err, 'Lỗi khi tạo đội cứu hộ');
       setError(err.response?.data?.message || 'Lỗi khi tạo đội cứu hộ');
@@ -430,13 +432,16 @@ export default function RescueTeamCreatePage() {
             value={addressText}
             onTextChange={setAddressText}
             provinceName={selectedProvinceName}
+            disabled={!isLocationInputEnabled}
             onChange={(result) => {
               setAddressText(result.address);
               setValue('baseLocationAddress', result.address);
               handleMapLocationChange(String(result.lat), String(result.lng));
             }}
             placeholder={
-              selectedProvinceName
+              !isLocationInputEnabled
+                ? 'Vui lòng chọn Quận/Huyện/Phường/Xã phía trên trước...'
+                : selectedProvinceName
                 ? `Nhập địa chỉ thuộc ${selectedProvinceName}...`
                 : 'Ví dụ: 65/15 đường 339, Phường Bình Trưng Tây, TP.HCM'
             }
@@ -444,17 +449,28 @@ export default function RescueTeamCreatePage() {
         </div>
 
         {/* Location Coordinates Card with Interactive Map */}
-        <LocationPickerMap
-          latitude={watch('latitude')}
-          longitude={watch('longitude')}
-          onChange={handleMapLocationChange}
-          isResolvingLocation={isResolvingLocation}
-          provinceId={provinceId}
-          adminUnitId={watch('adminUnitId')}
-          provinces={provinces}
-          wards={wards}
-          showSearch={false}
-        />
+        <div className="relative">
+          <LocationPickerMap
+            latitude={watch('latitude')}
+            longitude={watch('longitude')}
+            onChange={handleMapLocationChange}
+            isResolvingLocation={isResolvingLocation}
+            provinceId={provinceId}
+            adminUnitId={adminUnitId}
+            provinces={provinces}
+            wards={wards}
+            showSearch={false}
+          />
+          {!isLocationInputEnabled && (
+            <div className="absolute inset-0 bg-slate-50/75 dark:bg-gray-900/75 backdrop-blur-[1.5px] flex flex-col items-center justify-center gap-2.5 z-20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+              <MapPin size={22} className="text-indigo-500 dark:text-indigo-400 animate-bounce" />
+              <p className="text-xs font-bold text-gray-650 dark:text-gray-300 text-center px-6 leading-relaxed">
+                Vui lòng chọn Quận/Huyện/Phường/Xã ở phía trên<br />
+                để mở khóa bản đồ và ghim vị trí cứu hộ.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Specializations Card */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-100 dark:border-slate-700/60 space-y-4">

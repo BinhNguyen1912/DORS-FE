@@ -10,7 +10,7 @@ interface UnifiedRescueTeam {
   leaderName: string;
   leaderPhone: string;
   teamType: string;
-  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY';
+  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY' | 'DISPATCHED';
   address: string;
   memberCount: string;
   activeMissions: number;
@@ -84,7 +84,7 @@ export default function RescueTeamDashboardMap({
     const activeIds = new Set<number>();
 
     const getTeamIcon = (type: string, status: string) => {
-      const isBusy = status === 'BUSY' || status === 'ON_DUTY';
+      const isBusy = status === 'BUSY' || status === 'ON_DUTY' || status === 'DISPATCHED';
 
       let baseColor = 'bg-sky-500';
       let iconClass = 'fa-solid fa-users';

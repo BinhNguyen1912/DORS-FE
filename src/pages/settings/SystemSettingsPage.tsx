@@ -11,7 +11,8 @@ import {
   Code, 
   Mail, 
   Folder,
-  Palette
+  Palette,
+  Menu
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -51,6 +52,7 @@ interface TabItem {
 
 export default function SystemSettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingTab>('general');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const tabs: TabItem[] = [
     { id: 'general', label: 'Thông tin chung', icon: Info },
@@ -100,15 +102,27 @@ export default function SystemSettingsPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col text-left py-1">
-      {/* Settings Grid Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div className="flex-1 flex flex-col text-left py-1 w-full">
+      {/* Settings Flex Panel */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
         {/* Left navigation column */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="px-2">
-            <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider select-none mb-3">
-              Cấu hình hệ thống
-            </h3>
+        <div className={cn("transition-all duration-300 flex-shrink-0", isSidebarCollapsed ? "w-12 lg:w-16" : "w-full lg:w-64")}>
+          <div className="px-1 lg:px-2">
+            <div className={cn("flex items-center justify-between mb-3 select-none", isSidebarCollapsed ? "lg:justify-center" : "")}>
+              {!isSidebarCollapsed && (
+                <h3 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                  Cấu hình hệ thống
+                </h3>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-750 rounded-lg text-gray-400 hover:text-gray-650 transition-all cursor-pointer mx-auto lg:mx-0"
+                title={isSidebarCollapsed ? "Mở rộng menu" : "Thu gọn menu"}
+              >
+                <Menu size={isSidebarCollapsed ? 18 : 15} />
+              </button>
+            </div>
             
             <nav className="space-y-1">
               {tabs.map((tab) => {
@@ -117,16 +131,19 @@ export default function SystemSettingsPage() {
                 return (
                   <button
                     key={tab.id}
+                    type="button"
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      'w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl transition-all border-l-2 cursor-pointer',
+                      'w-full flex items-center gap-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer',
+                      isSidebarCollapsed ? 'justify-center px-1 border-0' : 'px-3 border-l-2',
                       isActive
                         ? 'border-slate-900 dark:border-white text-black dark:text-white bg-slate-50/50 dark:bg-gray-800'
                         : 'border-transparent text-gray-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white hover:bg-slate-50/30'
                     )}
+                    title={isSidebarCollapsed ? tab.label : undefined}
                   >
-                    <Icon size={16} className={cn(isActive ? 'text-slate-900 dark:text-white' : 'text-gray-400')} />
-                    <span>{tab.label}</span>
+                    <Icon size={isSidebarCollapsed ? 20 : 16} className={cn(isActive ? 'text-slate-900 dark:text-white' : 'text-gray-400', isSidebarCollapsed ? '' : 'flex-shrink-0')} />
+                    {!isSidebarCollapsed && <span>{tab.label}</span>}
                   </button>
                 );
               })}
@@ -135,7 +152,7 @@ export default function SystemSettingsPage() {
         </div>
 
         {/* Right Tab Content Container */}
-        <div className="lg:col-span-9 bg-white dark:bg-gray-800 rounded-2xl p-6 border border-slate-100 dark:border-slate-700/60 shadow-sm">
+        <div className="flex-1 w-full bg-white dark:bg-gray-800 rounded-2xl p-6 border border-slate-100 dark:border-slate-700/60 shadow-sm">
           {renderTabContent()}
         </div>
       </div>

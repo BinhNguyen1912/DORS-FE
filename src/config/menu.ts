@@ -16,7 +16,8 @@ export interface MenuItem {
   label: string;
   href: string;
   icon: React.ComponentType<any>;
-  children?: { label: string; href: string }[];
+  roles?: string[]; // Allowed roles (empty means allowed for all)
+  children?: { label: string; href: string; roles?: string[] }[];
 }
 
 export const menuItems: MenuItem[] = [
@@ -25,17 +26,58 @@ export const menuItems: MenuItem[] = [
     label: 'Danh mục',
     href: '#/categories',
     icon: FolderOpen,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'],
     children: [
-      { label: 'Thành Viên', href: ROUTES.USER_LIST },
-      { label: 'Chức danh', href: ROUTES.ROLE_LIST },
+      { label: 'Thành Viên', href: ROUTES.USER_LIST, roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
+      { label: 'Chức danh', href: ROUTES.ROLE_LIST, roles: ['SYSTEM_ADMIN'] },
     ],
   },
-  { label: 'Bản đồ cứu hộ', href: ROUTES.DISASTER_LIST, icon: Map }, // Currently using disaster list as placeholder
-  { label: 'Đội cứu hộ', href: ROUTES.RESCUE_TEAM_DASHBOARD, icon: Users },
-  { label: 'Nhiệm vụ', href: '#/missions', icon: Briefcase },
-  { label: 'Yêu cầu trợ giúp', href: '#/help-requests', icon: AlertTriangle },
-  { label: 'Nhân lực & Tình nguyện', href: '#/volunteer', icon: UserCheck },
-  { label: 'Thiết bị & Phương tiện', href: '#/equipment', icon: Truck },
-  { label: 'Báo cáo & Thống kê', href: '#/reports', icon: BarChart2 },
-  { label: 'Cài đặt hệ thống', href: ROUTES.SETTINGS, icon: Settings },
+  {
+    label: 'Bản đồ cứu hộ',
+    href: ROUTES.DISASTER_LIST,
+    icon: Map,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN', 'RESCUE_TEAM_LEADER', 'USER', 'VOLUNTEER']
+  },
+  {
+    label: 'Đội cứu hộ',
+    href: ROUTES.RESCUE_TEAM_DASHBOARD,
+    icon: Users,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN', 'RESCUE_TEAM_LEADER']
+  },
+  {
+    label: 'Nhiệm vụ',
+    href: '#/missions',
+    icon: Briefcase,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN', 'RESCUE_TEAM_LEADER']
+  },
+  {
+    label: 'Yêu cầu trợ giúp',
+    href: '#/help-requests',
+    icon: AlertTriangle,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN', 'RESCUE_TEAM_LEADER']
+  },
+  {
+    label: 'Nhân lực & Tình nguyện',
+    href: '#/volunteer',
+    icon: UserCheck,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN']
+  },
+  {
+    label: 'Thiết bị & Phương tiện',
+    href: '#/equipment',
+    icon: Truck,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN', 'RESCUE_TEAM_LEADER']
+  },
+  {
+    label: 'Báo cáo & Thống kê',
+    href: '#/reports',
+    icon: BarChart2,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN']
+  },
+  {
+    label: 'Cài đặt hệ thống',
+    href: ROUTES.SETTINGS,
+    icon: Settings,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN']
+  },
 ];

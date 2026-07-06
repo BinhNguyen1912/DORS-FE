@@ -15,13 +15,6 @@ interface UserFormModalProps {
   onSaveSuccess: () => void;
 }
 
-const roleFriendlyNames: Record<string, string> = {
-  SYSTEM_ADMIN: 'Quản trị viên hệ thống',
-  PROVINCE_ADMIN: 'Quản trị viên cấp tỉnh',
-  RESCUE_TEAM_LEADER: 'Đội trưởng đội cứu hộ',
-  USER: 'Người dùng thường',
-  VOLUNTEER: 'Tình nguyện viên',
-};
 
 export default function UserFormModal({
   isOpen,
@@ -594,7 +587,7 @@ export default function UserFormModal({
               >
                 {roles.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {roleFriendlyNames[r.name] || r.description || r.name}
+                    {r.description || r.name}
                   </option>
                 ))}
               </select>

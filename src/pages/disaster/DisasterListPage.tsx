@@ -404,6 +404,29 @@ export default function DisasterListPage() {
   // Parse Teams from API
   const parsedTeams = useMemo(() => {
     if (!dbTeamsList?.data || !Array.isArray(dbTeamsList.data)) return [];
+
+    const selectedSos = selectedSosId
+      ? parsedSosRequests.find((s) => s.id === selectedSosId)
+      : null;
+
+    const sosLoc = selectedSos?.location?.coordinates;
+    const sosLng = sosLoc?.[0];
+    const sosLat = sosLoc?.[1];
+
+    const calculateHaversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 6371; // km
+      const dLat = (lat2 - lat1) * (Math.PI / 180);
+      const dLon = (lon2 - lon1) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) *
+          Math.cos(lat2 * (Math.PI / 180)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
     return dbTeamsList.data.map((team: any) => {
       let lat = defaultCenter[0];
       let lng = defaultCenter[1];
@@ -411,6 +434,15 @@ export default function DisasterListPage() {
       if (loc?.coordinates && Array.isArray(loc.coordinates)) {
         lng = loc.coordinates[0];
         lat = loc.coordinates[1];
+      }
+
+      let distanceText = '—';
+      if (sosLat && sosLng && lat && lng) {
+        const dist = calculateHaversineDistance(sosLat, sosLng, lat, lng);
+        distanceText = `Cách ${dist.toFixed(1)} km`;
+      } else {
+        const dist = calculateHaversineDistance(defaultCenter[0], defaultCenter[1], lat, lng);
+        distanceText = `Cách ${dist.toFixed(1)} km (từ trung tâm)`;
       }
 
       return {
@@ -424,10 +456,10 @@ export default function DisasterListPage() {
         phone: team.leader?.phone || team.leaderPhone || team.phone || 'Chưa có SĐT',
         leaderName: team.leader?.fullName || team.leaderCitizenName || 'Chưa cập nhật',
         address: team.adminUnit?.name ? `${team.adminUnit.name}, ${provinceName}` : (team.address || provinceName),
-        distanceText: `Cách ${Math.min(25, Math.max(2, (team.id % 10) * 2.3 + 1.2)).toFixed(1)} km`,
+        distanceText,
       };
     });
-  }, [dbTeamsList, defaultCenter, provinceName]);
+  }, [dbTeamsList, defaultCenter, provinceName, selectedSosId, parsedSosRequests]);
 
   // Lists for bottom monitoring dashboard
   const availableTeams = useMemo(() => {
