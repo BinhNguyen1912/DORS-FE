@@ -280,17 +280,17 @@ export default function DisasterListPage() {
       const label = statusLabels[payload.status] || payload.status;
 
       if (payload.status === 'RESOLVED') {
-        toast.success(`✓ SOS-2024-${payload.sosId} đã được xử lý thành công!`);
+        toast.success(`✓ SOS-2026-${payload.sosId} đã được xử lý thành công!`);
       } else if (payload.status === 'CANCELLED') {
-        toast.info(`✕ SOS-2024-${payload.sosId} đã bị hủy.`);
+        toast.info(`✕ SOS-2026-${payload.sosId} đã bị hủy.`);
       } else {
-        toast.info(`🔔 Trạng thái SOS-2024-${payload.sosId} cập nhật thành: ${label}`);
+        toast.info(`🔔 Trạng thái SOS-2026-${payload.sosId} cập nhật thành: ${label}`);
       }
     };
 
     const handleNoTeam = (payload: { sosId: number; message: string }) => {
       console.log('📡 [WS] No team available:', payload);
-      toast.error(`⚠️ BÁO ĐỘNG: SOS-2024-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
+      toast.error(`⚠️ BÁO ĐỘNG: SOS-2026-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
     };
 
     dispatchSocket.on(DISPATCH_EVENTS.SOS_CREATED, handleNewSos);
@@ -381,7 +381,7 @@ export default function DisasterListPage() {
 
         return {
           id: sos.id,
-          code: `SOS-2024-${sos.id}`,
+          code: `SOS-2026-${sos.id}`,
           severity: (sos.severity || 'MEDIUM') as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
           lat,
           lng,
@@ -553,7 +553,7 @@ export default function DisasterListPage() {
     },
     onSuccess: (newSos) => {
       queryClient.invalidateQueries({ queryKey: ['db-sos-requests'] });
-      toast.success(`Đã tạo yêu cầu SOS khẩn cấp thành công! Mã: SOS-2024-${newSos.id}`);
+      toast.success(`Đã tạo yêu cầu SOS khẩn cấp thành công! Mã: SOS-2026-${newSos.id}`);
       setIsCreateModalOpen(false);
       resetCreateForm();
     },
@@ -1198,10 +1198,10 @@ export default function DisasterListPage() {
   const activeMissions = useMemo(() => {
     const busyTeams = parsedTeams.filter(t => t.status === 'BUSY' || t.status === 'ON_DUTY');
     return busyTeams.map((team, idx) => ({
-      id: `NV-2024-${team.id}`,
+      id: `NV-${team.id}`,
       status: 'Đang thực hiện',
       teamName: team.name,
-      sosCode: `SOS-2024-${idx + 100}`,
+      sosCode: `SOS-2026-${idx + 100}`,
       progress: Math.min(95, Math.max(30, (team.id % 7) * 11 + 27)),
     }));
   }, [parsedTeams]);
@@ -1886,7 +1886,7 @@ export default function DisasterListPage() {
                             <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100/30 dark:border-slate-800/30">
                               <div className="flex items-center gap-2.5">
                                 <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">{team.distanceText.replace('Cách ', '')}</span>
-                                <span className="text-[9px] font-extrabold text-red-500 truncate max-w-[80px]">{activeSos?.code || 'SOS-2024'}</span>
+                                <span className="text-[9px] font-extrabold text-red-500 truncate max-w-[80px]">{activeSos?.code || 'SOS-2026'}</span>
                               </div>
                               <button
                                 onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
@@ -2320,7 +2320,7 @@ export default function DisasterListPage() {
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2 mb-3 flex-shrink-0">
             <h3 className="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wider">Thống kê nhanh hôm nay</h3>
           </div>
-          <div className="grid grid-cols-2 gap-2 flex-1">
+          <div className="flex flex-col gap-2 flex-1 justify-center">
             <div className="bg-slate-50/50 dark:bg-[#0d1527] border border-[#ef4444]/15 p-2.5 rounded-xl flex flex-col justify-center text-left">
               <p className="text-[9px] text-gray-400 font-bold uppercase leading-none mb-1">SOS 24h qua</p>
               <p className="text-base font-black text-red-500 leading-none">{quickStats.newSos}</p>
@@ -2337,12 +2337,6 @@ export default function DisasterListPage() {
               <p className="text-[9px] text-gray-400 font-bold uppercase leading-none mb-1">Người được cứu</p>
               <p className="text-base font-black text-blue-600 dark:text-blue-450 leading-none">{quickStats.rescuedPeople}</p>
               <p className="text-[8px] text-gray-400 dark:text-gray-500 font-bold mt-1.5 leading-none">Trong các vụ SOS</p>
-            </div>
-
-            <div className="bg-slate-50/50 dark:bg-[#0d1527] border border-indigo-500/15 p-2.5 rounded-xl flex flex-col justify-center text-left">
-              <p className="text-[9px] text-gray-400 font-bold uppercase leading-none mb-1">Vùng ngập dự tính</p>
-              <p className="text-base font-black text-indigo-600 dark:text-indigo-400 leading-none">{quickStats.floodArea}</p>
-              <p className="text-[8px] text-gray-400 dark:text-gray-500 font-bold mt-1.5 leading-none">Tỷ lệ tương đối</p>
             </div>
           </div>
         </div>
