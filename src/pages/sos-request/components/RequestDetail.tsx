@@ -252,9 +252,9 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
       {/* Detail Content Boxes */}
       <div className="flex-1 min-h-0">
         {detailTab === 'info' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-            {/* Left details (col-span-7) */}
-            <div className="md:col-span-7 flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row gap-5">
+            {/* Left details */}
+            <div className="flex-1 flex flex-col gap-3 min-w-0">
               <div>
                 <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Vị trí báo cáo</h4>
                 <p className="text-xs font-extrabold text-gray-900 dark:text-white leading-relaxed">
@@ -295,8 +295,8 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
               </div>
             </div>
 
-            {/* Right extra info (col-span-5) */}
-            <div className="md:col-span-5 flex flex-col gap-4">
+            {/* Right extra info */}
+            <div className="w-full md:w-[260px] lg:w-[300px] flex-shrink-0 flex flex-col gap-4">
               {/* Pictures teaser panel */}
               <div className="border border-slate-150 dark:border-gray-800 rounded-2xl p-3 flex flex-col gap-2.5 bg-slate-50/20">
                 <div className="flex items-center justify-between select-none">
