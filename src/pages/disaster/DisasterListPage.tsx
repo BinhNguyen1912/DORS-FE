@@ -245,7 +245,7 @@ export default function DisasterListPage() {
       });
 
       // Show notification to user
-      toast.warning(`🚨 SOS MỚI: Yêu cầu từ ${sos.requesterName || 'Người dân'} (SĐT: ${sos.requesterPhone || 'Chưa cập nhật'}) tại ${sos.addressDetail || sos.adminUnit?.name || 'Vị trí hiện trường'}`);
+      toast.warning(`SOS MỚI: Yêu cầu từ ${sos.requesterName || 'Người dân'} (SĐT: ${sos.requesterPhone || 'Chưa cập nhật'}) tại ${sos.addressDetail || sos.adminUnit?.name || 'Vị trí hiện trường'}`);
     };
 
     const handleSosStatusUpdated = (payload: { sosId: number; status: string; assignedTeamId?: number; distanceMeters?: number }) => {
@@ -280,17 +280,17 @@ export default function DisasterListPage() {
       const label = statusLabels[payload.status] || payload.status;
 
       if (payload.status === 'RESOLVED') {
-        toast.success(`✓ SOS-2026-${payload.sosId} đã được xử lý thành công!`);
+        toast.success(`SOS-2026-${payload.sosId} đã được xử lý thành công!`);
       } else if (payload.status === 'CANCELLED') {
-        toast.info(`✕ SOS-2026-${payload.sosId} đã bị hủy.`);
+        toast.info(`SOS-2026-${payload.sosId} đã bị hủy.`);
       } else {
-        toast.info(`🔔 Trạng thái SOS-2026-${payload.sosId} cập nhật thành: ${label}`);
+        toast.info(`Trạng thái SOS-2026-${payload.sosId} cập nhật thành: ${label}`);
       }
     };
 
     const handleNoTeam = (payload: { sosId: number; message: string }) => {
       console.log('📡 [WS] No team available:', payload);
-      toast.error(`⚠️ BÁO ĐỘNG: SOS-2026-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
+      toast.error(`BÁO ĐỘNG: SOS-2026-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
     };
 
     dispatchSocket.on(DISPATCH_EVENTS.SOS_CREATED, handleNewSos);
