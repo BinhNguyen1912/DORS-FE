@@ -247,6 +247,14 @@ export default function SosRequestListPage() {
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
               : "text-gray-500 hover:text-gray-800 dark:hover:text-white"
           )}
+        >
+          <FileText size={16} />
+          <span>Yêu cầu gửi hồ sơ</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black leading-none bg-slate-100 text-gray-500 dark:bg-gray-800">
+            0
+          </span>
+        </button>
+      </div>
       {/* 3. FILTERS & SEARCH ROW */}
       <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-900 p-3.5 rounded-2xl shadow-xs border-0">
         <div className="flex items-center gap-2">

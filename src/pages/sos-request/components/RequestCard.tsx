@@ -23,10 +23,10 @@ export default function RequestCard({ request, isSelected, onClick }: RequestCar
     <div
       onClick={onClick}
       className={cn(
-        "p-3.5 rounded-2xl transition duration-150 cursor-pointer text-left relative flex flex-col gap-2 border-0 select-none",
+        "p-3.5 rounded-none transition duration-150 cursor-pointer text-left relative flex flex-col gap-2 border-0 select-none",
         isSelected
           ? "bg-slate-100/70 dark:bg-gray-800"
-          : "hover:bg-slate-50/70 dark:hover:bg-gray-850/50"
+          : "hover:bg-slate-50/70 dark:hover:bg-gray-855/50"
       )}
     >
       {/* Indicator red dot if PENDING */}
