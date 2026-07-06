@@ -247,23 +247,14 @@ export default function SosRequestListPage() {
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
               : "text-gray-500 hover:text-gray-800 dark:hover:text-white"
           )}
-        >
-          <FileText size={16} />
-          <span>Yêu cầu gửi hồ sơ</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black leading-none bg-slate-100 text-gray-500 dark:bg-gray-800">
-            0
-          </span>
-        </button>
-      </div>
-
       {/* 3. FILTERS & SEARCH ROW */}
-      <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 p-3.5 rounded-2xl shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-900 p-3.5 rounded-2xl shadow-xs border-0">
         <div className="flex items-center gap-2">
           {/* Status Dropdown */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-50 dark:bg-gray-850 border border-slate-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
+            className="bg-slate-50 dark:bg-gray-855 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none cursor-pointer border-0 shadow-xs"
           >
             <option value="Tất cả">Tất cả trạng thái</option>
             <option value="Mới tiếp nhận">Mới tiếp nhận</option>
@@ -277,7 +268,7 @@ export default function SosRequestListPage() {
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
-            className="bg-slate-50 dark:bg-gray-855 border border-slate-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
+            className="bg-slate-50 dark:bg-gray-855 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none cursor-pointer border-0 shadow-xs"
           >
             <option value="Tất cả">Tất cả mức độ</option>
             <option value="Mức độ: Cao">Mức độ: Cao</option>
@@ -289,7 +280,7 @@ export default function SosRequestListPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="bg-slate-50 dark:bg-gray-855 border border-slate-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none cursor-pointer"
+            className="bg-slate-50 dark:bg-gray-855 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none cursor-pointer border-0 shadow-xs"
           >
             <option value="newest">Ngày tạo: Mới nhất</option>
             <option value="oldest">Ngày tạo: Cũ nhất</option>
@@ -304,11 +295,11 @@ export default function SosRequestListPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm kiếm theo nội dung, mã, SĐT..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-gray-855 border border-slate-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-gray-900 transition"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-gray-855 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl focus:outline-none focus:bg-white dark:focus:bg-gray-900 transition border-0 shadow-xs"
           />
         </div>
 
-        <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 dark:bg-gray-800 dark:hover:bg-gray-750 border border-slate-200 dark:border-gray-700 text-gray-650 dark:text-gray-300 rounded-xl text-xs font-bold shadow-sm transition">
+        <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-655 dark:text-gray-300 rounded-xl text-xs font-bold shadow-xs transition border-0">
           <Download size={14} />
           <span>Xuất dữ liệu</span>
         </button>
@@ -316,19 +307,19 @@ export default function SosRequestListPage() {
 
       {/* 4. MAIN CONTAINER GRID: LIST & DETAILS */}
       {activeSubTab === 'HO_SO' ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-3xl p-12 text-center">
+        <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-3xl p-12 text-center shadow-xs">
           <FileText className="text-gray-300 dark:text-gray-650 mb-3" size={48} />
           <h3 className="text-sm font-extrabold text-gray-550 dark:text-gray-400">Không có yêu cầu gửi hồ sơ</h3>
           <p className="text-xs text-gray-400 dark:text-gray-550 mt-1 max-w-sm">Hiện tại chưa có hồ sơ nào được yêu cầu gửi lên hệ thống.</p>
         </div>
       ) : filteredRequests.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-3xl p-12 text-center">
+        <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-3xl p-12 text-center shadow-xs">
           <AlertTriangle className="text-gray-300 dark:text-gray-655 mb-3" size={48} />
           <h3 className="text-sm font-extrabold text-gray-550 dark:text-gray-400">Không tìm thấy yêu cầu</h3>
           <p className="text-xs text-gray-400 dark:text-gray-550 mt-1">Vui lòng kiểm tra lại bộ lọc hoặc từ khóa tìm kiếm.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch bg-white dark:bg-gray-900 rounded-3xl overflow-hidden shadow-sm border-0">
           {/* LEFT LIST COLUMN (col-span-4) */}
           <div className="lg:col-span-4 border-r border-slate-100 dark:border-gray-800 pr-4">
             <RequestList
