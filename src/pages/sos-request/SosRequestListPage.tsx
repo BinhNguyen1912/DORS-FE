@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import {
   ClipboardList,
   Search,
   Download,
   AlertTriangle,
   FileText,
+  CalendarRange,
 } from 'lucide-react';
-import { sosApi } from '../../apis';
 import { toast } from '../../stores';
 import { cn } from '../../lib/utils';
 import RequestList from './components/RequestList';
@@ -15,12 +15,11 @@ import RequestDetail from './components/RequestDetail';
 import { MOCK_REQUESTS, type SosRequestItem } from './components/mockData';
 
 export default function SosRequestListPage() {
-  const queryClient = useQueryClient();
-
-  // Local state to keep track of updates to mock data reactively
+  // Flood requests (citizen declarations) — completely separate from sos_request table
+  // Will be replaced by useQuery(() => floodRequestApi.getAll()) once BE is ready
   const [localMockRequests, setLocalMockRequests] = useState<SosRequestItem[]>(MOCK_REQUESTS);
 
-  // Selected sub-tab: 'NGAP_LUT' (Yêu cầu thông báo ngập lụt) or 'HO_SO' (Yêu cầu gửi hồ sơ)
+  // Selected sub-tab
   const [activeSubTab, setActiveSubTab] = useState<'NGAP_LUT' | 'HO_SO'>('NGAP_LUT');
 
   // Filter States
@@ -28,66 +27,13 @@ export default function SosRequestListPage() {
   const [severityFilter, setSeverityFilter] = useState<string>('Tất cả');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('newest');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
 
-  // Selection states
+  // Selection state
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
 
-  // Fetch SOS Requests from Backend
-  const { data: dbResponse } = useQuery({
-    queryKey: ['sos-requests-all'],
-    queryFn: () => sosApi.getAll({ limit: 100 }),
-  });
-
-  // Normalize list data by merging real DB requests with mock requests
-  const requests = useMemo(() => {
-    const dbList = dbResponse?.data || [];
-    
-    // Convert DB requests to match our UI schema
-    const parsedDbList = dbList.map((item: any) => {
-      let lat = 10.7961;
-      let lng = 106.7142;
-      if (item.location?.coordinates) {
-        lng = item.location.coordinates[0];
-        lat = item.location.coordinates[1];
-      }
-      return {
-        id: item.id,
-        code: `REQ-2026-${item.id.toString().padStart(4, '0')}`,
-        title: item.description || 'Yêu cầu cứu trợ khẩn cấp',
-        requesterName: item.requesterName || 'Người dân',
-        requesterPhone: item.requesterPhone || 'Chưa cập nhật',
-        createdAt: new Date(item.createdAt || item.created_at),
-        locationName: item.adminUnit?.name || 'Vị trí hiện trường',
-        addressDetail: item.description || 'Hiện trường SOS',
-        severity: item.severity || 'HIGH',
-        status: item.status || 'PENDING',
-        description: item.description || 'Yêu cầu cứu trợ khẩn cấp từ người dân.',
-        lat,
-        lng,
-        floodDepth: item.requiresEquipment ? '50 - 80 cm' : '20 - 40 cm',
-        estimatedArea: '~ 1.5 ha',
-        impact: 'Giao thông & Dân cư',
-        roadType: 'Đường chính',
-        source: item.source || 'Ứng dụng di động',
-        device: 'Thiết bị di động',
-        weather: 'Mưa lớn',
-        notes: item.resolutionNotes || 'Chưa có ghi chú',
-        imageUrls: item.imageUrls || [],
-        purpose: (item.purpose || 'REQUEST_SUPPORT') as 'DECLARE_ONLY' | 'REQUEST_SUPPORT',
-        isApprovedForMap: item.isApprovedForMap || false,
-      };
-    });
-
-    // Merge both, prioritizing DB items but adding Mock items so it looks rich
-    const combined = [...parsedDbList];
-    localMockRequests.forEach(mock => {
-      if (!combined.some(item => item.id === mock.id)) {
-        combined.push(mock);
-      }
-    });
-
-    return combined;
-  }, [dbResponse, localMockRequests]);
+  const requests: SosRequestItem[] = localMockRequests;
 
   // Set default selected request on load
   useEffect(() => {
@@ -100,13 +46,29 @@ export default function SosRequestListPage() {
     return requests.find(r => r.id === selectedRequestId) || null;
   }, [requests, selectedRequestId]);
 
-  // Filter requests
+  // Derived: any active filter
+  const hasActiveFilter =
+    statusFilter !== 'Tất cả' ||
+    severityFilter !== 'Tất cả' ||
+    searchQuery.trim() !== '' ||
+    dateFrom !== '' ||
+    dateTo !== '';
+
+  const clearFilters = () => {
+    setStatusFilter('Tất cả');
+    setSeverityFilter('Tất cả');
+    setSearchQuery('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  // Filter + sort
   const filteredRequests = useMemo(() => {
     if (activeSubTab === 'HO_SO') return [];
 
     return requests
       .filter(req => {
-        // Status filter
+        // Status
         if (statusFilter !== 'Tất cả') {
           const statusMap: Record<string, string> = {
             'Mới tiếp nhận': 'PENDING',
@@ -118,7 +80,7 @@ export default function SosRequestListPage() {
           if (req.status !== statusMap[statusFilter]) return false;
         }
 
-        // Severity filter
+        // Severity
         if (severityFilter !== 'Tất cả') {
           const severityMap: Record<string, string> = {
             'Mức độ: Cao': 'CRITICAL',
@@ -128,87 +90,76 @@ export default function SosRequestListPage() {
           if (req.severity !== severityMap[severityFilter]) return false;
         }
 
-        // Search query
+        // Date range
+        if (dateFrom !== '') {
+          const from = new Date(dateFrom);
+          from.setHours(0, 0, 0, 0);
+          if (req.createdAt < from) return false;
+        }
+        if (dateTo !== '') {
+          const to = new Date(dateTo);
+          to.setHours(23, 59, 59, 999);
+          if (req.createdAt > to) return false;
+        }
+
+        // Search
         if (searchQuery.trim() !== '') {
           const q = searchQuery.toLowerCase();
-          const matchTitle = req.title.toLowerCase().includes(q);
-          const matchCode = req.code.toLowerCase().includes(q);
-          const matchRequester = req.requesterName.toLowerCase().includes(q);
-          const matchPhone = req.requesterPhone.toLowerCase().includes(q);
-          if (!matchTitle && !matchCode && !matchRequester && !matchPhone) return false;
+          const match =
+            req.title.toLowerCase().includes(q) ||
+            req.code.toLowerCase().includes(q) ||
+            req.requesterName.toLowerCase().includes(q) ||
+            req.requesterPhone.toLowerCase().includes(q);
+          if (!match) return false;
         }
 
         return true;
       })
-      .sort((a, b) => {
-        if (sortBy === 'newest') {
-          return b.createdAt.getTime() - a.createdAt.getTime();
-        } else {
-          return a.createdAt.getTime() - b.createdAt.getTime();
-        }
-      });
-  }, [requests, activeSubTab, statusFilter, severityFilter, searchQuery, sortBy]);
+      .sort((a, b) =>
+        sortBy === 'newest'
+          ? b.createdAt.getTime() - a.createdAt.getTime()
+          : a.createdAt.getTime() - b.createdAt.getTime()
+      );
+  }, [requests, activeSubTab, statusFilter, severityFilter, searchQuery, sortBy, dateFrom, dateTo]);
 
-  // Assign/Auto-dispatch mutation
+  // Dispatch mutation (mock — will call floodRequestApi.dispatch() once BE ready)
   const assignTeamMutation = useMutation({
     mutationFn: async (id: number) => {
-      if (id >= 9900) {
-        // Simulated mock dispatch success
-        return { success: true, id };
-      }
-      return sosApi.assignTeam(id);
+      return { success: true, id };
     },
-    onSuccess: (res: any, id: number) => {
-      if (id >= 9900) {
-        setLocalMockRequests(prev =>
-          prev.map(item => (item.id === id ? { ...item, status: 'DISPATCHED' } : item))
-        );
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['sos-requests-all'] });
-      }
+    onSuccess: (_res, id) => {
+      setLocalMockRequests(prev =>
+        prev.map(item => (item.id === id ? { ...item, status: 'DISPATCHED' } : item))
+      );
       toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối & Đã tạo 1 SOS mới.');
     },
     onError: (err: any) => {
       toast.api(err, 'Lỗi phê duyệt yêu cầu');
-    }
+    },
   });
 
-  // Update Status mutation
+  // Update status mutation (mock)
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      if (id >= 9900) {
-        // Simulated mock update success
-        return { success: true, id, status };
-      }
-      return sosApi.updateStatus(id, { status });
+      return { success: true, id, status };
     },
-    onSuccess: (res: any, variables) => {
-      const { id, status } = variables;
-      if (id >= 9900) {
-        setLocalMockRequests(prev =>
-          prev.map(item => (item.id === id ? { ...item, status } : item))
-        );
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['sos-requests-all'] });
-      }
-      toast.success(`Đã cập nhật trạng thái yêu cầu thành công!`);
+    onSuccess: (_res, { id, status }) => {
+      setLocalMockRequests(prev =>
+        prev.map(item => (item.id === id ? { ...item, status } : item))
+      );
+      toast.success('Đã cập nhật trạng thái yêu cầu thành công!');
     },
     onError: (err: any) => {
       toast.api(err, 'Lỗi cập nhật trạng thái');
-    }
+    },
   });
 
-  // Approve for Map action
+  // Approve for Map
   const handleApproveForMap = (id: number) => {
-    if (id >= 9900) {
-      setLocalMockRequests(prev =>
-        prev.map(item => (item.id === id ? { ...item, isApprovedForMap: true } : item))
-      );
-      toast.success('Đã duyệt hiển thị điểm ngập lụt này lên bản đồ cứu hộ thành công!');
-    } else {
-      // Real request approval (simulated success locally for rich demo)
-      toast.success('Đã duyệt hiển thị điểm ngập lụt này lên bản đồ cứu hộ thành công!');
-    }
+    setLocalMockRequests(prev =>
+      prev.map(item => (item.id === id ? { ...item, isApprovedForMap: true } : item))
+    );
+    toast.success('Đã duyệt hiển thị điểm ngập lụt này lên bản đồ cứu hộ thành công!');
   };
 
   return (
@@ -255,9 +206,10 @@ export default function SosRequestListPage() {
           </span>
         </button>
       </div>
+
       {/* 3. FILTERS & SEARCH ROW */}
       <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-900 p-3.5 rounded-2xl shadow-xs border-0">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Status Dropdown */}
           <select
             value={statusFilter}
@@ -293,6 +245,28 @@ export default function SosRequestListPage() {
             <option value="newest">Ngày tạo: Mới nhất</option>
             <option value="oldest">Ngày tạo: Cũ nhất</option>
           </select>
+
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-gray-855 rounded-xl px-3 py-1.5 shadow-xs">
+            <CalendarRange size={13} className="text-gray-400 flex-shrink-0" />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              max={dateTo || undefined}
+              className="bg-transparent text-gray-700 dark:text-gray-300 text-xs font-bold focus:outline-none cursor-pointer w-[110px]"
+              title="Từ ngày"
+            />
+            <span className="text-gray-350 text-xs font-bold">—</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              min={dateFrom || undefined}
+              className="bg-transparent text-gray-700 dark:text-gray-300 text-xs font-bold focus:outline-none cursor-pointer w-[110px]"
+              title="Đến ngày"
+            />
+          </div>
         </div>
 
         {/* Search */}
@@ -307,13 +281,10 @@ export default function SosRequestListPage() {
           />
         </div>
 
-        {(statusFilter !== 'Tất cả' || severityFilter !== 'Tất cả' || searchQuery.trim() !== '') && (
+        {/* Clear Filters */}
+        {hasActiveFilter && (
           <button
-            onClick={() => {
-              setStatusFilter('Tất cả');
-              setSeverityFilter('Tất cả');
-              setSearchQuery('');
-            }}
+            onClick={clearFilters}
             className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition select-none cursor-pointer border-0 shadow-xs"
           >
             <span>Xóa bộ lọc</span>
@@ -328,13 +299,13 @@ export default function SosRequestListPage() {
 
       {/* 4. MAIN CONTAINER GRID: LIST & DETAILS */}
       {activeSubTab === 'HO_SO' ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-3xl p-12 text-center shadow-xs">
+        <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 rounded-3xl p-12 text-center shadow-xs">
           <FileText className="text-gray-300 dark:text-gray-650 mb-3" size={48} />
           <h3 className="text-sm font-extrabold text-gray-550 dark:text-gray-400">Không có yêu cầu gửi hồ sơ</h3>
           <p className="text-xs text-gray-400 dark:text-gray-550 mt-1 max-w-sm">Hiện tại chưa có hồ sơ nào được yêu cầu gửi lên hệ thống.</p>
         </div>
       ) : filteredRequests.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-3xl p-12 text-center shadow-xs">
+        <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900 rounded-3xl p-12 text-center shadow-xs">
           <AlertTriangle className="text-gray-300 dark:text-gray-655 mb-3" size={48} />
           <h3 className="text-sm font-extrabold text-gray-550 dark:text-gray-400">Không tìm thấy yêu cầu</h3>
           <p className="text-xs text-gray-400 dark:text-gray-550 mt-1">Vui lòng kiểm tra lại bộ lọc hoặc từ khóa tìm kiếm.</p>
