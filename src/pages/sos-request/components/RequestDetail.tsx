@@ -9,7 +9,7 @@ import {
   MoreVertical,
   Copy,
   ChevronDown,
-  Zap,
+  GitBranch,
   Users,
   X,
   CheckCircle,
@@ -221,8 +221,8 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
                         disabled={isAutoDispatching}
                         className="w-full text-left px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition cursor-pointer flex items-start gap-3 group disabled:opacity-60"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-blue-200 transition">
-                          {isAutoDispatching ? <Loader2 size={13} className="text-blue-600 animate-spin" /> : <Zap size={13} className="text-blue-600" />}
+                        <div className="flex-shrink-0 mt-0.5 text-blue-600 dark:text-blue-400">
+                          {isAutoDispatching ? <Loader2 size={15} className="animate-spin" /> : <GitBranch size={15} />}
                         </div>
                         <div>
                           <p className="text-xs font-extrabold text-gray-800 dark:text-white">Điều phối tự động</p>
@@ -235,8 +235,8 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
                         onClick={() => setIsManualMode(true)}
                         className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-gray-800 transition cursor-pointer flex items-start gap-3 group border-t border-slate-100 dark:border-gray-800"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 mt-0.5 group-hover:bg-slate-200 transition">
-                          <Users size={13} className="text-gray-600 dark:text-gray-300" />
+                        <div className="flex-shrink-0 mt-0.5 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition">
+                          <Users size={15} />
                         </div>
                         <div>
                           <p className="text-xs font-extrabold text-gray-800 dark:text-white">Điều phối thủ công</p>
