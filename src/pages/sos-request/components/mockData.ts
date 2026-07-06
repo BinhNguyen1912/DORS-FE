@@ -21,6 +21,8 @@ export interface SosRequestItem {
   weather: string;
   notes: string;
   imageUrls: string[];
+  purpose: 'DECLARE_ONLY' | 'REQUEST_SUPPORT';
+  isApprovedForMap?: boolean;
 }
 
 export const MOCK_REQUESTS: SosRequestItem[] = [
@@ -51,7 +53,8 @@ export const MOCK_REQUESTS: SosRequestItem[] = [
       'https://images.unsplash.com/photo-1488085061387-422e29b40080?auto=format&fit=crop&w=500&q=80',
       'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=500&q=80',
       'https://images.unsplash.com/photo-1492011221367-f47e3ccd77a0?auto=format&fit=crop&w=500&q=80',
-    ]
+    ],
+    purpose: 'REQUEST_SUPPORT',
   },
   {
     id: 9902,
@@ -78,7 +81,8 @@ export const MOCK_REQUESTS: SosRequestItem[] = [
     imageUrls: [
       'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=500&q=80',
       'https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=500&q=80',
-    ]
+    ],
+    purpose: 'REQUEST_SUPPORT',
   },
   {
     id: 9903,
@@ -104,7 +108,9 @@ export const MOCK_REQUESTS: SosRequestItem[] = [
     notes: 'Có chốt gác cảnh báo của dân phòng',
     imageUrls: [
       'https://images.unsplash.com/photo-1492011221367-f47e3ccd77a0?auto=format&fit=crop&w=500&q=80',
-    ]
+    ],
+    purpose: 'DECLARE_ONLY',
+    isApprovedForMap: false,
   },
   {
     id: 9904,
@@ -128,7 +134,9 @@ export const MOCK_REQUESTS: SosRequestItem[] = [
     device: 'iPhone 13',
     weather: 'Hửng nắng',
     notes: 'Người dân báo tin nước rút',
-    imageUrls: []
+    imageUrls: [],
+    purpose: 'DECLARE_ONLY',
+    isApprovedForMap: false,
   },
   {
     id: 9905,
@@ -154,6 +162,7 @@ export const MOCK_REQUESTS: SosRequestItem[] = [
     notes: 'Công nhân vệ sinh môi trường đang xử lý rác nghẹt cống',
     imageUrls: [
       'https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=500&q=80',
-    ]
+    ],
+    purpose: 'REQUEST_SUPPORT',
   }
 ];

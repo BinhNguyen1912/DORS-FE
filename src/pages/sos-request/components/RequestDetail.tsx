@@ -8,7 +8,6 @@ import {
   MoreVertical,
   Copy,
   ChevronDown,
-  FileText,
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { toast } from '../../../stores';
@@ -20,14 +19,20 @@ interface RequestDetailProps {
   request: SosRequestItem;
   onVerify: (id: number) => void;
   onUpdateStatus: (id: number, status: string) => void;
+  onApproveForMap?: (id: number) => void;
 }
 
 const statusBadges: Record<string, { label: string; style: string }> = {
-  PENDING: { label: 'MỚI', style: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/30' },
-  DISPATCHED: { label: 'ĐANG XÁC MINH', style: 'bg-orange-50 text-orange-650 border-orange-200 dark:bg-orange-950/40 dark:text-orange-450 dark:border-orange-900/30' },
-  ON_SITE: { label: 'ĐÃ XÁC NHẬN', style: 'bg-emerald-50 text-emerald-650 border-emerald-250 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/30' },
-  RESOLVED: { label: 'HOÀN THÀNH', style: 'bg-blue-50 text-blue-650 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/30' },
-  CANCELLED: { label: 'ĐÃ TỪ CHỐI', style: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' },
+  PENDING: { label: 'MỚI', style: 'text-red-650 dark:text-red-400 font-extrabold' },
+  DISPATCHED: { label: 'ĐANG XÁC MINH', style: 'text-orange-600 dark:text-orange-450 font-extrabold' },
+  ON_SITE: { label: 'ĐÃ XÁC NHẬN', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
+  RESOLVED: { label: 'HOÀN THÀNH', style: 'text-blue-600 dark:text-blue-450 font-extrabold' },
+  CANCELLED: { label: 'ĐÃ TỪ CHỐI', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
+};
+
+const purposeLabels = {
+  DECLARE_ONLY: { label: 'Khai báo ngập lụt', style: 'text-blue-600 dark:text-blue-400 font-extrabold' },
+  REQUEST_SUPPORT: { label: 'Yêu cầu cứu trợ', style: 'text-rose-600 dark:text-rose-450 font-extrabold' },
 };
 
 const severityLabels: Record<string, { label: string; color: string }> = {
@@ -37,7 +42,7 @@ const severityLabels: Record<string, { label: string; color: string }> = {
   LOW: { label: 'Thấp', color: '#166534' },
 };
 
-export default function RequestDetail({ request, onVerify, onUpdateStatus }: RequestDetailProps) {
+export default function RequestDetail({ request, onVerify, onUpdateStatus, onApproveForMap }: RequestDetailProps) {
   const [detailTab, setDetailTab] = useState<'info' | 'images' | 'history'>('info');
   const [isVerifyDropdownOpen, setIsVerifyDropdownOpen] = useState(false);
 
@@ -100,15 +105,19 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
   };
 
   return (
-    <div className="lg:col-span-8 bg-white dark:bg-gray-900 border border-slate-150 dark:border-gray-800 rounded-3xl p-5 flex flex-col gap-4 max-h-[660px] overflow-y-auto no-scrollbar shadow-sm">
+    <div className="bg-white dark:bg-gray-900 p-5 flex flex-col gap-4 h-[660px] overflow-hidden select-none border-0">
       {/* Header Box */}
-      <div className="flex items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-gray-900 dark:text-white tracking-wide uppercase">
+      <div className="flex items-start justify-between gap-4 pb-3 border-0">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <span className="text-[10px] font-black text-gray-900 dark:text-white tracking-wide uppercase">
               {request.code}
             </span>
-            <span className={cn("px-1.5 py-0.2 text-[8px] font-black uppercase rounded border", statusBadges[request.status]?.style)}>
+            <span className={cn("text-[9px] uppercase tracking-wider", purposeLabels[request.purpose]?.style)}>
+              {purposeLabels[request.purpose]?.label}
+            </span>
+            <span className="text-gray-300 dark:text-gray-700">•</span>
+            <span className={cn("text-[9px] uppercase tracking-wider", statusBadges[request.status]?.style)}>
               {statusBadges[request.status]?.label}
             </span>
           </div>
@@ -118,66 +127,82 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
         </div>
 
         <div className="flex items-center gap-2 relative">
-          <div className="relative">
-            <button
-              onClick={() => setIsVerifyDropdownOpen(!isVerifyDropdownOpen)}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition duration-150 flex items-center gap-1 shadow-sm select-none cursor-pointer"
-            >
-              <span>Xác minh & xử lý</span>
-              <ChevronDown size={12} className={cn("transition-transform duration-200", isVerifyDropdownOpen ? "rotate-180" : "")} />
-            </button>
+          {request.purpose === 'REQUEST_SUPPORT' ? (
+            <div className="relative">
+              <button
+                onClick={() => setIsVerifyDropdownOpen(!isVerifyDropdownOpen)}
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-750 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider transition duration-150 flex items-center gap-1 shadow-xs select-none cursor-pointer"
+              >
+                <span>Điều phối cứu trợ</span>
+                <ChevronDown size={11} className={cn("transition-transform duration-200", isVerifyDropdownOpen ? "rotate-180" : "")} />
+              </button>
 
-            {isVerifyDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl shadow-xl z-20 py-1 overflow-hidden animate-fade-in font-bold text-xs">
-                <button
-                  onClick={() => {
-                    onVerify(request.id);
-                    setIsVerifyDropdownOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition cursor-pointer"
-                >
-                  Phê duyệt & Điều phối live
-                </button>
-                <button
-                  onClick={() => {
-                    onUpdateStatus(request.id, 'ON_SITE');
-                    setIsVerifyDropdownOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition cursor-pointer"
-                >
-                  Đánh dấu đã tiếp cận
-                </button>
-                <button
-                  onClick={() => {
-                    onUpdateStatus(request.id, 'RESOLVED');
-                    setIsVerifyDropdownOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition cursor-pointer"
-                >
-                  Hoàn tất xử lý
-                </button>
-                <hr className="border-slate-100 dark:border-gray-700 my-1" />
-                <button
-                  onClick={() => {
-                    onUpdateStatus(request.id, 'CANCELLED');
-                    setIsVerifyDropdownOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 transition cursor-pointer"
-                >
-                  Từ chối / Hủy yêu cầu
-                </button>
-              </div>
-            )}
-          </div>
+              {isVerifyDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-slate-100 dark:border-gray-800 rounded-xl shadow-xl z-20 py-1 overflow-hidden animate-fade-in font-bold text-[11px]">
+                  <button
+                    onClick={() => {
+                      onVerify(request.id);
+                      setIsVerifyDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition cursor-pointer"
+                  >
+                    Điều phối tự động (Auto)
+                  </button>
+                  <button
+                    onClick={() => {
+                      onVerify(request.id);
+                      setIsVerifyDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition cursor-pointer"
+                  >
+                    Điều phối thủ công (Manual)
+                  </button>
+                  <hr className="border-slate-100 dark:border-gray-800 my-1" />
+                  <button
+                    onClick={() => {
+                      onUpdateStatus(request.id, 'CANCELLED');
+                      setIsVerifyDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-red-955/30 text-red-650 dark:text-red-400 transition cursor-pointer"
+                  >
+                    Từ chối / Hủy yêu cầu
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              {request.isApprovedForMap ? (
+                <span className="px-3.5 py-2 bg-emerald-50 text-emerald-650 dark:bg-emerald-950/20 dark:text-emerald-450 rounded-xl text-[11px] font-extrabold select-none">
+                  Đã hiển thị trên bản đồ
+                </span>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onApproveForMap?.(request.id)}
+                    className="px-3.5 py-2 bg-emerald-650 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider transition duration-150 shadow-xs select-none cursor-pointer"
+                  >
+                    Duyệt lên bản đồ
+                  </button>
+                  <button
+                    onClick={() => onUpdateStatus(request.id, 'CANCELLED')}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-slate-700 dark:text-slate-350 rounded-xl text-[11px] font-bold uppercase tracking-wider transition duration-150 shadow-xs select-none cursor-pointer"
+                  >
+                    Từ chối
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
-          <button className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 border border-slate-200 dark:border-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-xl transition">
-            <MoreVertical size={16} />
+          <button className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-xl transition">
+            <MoreVertical size={15} />
           </button>
         </div>
       </div>
 
       {/* Informative Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-slate-50/50 dark:bg-[#0d1527] border border-slate-100 dark:border-gray-800/80 p-4 rounded-2xl text-[11px] text-gray-500 font-semibold">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-slate-50/50 dark:bg-[#0d1527] p-4 rounded-2xl text-[11px] text-gray-500 font-semibold border-0">
         <div>
           <p className="text-[9px] uppercase tracking-wider text-gray-400 block mb-1">Người gửi</p>
           <p className="text-gray-900 dark:text-white font-normal flex items-center gap-1">
@@ -219,7 +244,7 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
       </div>
 
       {/* Sub-tab view buttons */}
-      <div className="flex border-b border-slate-100 dark:border-slate-800 gap-4 text-xs font-bold">
+      <div className="flex gap-4 text-xs font-bold border-0">
         <button
           onClick={() => setDetailTab('info')}
           className={cn(
@@ -257,48 +282,48 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
             <div className="flex-1 flex flex-col gap-3 min-w-0">
               <div>
                 <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Vị trí báo cáo</h4>
-                <p className="text-xs font-extrabold text-gray-900 dark:text-white leading-relaxed">
+                <p className="text-xs font-normal text-black dark:text-white leading-relaxed">
                   {request.addressDetail}
                 </p>
               </div>
 
               {/* Mini leaflet map container */}
-              <div className="border border-slate-200 dark:border-gray-800 rounded-2xl h-44 overflow-hidden shadow-inner relative z-0">
+              <div className="border-0 rounded-2xl h-32 overflow-hidden shadow-inner relative z-0 bg-slate-50 dark:bg-gray-850">
                 <div id="mini-leaflet-map" ref={mapContainerRef} className="w-full h-full animate-fade-in" />
               </div>
 
               <div>
                 <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Mô tả</h4>
-                <p className="text-xs text-gray-650 dark:text-gray-300 leading-relaxed bg-slate-50 dark:bg-gray-850 p-3 rounded-xl">
+                <p className="text-xs text-gray-650 dark:text-gray-300 leading-relaxed bg-slate-50 dark:bg-gray-850 p-2.5 rounded-xl">
                   {request.description}
                 </p>
               </div>
 
               {/* Specs specifications */}
-              <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800 pt-3">
-                <div className="flex items-center justify-between border border-slate-100 dark:border-gray-800 p-2.5 rounded-xl text-xs font-bold">
-                  <span className="text-gray-400">Mức độ ngập</span>
+              <div className="grid grid-cols-2 gap-2.5 border-t border-slate-100/60 dark:border-gray-800/60 pt-3">
+                <div className="flex items-center justify-between bg-slate-50/50 dark:bg-gray-850 p-2 rounded-xl text-xs font-normal border-0 text-black dark:text-white">
+                  <span className="text-gray-450 dark:text-gray-400">Mức độ ngập</span>
                   <span className="text-red-500 font-extrabold">{request.floodDepth}</span>
                 </div>
-                <div className="flex items-center justify-between border border-slate-100 dark:border-gray-800 p-2.5 rounded-xl text-xs font-bold">
-                  <span className="text-gray-400">Diện tích ước tính</span>
-                  <span className="text-gray-700 dark:text-white font-extrabold">{request.estimatedArea}</span>
+                <div className="flex items-center justify-between bg-slate-50/50 dark:bg-gray-850 p-2 rounded-xl text-xs font-normal border-0 text-black dark:text-white">
+                  <span className="text-gray-450 dark:text-gray-400">Diện tích ước tính</span>
+                  <span>{request.estimatedArea}</span>
                 </div>
-                <div className="flex items-center justify-between border border-slate-100 dark:border-gray-800 p-2.5 rounded-xl text-xs font-bold">
-                  <span className="text-gray-400">Ảnh hưởng</span>
-                  <span className="text-gray-700 dark:text-white font-extrabold">{request.impact}</span>
+                <div className="flex items-center justify-between bg-slate-50/50 dark:bg-gray-850 p-2 rounded-xl text-xs font-normal border-0 text-black dark:text-white">
+                  <span className="text-gray-450 dark:text-gray-400">Ảnh hưởng</span>
+                  <span>{request.impact}</span>
                 </div>
-                <div className="flex items-center justify-between border border-slate-100 dark:border-gray-800 p-2.5 rounded-xl text-xs font-bold">
-                  <span className="text-gray-400">Loại đường</span>
-                  <span className="text-gray-700 dark:text-white font-extrabold">{request.roadType}</span>
+                <div className="flex items-center justify-between bg-slate-50/50 dark:bg-gray-850 p-2 rounded-xl text-xs font-normal border-0 text-black dark:text-white">
+                  <span className="text-gray-450 dark:text-gray-400">Loại đường</span>
+                  <span>{request.roadType}</span>
                 </div>
               </div>
             </div>
 
             {/* Right extra info */}
-            <div className="w-full md:w-[260px] lg:w-[300px] flex-shrink-0 flex flex-col gap-4">
+            <div className="w-full md:w-[260px] lg:w-[300px] flex-shrink-0 flex flex-col gap-3">
               {/* Pictures teaser panel */}
-              <div className="border border-slate-150 dark:border-gray-800 rounded-2xl p-3 flex flex-col gap-2.5 bg-slate-50/20">
+              <div className="p-3 rounded-2xl flex flex-col gap-2.5 bg-slate-50/20 border-0">
                 <div className="flex items-center justify-between select-none">
                   <span className="text-[10px] font-bold text-gray-450 dark:text-gray-500 uppercase tracking-wider">Hình ảnh minh họa</span>
                   {request.imageUrls?.length > 0 && (
@@ -307,11 +332,11 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
                 </div>
 
                 {request.imageUrls?.length === 0 ? (
-                  <div className="py-8 text-center text-[10.5px] font-semibold text-gray-400 bg-slate-50 dark:bg-gray-850 rounded-xl">Không có hình ảnh đi kèm</div>
+                  <div className="py-6 text-center text-[10px] font-semibold text-gray-400 bg-slate-50 dark:bg-gray-850 rounded-xl">Không có hình ảnh đi kèm</div>
                 ) : (
                   <div className="grid grid-cols-2 gap-1.5 animate-fade-in">
                     {request.imageUrls.slice(0, 4).map((url, idx) => (
-                      <div key={idx} className="h-16 rounded-lg overflow-hidden border border-slate-200 dark:border-gray-850 relative z-0">
+                      <div key={idx} className="h-14 rounded-lg overflow-hidden border-0 relative z-0">
                         <img src={url} alt="flood info" className="w-full h-full object-cover" />
                       </div>
                     ))}
@@ -320,24 +345,24 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
               </div>
 
               {/* Supplementary specifications card */}
-              <div className="border border-slate-150 dark:border-gray-800 rounded-2xl p-4 flex flex-col gap-3 text-xs font-bold bg-white dark:bg-gray-900">
-                <h4 className="text-[10px] font-bold text-gray-450 dark:text-gray-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-1.5 mb-1 text-left">Thông tin bổ sung</h4>
+              <div className="p-4 rounded-2xl flex flex-col gap-2.5 text-xs font-normal text-black dark:text-white bg-slate-50/20 border-0">
+                <h4 className="text-[10px] font-bold text-gray-455 dark:text-gray-500 uppercase tracking-wider border-b border-slate-100/60 dark:border-gray-800/60 pb-1.5 mb-0.5 text-left">Thông tin bổ sung</h4>
 
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-400">Nguồn yêu cầu</span>
-                  <span className="text-gray-800 dark:text-white font-extrabold">{request.source}</span>
+                  <span className="text-gray-450 dark:text-gray-400">Nguồn yêu cầu</span>
+                  <span>{request.source}</span>
                 </div>
 
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-400">Thiết bị gửi</span>
-                  <span className="text-gray-800 dark:text-white font-extrabold">{request.device}</span>
+                  <span className="text-gray-450 dark:text-gray-400">Thiết bị gửi</span>
+                  <span>{request.device}</span>
                 </div>
 
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-400">Tọa độ</span>
+                  <span className="text-gray-450 dark:text-gray-400">Tọa độ</span>
                   <button
                     onClick={() => handleCopyCoords(`${request.lat}, ${request.lng}`)}
-                    className="text-blue-600 hover:text-blue-700 dark:text-blue-450 font-extrabold flex items-center gap-1 cursor-pointer"
+                    className="text-blue-600 hover:text-blue-700 dark:text-blue-450 font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <span>{request.lat.toFixed(5)}, {request.lng.toFixed(5)}</span>
                     <Copy size={11} />
@@ -345,13 +370,13 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
                 </div>
 
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-400">Thời tiết lúc gửi</span>
-                  <span className="text-gray-800 dark:text-white font-extrabold">{request.weather}</span>
+                  <span className="text-gray-450 dark:text-gray-400">Thời tiết lúc gửi</span>
+                  <span>{request.weather}</span>
                 </div>
 
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-400">Ghi chú người gửi</span>
-                  <span className="text-gray-800 dark:text-white font-extrabold truncate max-w-[120px]">{request.notes}</span>
+                  <span className="text-gray-450 dark:text-gray-400">Ghi chú người gửi</span>
+                  <span className="truncate max-w-[120px]">{request.notes}</span>
                 </div>
               </div>
             </div>
@@ -359,7 +384,7 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
         )}
 
         {detailTab === 'images' && (
-          <div className="p-2 animate-fade-in">
+          <div className="p-2 animate-fade-in max-h-[380px] overflow-y-auto no-scrollbar">
             {request.imageUrls?.length === 0 ? (
               <div className="py-24 text-center text-xs font-semibold text-gray-400">Yêu cầu này không chứa tệp tin đa phương tiện nào</div>
             ) : (
@@ -375,7 +400,7 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
         )}
 
         {detailTab === 'history' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in max-h-[380px] overflow-y-auto no-scrollbar">
             <RequestHistory request={request} />
           </div>
         )}

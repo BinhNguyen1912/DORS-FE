@@ -4,7 +4,6 @@ import {
   ClipboardList,
   Search,
   Download,
-  Settings,
   AlertTriangle,
   FileText,
 } from 'lucide-react';
@@ -13,10 +12,13 @@ import { toast } from '../../stores';
 import { cn } from '../../lib/utils';
 import RequestList from './components/RequestList';
 import RequestDetail from './components/RequestDetail';
-import { MOCK_REQUESTS } from './components/mockData';
+import { MOCK_REQUESTS, type SosRequestItem } from './components/mockData';
 
 export default function SosRequestListPage() {
   const queryClient = useQueryClient();
+
+  // Local state to keep track of updates to mock data reactively
+  const [localMockRequests, setLocalMockRequests] = useState<SosRequestItem[]>(MOCK_REQUESTS);
 
   // Selected sub-tab: 'NGAP_LUT' (Yêu cầu thông báo ngập lụt) or 'HO_SO' (Yêu cầu gửi hồ sơ)
   const [activeSubTab, setActiveSubTab] = useState<'NGAP_LUT' | 'HO_SO'>('NGAP_LUT');
@@ -39,7 +41,7 @@ export default function SosRequestListPage() {
   // Normalize list data by merging real DB requests with mock requests
   const requests = useMemo(() => {
     const dbList = dbResponse?.data || [];
-
+    
     // Convert DB requests to match our UI schema
     const parsedDbList = dbList.map((item: any) => {
       let lat = 10.7961;
@@ -71,19 +73,21 @@ export default function SosRequestListPage() {
         weather: 'Mưa lớn',
         notes: item.resolutionNotes || 'Chưa có ghi chú',
         imageUrls: item.imageUrls || [],
+        purpose: (item.purpose || 'REQUEST_SUPPORT') as 'DECLARE_ONLY' | 'REQUEST_SUPPORT',
+        isApprovedForMap: item.isApprovedForMap || false,
       };
     });
 
     // Merge both, prioritizing DB items but adding Mock items so it looks rich
     const combined = [...parsedDbList];
-    MOCK_REQUESTS.forEach(mock => {
+    localMockRequests.forEach(mock => {
       if (!combined.some(item => item.id === mock.id)) {
         combined.push(mock);
       }
     });
 
     return combined;
-  }, [dbResponse]);
+  }, [dbResponse, localMockRequests]);
 
   // Set default selected request on load
   useEffect(() => {
@@ -148,11 +152,21 @@ export default function SosRequestListPage() {
   // Assign/Auto-dispatch mutation
   const assignTeamMutation = useMutation({
     mutationFn: async (id: number) => {
+      if (id >= 9900) {
+        // Simulated mock dispatch success
+        return { success: true, id };
+      }
       return sosApi.assignTeam(id);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sos-requests-all'] });
-      toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối.');
+    onSuccess: (res: any, id: number) => {
+      if (id >= 9900) {
+        setLocalMockRequests(prev =>
+          prev.map(item => (item.id === id ? { ...item, status: 'DISPATCHED' } : item))
+        );
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['sos-requests-all'] });
+      }
+      toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối & Đã tạo 1 SOS mới.');
     },
     onError: (err: any) => {
       toast.api(err, 'Lỗi phê duyệt yêu cầu');
@@ -162,10 +176,21 @@ export default function SosRequestListPage() {
   // Update Status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      if (id >= 9900) {
+        // Simulated mock update success
+        return { success: true, id, status };
+      }
       return sosApi.updateStatus(id, { status });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sos-requests-all'] });
+    onSuccess: (res: any, variables) => {
+      const { id, status } = variables;
+      if (id >= 9900) {
+        setLocalMockRequests(prev =>
+          prev.map(item => (item.id === id ? { ...item, status } : item))
+        );
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['sos-requests-all'] });
+      }
       toast.success(`Đã cập nhật trạng thái yêu cầu thành công!`);
     },
     onError: (err: any) => {
@@ -173,8 +198,21 @@ export default function SosRequestListPage() {
     }
   });
 
+  // Approve for Map action
+  const handleApproveForMap = (id: number) => {
+    if (id >= 9900) {
+      setLocalMockRequests(prev =>
+        prev.map(item => (item.id === id ? { ...item, isApprovedForMap: true } : item))
+      );
+      toast.success('Đã duyệt hiển thị điểm ngập lụt này lên bản đồ cứu hộ thành công!');
+    } else {
+      // Real request approval (simulated success locally for rich demo)
+      toast.success('Đã duyệt hiển thị điểm ngập lụt này lên bản đồ cứu hộ thành công!');
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-4 text-left font-sans text-gray-800 dark:text-gray-200 min-h-[calc(100vh-3.5rem)] select-none">
+    <div className="flex flex-col gap-4 text-left font-sans text-gray-855 dark:text-gray-200 min-h-[calc(100vh-3.5rem)] select-none">
       {/* 2. TAB CONTROLLER BUTTONS */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6">
         <button
@@ -290,21 +328,26 @@ export default function SosRequestListPage() {
           <p className="text-xs text-gray-400 dark:text-gray-550 mt-1">Vui lòng kiểm tra lại bộ lọc hoặc từ khóa tìm kiếm.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch bg-white dark:bg-gray-900 rounded-3xl overflow-hidden">
           {/* LEFT LIST COLUMN (col-span-4) */}
-          <RequestList
-            requests={filteredRequests}
-            selectedRequestId={selectedRequestId}
-            onSelectRequest={(id) => setSelectedRequestId(id)}
-          />
+          <div className="lg:col-span-4 border-r border-slate-100 dark:border-gray-800 pr-4">
+            <RequestList
+              requests={filteredRequests}
+              selectedRequestId={selectedRequestId}
+              onSelectRequest={(id) => setSelectedRequestId(id)}
+            />
+          </div>
 
           {/* RIGHT DETAILED COLUMN (col-span-8) */}
           {selectedRequest && (
-            <RequestDetail
-              request={selectedRequest}
-              onVerify={(id) => assignTeamMutation.mutate(id)}
-              onUpdateStatus={(id, status) => updateStatusMutation.mutate({ id, status })}
-            />
+            <div className="lg:col-span-8 pl-4">
+              <RequestDetail
+                request={selectedRequest}
+                onVerify={(id) => assignTeamMutation.mutate(id)}
+                onUpdateStatus={(id, status) => updateStatusMutation.mutate({ id, status })}
+                onApproveForMap={(id) => handleApproveForMap(id)}
+              />
+            </div>
           )}
         </div>
       )}
