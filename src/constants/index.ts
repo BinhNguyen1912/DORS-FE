@@ -17,7 +17,7 @@ export const ROUTES = {
   RESCUE_TEAM_DETAIL: '/rescue-team/:id',
   TEAM_SPECIALIZATION_LIST: '/rescue-team/specialization',
   DISASTER: '/disaster',
-  DISASTER_LIST: '/disaster/list',
+  DISASTER_LIST: '/disaster/dashboard',
   DISASTER_DETAIL: '/disaster/:id',
   DONATION: '/donation',
   DONATION_LIST: '/donation/list',

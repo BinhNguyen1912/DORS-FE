@@ -150,7 +150,7 @@ export default function DisasterListPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
-  const [showUserLocation, setShowUserLocation] = useState(true);
+  const [showUserLocation, setShowUserLocation] = useState(false);
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   useEffect(() => {
@@ -311,6 +311,7 @@ export default function DisasterListPage() {
         (position) => {
           const { latitude, longitude } = position.coords;
           setUserLocation([latitude, longitude]);
+          setShowUserLocation(true);
           if (mapRef.current) {
             mapRef.current.setView([latitude, longitude], 14, { animate: true });
           }
@@ -327,8 +328,10 @@ export default function DisasterListPage() {
   };
 
   useEffect(() => {
-    requestUserLocation();
-  }, []);
+    if (showUserLocation && !userLocation) {
+      requestUserLocation();
+    }
+  }, [showUserLocation, userLocation]);
 
   useEffect(() => {
     if (!mapRef.current) return;
