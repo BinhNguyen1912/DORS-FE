@@ -180,21 +180,21 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-slate-50/50 dark:bg-[#0d1527] border border-slate-100 dark:border-gray-800/80 p-4 rounded-2xl text-[11px] text-gray-500 font-semibold">
         <div>
           <p className="text-[9px] uppercase tracking-wider text-gray-400 block mb-1">Người gửi</p>
-          <p className="text-gray-855 dark:text-white font-extrabold flex items-center gap-1">
+          <p className="text-gray-900 dark:text-white font-normal flex items-center gap-1">
             <User size={11} className="text-gray-400" />
             <span>{request.requesterName}</span>
           </p>
         </div>
         <div>
           <p className="text-[9px] uppercase tracking-wider text-gray-400 block mb-1">Số điện thoại</p>
-          <p className="text-blue-600 dark:text-blue-400 font-extrabold flex items-center gap-1">
+          <p className="text-gray-900 dark:text-white font-normal flex items-center gap-1">
             <Phone size={11} className="text-gray-400" />
             <span>{request.requesterPhone}</span>
           </p>
         </div>
         <div>
           <p className="text-[9px] uppercase tracking-wider text-gray-400 block mb-1">Thời gian gửi</p>
-          <p className="text-gray-800 dark:text-white font-extrabold flex items-center gap-1">
+          <p className="text-gray-900 dark:text-white font-normal flex items-center gap-1">
             <Clock size={11} className="text-gray-400" />
             <span>
               {request.createdAt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}{' '}
@@ -204,14 +204,14 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
         </div>
         <div>
           <p className="text-[9px] uppercase tracking-wider text-gray-400 block mb-1">Khu vực</p>
-          <p className="text-gray-800 dark:text-white font-extrabold flex items-center gap-1 truncate">
+          <p className="text-gray-900 dark:text-white font-normal flex items-center gap-1 truncate">
             <MapPin size={11} className="text-gray-400 flex-shrink-0" />
             <span className="truncate">{request.locationName}</span>
           </p>
         </div>
         <div>
           <p className="text-[9px] uppercase tracking-wider text-gray-400 block mb-1">Mức độ</p>
-          <p className="font-extrabold flex items-center gap-1.5" style={{ color: severityLabels[request.severity]?.color || '#3b82f6' }}>
+          <p className="text-gray-900 dark:text-white font-normal flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ backgroundColor: severityLabels[request.severity]?.color || '#3b82f6' }} />
             <span>{severityLabels[request.severity]?.label || request.severity}</span>
           </p>
@@ -250,7 +250,7 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus }: Req
       </div>
 
       {/* Detail Content Boxes */}
-      <div className="flex-1 min-h-0">
+      <div className="w-full">
         {detailTab === 'info' && (
           <div className="flex flex-col md:flex-row gap-5">
             {/* Left details */}

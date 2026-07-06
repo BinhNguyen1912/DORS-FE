@@ -39,7 +39,7 @@ export default function SosRequestListPage() {
   // Normalize list data by merging real DB requests with mock requests
   const requests = useMemo(() => {
     const dbList = dbResponse?.data || [];
-    
+
     // Convert DB requests to match our UI schema
     const parsedDbList = dbList.map((item: any) => {
       let lat = 10.7961;
@@ -175,20 +175,6 @@ export default function SosRequestListPage() {
 
   return (
     <div className="flex flex-col gap-4 text-left font-sans text-gray-800 dark:text-gray-200 min-h-[calc(100vh-3.5rem)] select-none">
-      {/* 1. TOP HEADER TITLE */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-black tracking-wide text-gray-900 dark:text-white flex items-center gap-2">
-            <span>Yêu cầu (Request)</span>
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold mt-0.5">Quản lý các yêu cầu gửi lên hệ thống</p>
-        </div>
-        <button className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-750 text-gray-650 dark:text-gray-300 rounded-xl text-xs font-bold shadow-sm transition">
-          <Settings size={14} />
-          <span>Cài đặt loại yêu cầu</span>
-        </button>
-      </div>
-
       {/* 2. TAB CONTROLLER BUTTONS */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6">
         <button
