@@ -812,12 +812,28 @@ export default function UserListPage() {
                             </td>
                           )}
 
-                          {/* Dynamic Roles badges */}
+                          {/* Dynamic Roles badges with inline select update */}
                           {visibleColumns.role !== false && (
-                            <td className="py-3 px-4">
-                              <span className={cn('px-2.5 py-0.5 text-[9px] font-normal rounded-lg uppercase tracking-wider whitespace-nowrap', getRoleBadge(getUserRoleName(item)))}>
-                                {getUserRoleName(item)}
-                              </span>
+                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                              <select
+                                value={getUserRoleId(item)}
+                                onChange={(e) => handleUpdateRole(item.id, Number(e.target.value))}
+                                disabled={updateRoleMutation.isPending}
+                                className={cn(
+                                  'px-2 py-0.5 text-[9.5px] font-bold rounded-lg uppercase tracking-wider cursor-pointer border-0 outline-none focus:ring-1 focus:ring-amber-500 max-w-[160px] bg-transparent',
+                                  getRoleBadge(getUserRoleName(item))
+                                )}
+                              >
+                                {roles.map(r => (
+                                  <option 
+                                    key={r.id} 
+                                    value={r.id}
+                                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs font-semibold normal-case"
+                                  >
+                                    {r.description || r.name}
+                                  </option>
+                                ))}
+                              </select>
                             </td>
                           )}
 
