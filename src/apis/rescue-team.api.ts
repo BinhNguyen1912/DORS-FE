@@ -50,19 +50,19 @@ export const rescueTeamApi = {
   },
 
   create: async (data: Partial<RescueTeam>): Promise<RescueTeam> => {
-    const response = await api.post<{ data: RescueTeam }>('/rescue-teams', data);
-    return response.data.data;
+    const response = await api.post<any>('/rescue-teams', data);
+    return response.data?.data !== undefined ? response.data.data : response.data;
   },
 
   update: async (
     id: number,
     data: Partial<RescueTeam>
   ): Promise<RescueTeam> => {
-    const response = await api.patch<{ data: RescueTeam }>(
+    const response = await api.patch<any>(
       `/rescue-teams/${id}`,
       data
     );
-    return response.data.data;
+    return response.data?.data !== undefined ? response.data.data : response.data;
   },
 
   updateLocation: async (
@@ -108,6 +108,11 @@ export const rescueTeamApi = {
     data: { status: string; resolutionNotes?: string }
   ): Promise<any> => {
     const response = await api.patch<any>(`/sos-requests/${id}/status`, data);
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
+
+  bulkUpdateStatus: async (ids: number[], status: string): Promise<{ updated: number; failed: number[] }> => {
+    const response = await api.patch<any>('/rescue-teams/bulk-status', { ids, status });
     return response.data?.data !== undefined ? response.data.data : response.data;
   },
 

@@ -22,13 +22,14 @@ import Loader from '../../components/common/Loader';
 import RescueEquipmentsTab from './components/RescueEquipmentsTab';
 
 const statusColors = {
-  AVAILABLE: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
-  BUSY: 'bg-amber-500/10 text-amber-500 border border-amber-500/20',
-  OFF_DUTY: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
-  STANDBY: 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20',
-  ACTIVE: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
-  ON_DUTY: 'bg-amber-500/10 text-amber-500 border border-amber-500/20',
-  INACTIVE: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
+  AVAILABLE: 'bg-emerald-500/10 text-emerald-500',
+  BUSY: 'bg-amber-500/10 text-amber-500',
+  OFF_DUTY: 'bg-gray-500/10 text-gray-400',
+  STANDBY: 'bg-indigo-500/10 text-indigo-500',
+  DISPATCHED: 'bg-orange-500/10 text-orange-500',
+  ACTIVE: 'bg-emerald-500/10 text-emerald-500',
+  ON_DUTY: 'bg-amber-500/10 text-amber-500',
+  INACTIVE: 'bg-gray-500/10 text-gray-400',
 };
 
 const statusLabels: Record<string, string> = {
@@ -36,6 +37,7 @@ const statusLabels: Record<string, string> = {
   BUSY: 'Đang làm nhiệm vụ',
   OFF_DUTY: 'Ngoại tuyến',
   STANDBY: 'Dự phòng',
+  DISPATCHED: 'Đang tiếp cận',
   ACTIVE: 'Sẵn sàng',
   ON_DUTY: 'Đang làm nhiệm vụ',
   INACTIVE: 'Ngoại tuyến',
@@ -55,7 +57,10 @@ export default function RescueTeamDetailPage() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'missions' | 'equipment' | 'stats' | 'history' | 'shift'>('overview');
+  const initialTab = searchParams.get('tab') as any;
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'missions' | 'equipment' | 'stats' | 'history' | 'shift'>(
+    ['overview', 'members', 'missions', 'equipment', 'stats', 'history', 'shift'].includes(initialTab) ? initialTab : 'overview'
+  );
   
   // Edit mode states
   const [isEditing, setIsEditing] = useState(searchParams.get('edit') === 'true');
@@ -94,7 +99,7 @@ export default function RescueTeamDetailPage() {
   const members = membersResponse?.data || [];
 
   // Add Member form/modal states
-  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(searchParams.get('addMember') === 'true');
   const [memberType, setMemberType] = useState<'user' | 'citizen'>('user');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [citizenName, setCitizenName] = useState('');
@@ -105,6 +110,14 @@ export default function RescueTeamDetailPage() {
   const [isUserSearchLoading, setIsUserSearchLoading] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [userDropdownSearch, setUserDropdownSearch] = useState('');
+
+  const hasLeader = !!(team?.leaderId || team?.leaderCitizenName);
+
+  useEffect(() => {
+    if (isAddMemberOpen) {
+      setRoleInTeam(hasLeader ? 'MEMBER' : 'LEADER');
+    }
+  }, [isAddMemberOpen, hasLeader]);
   
   // Delete/Role change loading states
   const [deleteMemberId, setDeleteMemberId] = useState<number | null>(null);
@@ -678,9 +691,15 @@ export default function RescueTeamDetailPage() {
                     <div className="space-y-1">
                       <div className="flex items-center flex-wrap gap-2">
                         <h2 className="text-base font-extrabold text-gray-900 dark:text-white leading-tight">{team.name}</h2>
-                        <span className="px-2 py-0.5 text-[9px] font-bold rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 uppercase">
+                        <span className="px-2 py-0.5 text-[9px] font-bold rounded-lg bg-red-500/10 text-red-500 uppercase">
                           {typeLabel}
                         </span>
+                        {!hasLeader && (
+                          <span className="px-2 py-0.5 text-[9px] font-bold rounded-lg bg-amber-500/10 text-amber-500 uppercase flex items-center gap-1">
+                            <AlertCircle size={10} />
+                            Chưa có đội trưởng
+                          </span>
+                        )}
                       </div>
                       <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">Mã đội: {displayCode}</p>
                     </div>
@@ -760,7 +779,11 @@ export default function RescueTeamDetailPage() {
                         </div>
                         <div className="py-2.5 flex justify-between">
                           <span className="text-gray-500 font-semibold">{RESCUE_TEXTS.DETAIL_LEADER}</span>
-                          <span className="font-normal text-black dark:text-white">
+                          <span className={cn(
+                            "font-normal flex items-center gap-1",
+                            hasLeader ? "text-black dark:text-white" : "text-amber-500 font-bold"
+                          )}>
+                            {!hasLeader && <AlertCircle size={12} />}
                             {team.leader?.fullName || team.leaderCitizenName || 'Chưa có đội trưởng'}
                           </span>
                         </div>
@@ -822,6 +845,19 @@ export default function RescueTeamDetailPage() {
 
                 {activeTab === 'members' && (
                   <div className="space-y-4">
+                    {!hasLeader && (
+                      <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl flex items-start gap-3 shadow-sm">
+                        <AlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" size={16} />
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-amber-800 dark:text-amber-400">Đội cứu hộ chưa có đội trưởng!</p>
+                          <p className="text-[11px] text-amber-700 dark:text-amber-350 leading-relaxed font-medium">
+                            Đội cứu hộ bắt buộc phải có ít nhất một thành viên giữ vai trò <strong>Trưởng đội (Đội trưởng)</strong> để được kích hoạt trên hệ thống. 
+                            Các đội cứu hộ chưa có đội trưởng sẽ được ẩn khỏi danh sách quét tự động để tránh phân công SOS nhầm lẫn.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Danh sách thành viên đội</h3>
                       <button 

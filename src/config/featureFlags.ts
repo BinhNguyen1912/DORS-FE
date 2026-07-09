@@ -24,6 +24,7 @@ export const FEATURE_FLAGS: Record<string, boolean> = {
   // Disasters module
   [ROUTES.DISASTER_LIST]: true,
   [ROUTES.DISASTER_DETAIL]: true,
+  [ROUTES.SOS_REQUEST_LIST]: true,
 
   // Donations module
   [ROUTES.DONATION_LIST]: true,

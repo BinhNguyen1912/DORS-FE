@@ -44,19 +44,7 @@ const teamTypeColors: Record<string, { bg: string; text: string }> = {
   TONG_HOP: { bg: 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20', text: 'text-indigo-500' },
 };
 
-const statusLabels: Record<string, string> = {
-  AVAILABLE: 'Sẵn sàng',
-  BUSY: 'Đang làm nhiệm vụ',
-  OFF_DUTY: 'Ngoại tuyến',
-  STANDBY: 'Dự phòng',
-};
-
-const statusColors: Record<string, string> = {
-  AVAILABLE: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20',
-  BUSY: 'bg-amber-500/10 text-amber-500 border border-amber-500/20',
-  OFF_DUTY: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
-  STANDBY: 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20',
-};
+// Unused helper structures removed to prevent build warnings
 
 interface UnifiedRescueTeam {
   id: number;
@@ -65,7 +53,7 @@ interface UnifiedRescueTeam {
   leaderName: string;
   leaderPhone: string;
   teamType: string;
-  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY';
+  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY' | 'DISPATCHED';
   address: string;
   memberCount: string;
   activeMissions: number;
@@ -123,6 +111,19 @@ export default function RescueTeamListPage() {
     },
   });
 
+  // Update DB team status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      rescueTeamApi.update(id, { status } as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rescue-teams'] });
+      toast.success('Cập nhật trạng thái đội cứu hộ thành công!');
+    },
+    onError: (err: any) => {
+      toast.api(err, 'Lỗi khi cập nhật trạng thái');
+    },
+  });
+
   const handleConfirmDelete = () => {
     if (deleteTeamId) {
       deleteMutation.mutate(deleteTeamId);
@@ -137,6 +138,8 @@ export default function RescueTeamListPage() {
         BUSY: 'BUSY',
         OFF_DUTY: 'OFF_DUTY',
         STANDBY: 'STANDBY',
+        DISPATCHED: 'DISPATCHED',
+        // Legacy values from older BE versions
         ACTIVE: 'AVAILABLE',
         ON_DUTY: 'BUSY',
         INACTIVE: 'OFF_DUTY',
@@ -167,6 +170,12 @@ export default function RescueTeamListPage() {
       const teamTypeCode = typeMap[team.teamType] || 'TH';
       const code = `${teamTypeCode}-${String(team.id).padStart(4, '0')}`;
 
+      // Tính số thành viên thực tế
+      const activeMembers = (team as any).members
+        ? (team as any).members.filter((m: any) => m.isActive).length
+        : (team as any).memberCount ?? (team as any).activeMemberCount ?? 0;
+      const maxCap = team.maxCapacity || 20;
+
       return {
         id: team.id,
         code,
@@ -176,9 +185,7 @@ export default function RescueTeamListPage() {
         teamType: typeMap[team.teamType] || 'TONG_HOP',
         status: (statusMap[team.status] || 'AVAILABLE') as any,
         address,
-        memberCount: `${
-          (team as any).members ? (team as any).members.filter((m: any) => m.isActive).length : 0
-        }/${team.maxCapacity || 20}`,
+        memberCount: `${activeMembers}/${maxCap}`,
         activeMissions: team.missionsCount || 0,
         logoUrl: team.logoUrl,
       };
@@ -212,9 +219,53 @@ export default function RescueTeamListPage() {
   const totalPages = Math.max(1, Math.ceil(filteredTeams.length / itemsPerPage));
 
   // Reset page when filter changes
-  useMemo(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, teamTypeFilter]);
+  // Selection state & helpers
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  const isAllSelected = useMemo(() => {
+    if (paginatedTeams.length === 0) return false;
+    return paginatedTeams.every(t => selectedIds.includes(t.id));
+  }, [paginatedTeams, selectedIds]);
+
+  const handleSelectAllToggle = () => {
+    if (isAllSelected) {
+      const paginatedIds = paginatedTeams.map(t => t.id);
+      setSelectedIds(prev => prev.filter(id => !paginatedIds.includes(id)));
+    } else {
+      const paginatedIds = paginatedTeams.map(t => t.id);
+      setSelectedIds(prev => {
+        const union = new Set([...prev, ...paginatedIds]);
+        return Array.from(union);
+      });
+    }
+  };
+
+  const handleSelectRow = (id: number) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(x => x !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const bulkUpdateStatusMutation = useMutation({
+    mutationFn: ({ ids, status }: { ids: number[]; status: string }) =>
+      rescueTeamApi.bulkUpdateStatus(ids, status),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['rescue-teams'] });
+      setSelectedIds([]);
+      if (result?.failed?.length > 0) {
+        toast.warning(`Cập nhật ${result.updated} đội thành công. ${result.failed.length} đội thất bại.`);
+      } else {
+        toast.success(`Cập nhật trạng thái ${result?.updated ?? selectedIds.length} đội cứu hộ thành công!`);
+      }
+    },
+    onError: (err: any) => {
+      toast.api(err, 'Lỗi khi cập nhật trạng thái hàng loạt');
+    },
+  });
 
   return (
     <div className="space-y-4">
@@ -301,12 +352,58 @@ export default function RescueTeamListPage() {
           />
         </div>
       </div>
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 p-3.5 rounded-2xl shadow-sm transition-all duration-200">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-amber-800 dark:text-amber-400">
+              Đã chọn {selectedIds.length} đội cứu hộ
+            </span>
+            <div className="h-4 w-px bg-amber-200 dark:bg-amber-900" />
+            <select
+              value=""
+              onChange={(e) => {
+                const status = e.target.value;
+                if (status) {
+                  bulkUpdateStatusMutation.mutate({ ids: selectedIds, status });
+                }
+              }}
+              disabled={bulkUpdateStatusMutation.isPending}
+              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-amber-200 dark:border-amber-900 bg-white dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none cursor-pointer"
+            >
+              <option value="" disabled>-- Cập nhật trạng thái hàng loạt --</option>
+              <option value="AVAILABLE">Sẵn sàng</option>
+              <option value="BUSY">Đang làm nhiệm vụ</option>
+              <option value="DISPATCHED">Đang tiếp cận</option>
+              <option value="STANDBY">Dự phòng</option>
+              <option value="OFF_DUTY">Ngoại tuyến</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedIds([])}
+            className="px-3.5 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+          >
+            Hủy chọn
+          </button>
+        </div>
+      )}
+
       {/* Main Table view */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-700/60 text-black dark:text-white font-bold bg-slate-50/70 dark:bg-gray-900/40 select-none">
+                <th className="py-3.5 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={handleSelectAllToggle}
+                    className="w-3.5 h-3.5 rounded border-gray-350 dark:border-gray-700 bg-transparent text-amber-500 focus:ring-amber-500 cursor-pointer"
+                  />
+                </th>
                 {visibleColumns.code !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_CODE}</th>}
                 {visibleColumns.name !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_NAME}</th>}
                 {visibleColumns.teamType !== false && <th className="py-3.5 px-4">{RESCUE_TEXTS.COL_TYPE}</th>}
@@ -320,7 +417,7 @@ export default function RescueTeamListPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-black dark:text-white">
               {isLoading ? (
                 <tr>
-                  <td colSpan={Object.values(visibleColumns).filter(v => v !== false).length} className="py-16 text-center text-gray-400">
+                  <td colSpan={Object.values(visibleColumns).filter(v => v !== false).length + 1} className="py-16 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
                       <p className="font-semibold text-xs">Đang tải danh sách đội cứu hộ...</p>
@@ -329,20 +426,30 @@ export default function RescueTeamListPage() {
                 </tr>
               ) : paginatedTeams.length === 0 ? (
                 <tr>
-                  <td colSpan={Object.values(visibleColumns).filter(v => v !== false).length} className="py-16 text-center text-gray-400 font-semibold">
+                  <td colSpan={Object.values(visibleColumns).filter(v => v !== false).length + 1} className="py-16 text-center text-gray-400 font-semibold">
                     Không tìm thấy đội cứu hộ nào phù hợp
                   </td>
                 </tr>
               ) : (
                 paginatedTeams.map((team) => {
                   const typeStyle = teamTypeColors[team.teamType] || teamTypeColors.TONG_HOP;
-                  const statusColor = statusColors[team.status] || statusColors.ACTIVE;
 
                   return (
                     <tr
                       key={team.id}
-                      className="group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors"
+                      className={cn(
+                        "group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors",
+                        selectedIds.includes(team.id) && "bg-amber-50/20 dark:bg-amber-950/10"
+                      )}
                     >
+                      <td className="py-4 px-4 font-normal" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(team.id)}
+                          onChange={() => handleSelectRow(team.id)}
+                          className="w-3.5 h-3.5 rounded border-gray-350 dark:border-gray-700 bg-transparent text-amber-500 focus:ring-amber-500 cursor-pointer"
+                        />
+                      </td>
                       {/* Code */}
                       {visibleColumns.code !== false && (
                         <td className="py-4 px-4 font-mono text-black dark:text-white font-normal">
@@ -388,13 +495,22 @@ export default function RescueTeamListPage() {
 
                       {/* Status Badge */}
                       {visibleColumns.status !== false && (
-                        <td className="py-4 px-4 font-normal">
-                          <span className={cn(
-                            'px-2.5 py-0.5 text-[10px] font-normal rounded-full uppercase whitespace-nowrap',
-                            statusColor
-                          )}>
-                            {statusLabels[team.status] || team.status}
-                          </span>
+                        <td className="py-4 px-4 font-normal" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={team.status}
+                            onChange={(e) => {
+                              const newStatus = e.target.value;
+                              updateStatusMutation.mutate({ id: team.id, status: newStatus });
+                            }}
+                            disabled={updateStatusMutation.isPending}
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-transparent text-gray-800 dark:text-gray-200 border border-slate-200 dark:border-slate-700 focus:outline-none cursor-pointer"
+                          >
+                            <option value="AVAILABLE" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Sẵn sàng</option>
+                            <option value="BUSY" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Đang làm nhiệm vụ</option>
+                            <option value="DISPATCHED" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Đang tiếp cận</option>
+                            <option value="STANDBY" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Dự phòng</option>
+                            <option value="OFF_DUTY" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Ngoại tuyến</option>
+                          </select>
                         </td>
                       )}
 

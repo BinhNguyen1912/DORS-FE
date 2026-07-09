@@ -40,7 +40,7 @@ interface UnifiedRescueTeam {
   leaderName: string;
   leaderPhone: string;
   teamType: string;
-  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY';
+  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY' | 'DISPATCHED';
   address: string;
   memberCount: string;
   activeMissions: number;
@@ -133,6 +133,7 @@ export default function RescueTeamDashboardPage() {
         BUSY: 'BUSY',
         OFF_DUTY: 'OFF_DUTY',
         STANDBY: 'STANDBY',
+        DISPATCHED: 'DISPATCHED',
         ACTIVE: 'AVAILABLE',
         ON_DUTY: 'BUSY',
         INACTIVE: 'OFF_DUTY',

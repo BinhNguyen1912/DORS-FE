@@ -404,7 +404,7 @@
     async function checkHealth() {
       const badge = document.getElementById('api-status-badge');
       try {
-        const res = await fetch(`${getBackendUrl()}/sos-requests/nearby?lat=10.7&lng=106&radius=1&status=PENDING`);
+        const res = await fetch(`${getBackendUrl()}/health`);
         if (res.status === 200 || res.status === 401 || res.status === 403) {
           badge.className = "px-2 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1";
           badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 glow-dot"></span> API hoạt động`;

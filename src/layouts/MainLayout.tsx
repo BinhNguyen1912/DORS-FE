@@ -253,7 +253,45 @@ export default function MainLayout() {
   };
 
   const headerInfo = getHeaderInfo(location.pathname);
-  const userRoleText = user?.role === 'SYSTEM_ADMIN' ? 'Quản trị viên' : 'Điều phối viên';
+
+  const roleTranslations: Record<string, string> = {
+    SYSTEM_ADMIN: 'Quản trị viên hệ thống',
+    PROVINCE_ADMIN: 'Quản trị viên cấp tỉnh',
+    RESCUE_TEAM_LEADER: 'Đội trưởng cứu hộ',
+    USER: 'Người dùng',
+    VOLUNTEER: 'Tình nguyện viên',
+  };
+  const userRole = user?.role || (user as any)?.userRoles?.[0]?.role?.name;
+  const userRoleText = userRole ? (roleTranslations[userRole] || userRole) : 'Điều phối viên';
+
+  // Lọc danh sách menu theo quyền của vai trò (RBAC)
+  const filteredMenuItems = menuItems
+    .map((item) => {
+      if (item.roles && (!userRole || !item.roles.includes(userRole))) {
+        return null;
+      }
+
+      if (item.children) {
+        const filteredChildren = item.children.filter((child) => {
+          if (child.roles && (!userRole || !child.roles.includes(userRole))) {
+            return false;
+          }
+          return true;
+        });
+
+        if (filteredChildren.length === 0) {
+          return null;
+        }
+
+        return {
+          ...item,
+          children: filteredChildren,
+        };
+      }
+
+      return item;
+    })
+    .filter(Boolean) as typeof menuItems;
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-gray-950 flex">
@@ -314,7 +352,7 @@ export default function MainLayout() {
 
         {/* Navigation links */}
         <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto no-scrollbar">
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => {
             const Icon = item.icon;
             const hasChildren = !!item.children;
             const isExpanded = !!expandedMenus[item.label];

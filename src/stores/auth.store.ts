@@ -16,8 +16,13 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       isAuthenticated: false,
-      setAuth: (user, accessToken) =>
-        set({ user, accessToken, isAuthenticated: true }),
+      setAuth: (user, accessToken) => {
+        const mappedUser = { ...user };
+        if (!mappedUser.role && (mappedUser as any).userRoles?.[0]?.role?.name) {
+          mappedUser.role = (mappedUser as any).userRoles[0].role.name;
+        }
+        set({ user: mappedUser, accessToken, isAuthenticated: true });
+      },
       logout: () => {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');

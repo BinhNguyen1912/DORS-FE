@@ -63,8 +63,8 @@ const NAMESPACE_CONFIGS: NamespaceConfig[] = [
       return (
         role?.includes('ADMIN') ||
         role === 'SUPER_ADMIN' ||
-        role === 'TEAM_LEADER' ||
-        role === 'RESCUE_MEMBER'
+        role === 'RESCUE_TEAM_LEADER' ||
+        role === 'VOLUNTEER'
       );
     },
     getQuery: (user) => ({

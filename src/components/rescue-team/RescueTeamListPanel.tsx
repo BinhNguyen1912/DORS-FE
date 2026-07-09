@@ -1,11 +1,12 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { ROUTES } from '../../constants';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { rescueTeamApi } from '../../apis';
+import { toast } from '../../stores';
 import {
   teamTypeLabels,
   teamTypeColors,
-  statusLabels,
-  statusColors,
 } from '../../constants/rescueTeam.constants';
 
 interface UnifiedRescueTeam {
@@ -14,7 +15,7 @@ interface UnifiedRescueTeam {
   leaderName: string;
   leaderPhone: string;
   teamType: string;
-  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY';
+  status: 'AVAILABLE' | 'BUSY' | 'OFF_DUTY' | 'STANDBY' | 'DISPATCHED';
   address: string;
   memberCount: string;
   activeMissions: number;
@@ -50,6 +51,19 @@ export default function RescueTeamListPanel({
   onDeleteTeam,
 }: RescueTeamListPanelProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      rescueTeamApi.update(id, { status } as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rescue-teams'] });
+      toast.success('Cập nhật trạng thái đội cứu hộ thành công!');
+    },
+    onError: (err: any) => {
+      toast.api(err, 'Lỗi khi cập nhật trạng thái');
+    },
+  });
 
   return (
     <div className="lg:col-span-5 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-700 flex flex-col h-full">
@@ -114,7 +128,6 @@ export default function RescueTeamListPanel({
         ) : (
           filteredTeams.map((team) => {
             const typeStyle = teamTypeColors[team.teamType] || teamTypeColors.TONG_HOP;
-            const statusColor = statusColors[team.status] || statusColors.ACTIVE;
 
             return (
               <div
@@ -189,10 +202,22 @@ export default function RescueTeamListPanel({
                 </div>
 
                 {/* Right: Status badge & Actions */}
-                <div className="flex flex-col items-end gap-2.5 justify-between h-full min-h-[44px] flex-shrink-0">
-                  <span className={cn('px-2 py-0.5 text-[9px] font-extrabold rounded-lg border', statusColor)}>
-                    {statusLabels[team.status] || team.status}
-                  </span>
+                <div className="flex flex-col items-end gap-2.5 justify-between h-full min-h-[44px] flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <select
+                    value={team.status}
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      updateStatusMutation.mutate({ id: team.id, status: newStatus });
+                    }}
+                    disabled={updateStatusMutation.isPending}
+                    className="px-1.5 py-0.5 text-[10px] font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-gray-800 dark:text-gray-200 focus:outline-none cursor-pointer"
+                  >
+                    <option value="AVAILABLE" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Sẵn sàng</option>
+                    <option value="BUSY" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Đang làm nhiệm vụ</option>
+                    <option value="DISPATCHED" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Đang tiếp cận</option>
+                    <option value="STANDBY" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Dự phòng</option>
+                    <option value="OFF_DUTY" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200">Ngoại tuyến</option>
+                  </select>
 
                   {/* Dropdown Menu actions */}
                   <div className="relative" onClick={(e) => e.stopPropagation()}>

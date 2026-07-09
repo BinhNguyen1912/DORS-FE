@@ -17,14 +17,16 @@ export const ROUTES = {
   RESCUE_TEAM_DETAIL: '/rescue-team/:id',
   TEAM_SPECIALIZATION_LIST: '/rescue-team/specialization',
   DISASTER: '/disaster',
-  DISASTER_LIST: '/disaster/list',
+  DISASTER_LIST: '/disaster/dashboard',
   DISASTER_DETAIL: '/disaster/:id',
+  SOS_REQUEST_LIST: '/request',
   DONATION: '/donation',
   DONATION_LIST: '/donation/list',
   DONATION_CAMPAIGN: '/donation/campaign',
   USER_LIST: '/categories/users',
   ROLE_LIST: '/categories/roles',
   SETTINGS: '/settings',
+  PROFILE: '/profile',
 } as const;
 
 export * from './provinceCenters';

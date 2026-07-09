@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flood Request Simulator & Stress Tester</title>
+  
+  <!-- Fonts & Leaflet Map CSS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at top left, #0f172a, #020617);
+      color: #f8fafc;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.5);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .glow-dot {
+      box-shadow: 0 0 12px currentColor;
+    }
+    .loader {
+      width: 25px;
+      aspect-ratio: .75;
+      --c: no-repeat linear-gradient(currentColor 0 0);
+      background: 
+        var(--c) 0%   50%,
+        var(--c) 50%  50%,
+        var(--c) 100% 50%;
+      background-size: 20% 60%;
+      animation: l9 1s infinite;
+      display: inline-block;
+    }
+    @keyframes l9 {
+      33% {background-position: 0% 0%  ,50% 100%,100% 0%  }
+      66% {background-position: 0% 100%,50% 0%  ,100% 100%}
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col custom-scroll">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-[1000]">
+    <div class="flex items-center space-x-3">
+      <div class="p-2 bg-blue-600/20 rounded-lg text-blue-500 border border-blue-500/30 glow-dot">
+        <i data-lucide="waves" class="w-6 h-6 animate-pulse"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-300 bg-clip-text text-transparent">
+          Flood Request Simulator
+        </h1>
+        <p class="text-xs text-slate-400">Trình giả lập & stress test tin báo ngập lụt, rate-limiting & kiểm soát race condition</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-2 text-xs">
+        <span class="text-slate-400">Trạng thái API:</span>
+        <span id="api-status-badge" class="px-2 py-0.5 rounded-full font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center space-x-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping mr-1"></span>
+          Đang kiểm tra...
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 p-6 h-[calc(100vh-80px)] overflow-hidden">
+    
+    <!-- Left Column: Settings, Form submission & Track (5/12 cols) -->
+    <section class="xl:col-span-5 flex flex-col gap-6 overflow-y-auto pr-2 custom-scroll">
+      
+      <!-- Panel 1: Connection Config -->
+      <div class="glass-card rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="settings" class="w-5 h-5 text-blue-400"></i>
+            <h2 class="font-semibold text-slate-200">Cấu hình kết nối hệ thống</h2>
+          </div>
+          <button id="btn-health-check" onclick="checkBackendHealth()" class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Check Health
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">BACKEND API URL</label>
+            <input type="text" id="cfg-backend-url" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-blue-500" value="http://localhost:8585">
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">MẬT KHẨU TÀI KHOẢN ADMIN (TEST DUYỆT)</label>
+            <div class="flex gap-2">
+              <button onclick="autoLoginAdmin()" class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 shadow-md">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Login Admin
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Token claims decoded info -->
+        <div class="space-y-2">
+          <label class="block text-[10px] font-semibold text-slate-400 mb-1">JWT ACCESS TOKEN (Để thực hiện tác vụ Admin)</label>
+          <textarea id="cfg-jwt-token" rows="2" placeholder="Dán Token Admin vào đây, hoặc click nút Login Admin phía trên để tự đăng nhập bằng tài khoản admin mặc định..." class="w-full p-2 bg-slate-950/80 border border-slate-800 rounded-lg text-[10px] font-mono text-slate-300 focus:outline-none focus:border-blue-500 custom-scroll"></textarea>
+        </div>
+        <!-- Token Decoded Info Panel -->
+        <div id="token-info-badge" class="hidden mt-2 p-2.5 bg-blue-950/30 border border-blue-500/20 rounded-lg text-xs">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Panel 2: Submit Flood Request -->
+      <div class="glass-card rounded-2xl p-5 shadow-2xl relative">
+        <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="megaphone" class="w-5 h-5 text-indigo-400"></i>
+            <h2 class="font-semibold text-slate-200">Gửi Báo Cáo Ngập Lụt (Dân gửi)</h2>
+          </div>
+          <button onclick="fillRandomData()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/20 rounded-lg text-xs font-medium transition flex items-center gap-1">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 animate-pulse"></i> Tạo ngẫu nhiên
+          </button>
+        </div>
+
+        <form id="flood-form" onsubmit="submitFloodRequest(event)" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Họ tên người báo</label>
+              <input type="text" id="f-name" required placeholder="Nguyễn Văn A" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Số điện thoại (để kiểm tra rate-limit)</label>
+              <input type="text" id="f-phone" required placeholder="0901234567" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Tiêu đề tin báo</label>
+            <input type="text" id="f-title" required placeholder="Ngập nặng tại..." class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Mục đích gửi tin</label>
+              <select id="f-purpose" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                <option value="DECLARE_ONLY">Chỉ khai báo (DECLARE_ONLY)</option>
+                <option value="REQUEST_SUPPORT">Yêu cầu cứu trợ (REQUEST_SUPPORT)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Mức độ nghiêm trọng</label>
+              <select id="f-severity" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                <option value="LOW">Thấp (LOW)</option>
+                <option value="MEDIUM">Trung bình (MEDIUM)</option>
+                <option value="HIGH" selected>Cao (HIGH)</option>
+                <option value="CRITICAL">Nguy kịch (CRITICAL)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Độ sâu ngập thấp nhất (cm)</label>
+              <input type="number" id="f-depth-min" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500" value="30">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Độ sâu ngập lớn nhất (cm)</label>
+              <input type="number" id="f-depth-max" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500" value="50">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Diện tích ước tính (ha)</label>
+              <input type="number" step="any" id="f-area" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500" value="1.5">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Thời tiết lúc báo</label>
+              <input type="text" id="f-weather" placeholder="Mưa to kéo dài" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Vĩ độ (Latitude - click bản đồ)</label>
+              <input type="number" step="any" id="f-lat" required class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500" value="10.762622">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Kinh độ (Longitude - click bản đồ)</label>
+              <input type="number" step="any" id="f-lng" required class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500" value="106.660172">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Địa chỉ chi tiết (Tự dịch khi click bản đồ)</label>
+            <input type="text" id="f-address" placeholder="Tên đường, phường, quận..." class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Mô tả tình huống</label>
+            <textarea id="f-desc" rows="2" placeholder="Nhập thêm mô tả..." class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500 custom-scroll"></textarea>
+          </div>
+
+          <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-1.5 transition uppercase text-xs">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>Gửi Yêu Cầu Báo Ngập</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Panel 3: Anonymous Public Tracking -->
+      <div class="glass-card rounded-2xl p-5 shadow-2xl relative">
+        <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+        <div class="flex items-center space-x-2 mb-4">
+          <i data-lucide="search" class="w-5 h-5 text-emerald-400"></i>
+          <h2 class="font-semibold text-slate-200">Tra Cứu Tin Báo Ẩn Danh (Dân kiểm tra)</h2>
+        </div>
+
+        <div class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Số điện thoại gửi tin</label>
+              <input type="text" id="track-phone" placeholder="Nhập SĐT đã gửi" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Mã ID Yêu cầu</label>
+              <input type="number" id="track-id" placeholder="Nhập ID số" class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+            </div>
+          </div>
+          <button onclick="trackRequest()" class="w-full py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/20 rounded-xl font-bold transition flex items-center justify-center gap-1 text-xs">
+            <i data-lucide="shield-check" class="w-4 h-4"></i> Tra cứu ẩn danh
+          </button>
+
+          <!-- Tracking output result box -->
+          <div id="track-result-box" class="hidden p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
+            <!-- Dynamic data output -->
+          </div>
+        </div>
+      </div>
+      
+    </section>
+
+    <!-- Right Column: Interactive Map, Admin Control List & Log Console (7/12 cols) -->
+    <section class="xl:col-span-7 flex flex-col gap-6 overflow-hidden">
+      
+      <!-- Live Map (Leaflet) -->
+      <div class="glass-card rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col min-h-[300px] relative">
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-2.5 flex items-center justify-between z-[500]">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="map-pin" class="w-5 h-5 text-cyan-400"></i>
+            <span class="font-semibold text-slate-200 text-xs">Bản đồ điểm ngập lụt</span>
+          </div>
+          <span class="text-[10px] text-slate-400">Click để lấy vĩ độ/kinh độ trên form</span>
+        </div>
+        <div id="map" class="flex-1 w-full bg-slate-950 z-[10]"></div>
+      </div>
+
+      <!-- Admin Control Panel List -->
+      <div class="glass-card rounded-2xl shadow-2xl h-[280px] flex flex-col overflow-hidden">
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-2.5 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="list-filter" class="w-5 h-5 text-indigo-400"></i>
+            <span class="font-semibold text-slate-200 text-xs">Danh sách yêu cầu (Admin Duyệt & Điều Phối)</span>
+          </div>
+          <button onclick="fetchRecentRequests()" class="text-xs px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/20 rounded transition flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Tải lại danh sách
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-auto p-4 no-scrollbar">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 pb-2">
+                <th class="py-2 pr-2">ID</th>
+                <th class="py-2">Tiêu đề</th>
+                <th class="py-2">Mục đích</th>
+                <th class="py-2">Trạng thái</th>
+                <th class="py-2">Bản đồ</th>
+                <th class="py-2 text-right">Tác vụ phê duyệt & Test Race Condition</th>
+              </tr>
+            </thead>
+            <tbody id="requests-tbody" class="divide-y divide-slate-800/50 text-slate-300">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-500 italic">Nhấn nút Tải lại danh sách hoặc đăng nhập Admin để xem dữ liệu...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Log Console -->
+      <div class="glass-card rounded-2xl shadow-2xl h-[220px] flex flex-col overflow-hidden">
+        <div class="bg-slate-900/60 border-b border-slate-800/80 px-5 py-2 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="terminal" class="w-5 h-5 text-blue-400"></i>
+            <span class="font-semibold text-slate-200 font-mono text-xs">Bảng điều khiển dòng sự kiện (REST Log)</span>
+          </div>
+          <button onclick="document.getElementById('rest-console').innerHTML=''" class="text-xs px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded transition flex items-center">
+            <i data-lucide="ban" class="w-3.5 h-3.5 mr-1"></i> Xóa log
+          </button>
+        </div>
+        <div id="rest-console" class="flex-1 p-3 bg-slate-950/90 font-mono text-[11px] overflow-y-auto space-y-2 custom-scroll text-slate-300">
+          <div class="text-slate-500 italic">[00:00:00] Trình mô phỏng đã sẵn sàng. Hãy bấm tạo ngẫu nhiên hoặc gửi tin báo để bắt đầu.</div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Leaflet Javascript -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <script>
+    // Initialize icons
+    lucide.createIcons();
+
+    let map, clickMarker, requestMarkers = [];
+
+    // HCMC random bounds
+    const hcmcSpots = [
+      { lat: 10.7961, lng: 106.7142, road: 'Đường Nguyễn Hữu Cảnh', label: 'Bình Thạnh' },
+      { lat: 10.8524, lng: 106.7583, road: 'Khu vực Chợ Thủ Đức', label: 'Thủ Đức' },
+      { lat: 10.7228, lng: 106.7029, road: 'Cầu Rạch Đỉa, Lê Văn Lương', label: 'Nhà Bè' },
+      { lat: 10.7483, lng: 106.6967, road: 'Đường Trần Xuân Soạn', label: 'Quận 7' },
+      { lat: 10.8252, lng: 106.6802, road: 'Trường Tiểu học Nguyễn Thượng Hiền', label: 'Gò Vấp' }
+    ];
+
+    const names = ['Nguyễn Văn Anh', 'Trần Thị Bình', 'Lê Hoàng Cường', 'Phạm Minh Duy', 'Võ Thị Hoa', 'Hoàng Văn Dũng'];
+    const titles = [
+      'Ngập sâu nửa bánh xe lớn tại đường chính',
+      'Nước ngập tràn vào nhà dân gây hỏng đồ đạc',
+      'Khu dân cư ngập nặng sau cơn mưa giông lớn',
+      'Đoạn đường thấp trũng ngập lụt cục bộ',
+      'Triều cường dâng cao tràn qua đê ngăn'
+    ];
+    const impacts = ['Giao thông ách tắc', 'Tràn vào tầng trệt nhà dân', 'Kinh doanh bị gián đoạn', 'Xe máy chết máy la liệt'];
+    const roads = ['Đường đô thị lớn', 'Khu dân cư nội bộ', 'Hẻm nhỏ bê tông', 'Đường quốc lộ chính'];
+
+    // 1. Initialize Map
+    function initMap() {
+      map = L.map('map').setView([10.762622, 106.660172], 12);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
+      }).addTo(map);
+
+      map.on('click', function(e) {
+        const lat = parseFloat(e.latlng.lat.toFixed(6));
+        const lng = parseFloat(e.latlng.lng.toFixed(6));
+        document.getElementById('f-lat').value = lat;
+        document.getElementById('f-lng').value = lng;
+        setClickLocation(lat, lng);
+        fetchReverseGeocode(lat, lng);
+      });
+    }
+
+    function setClickLocation(lat, lng) {
+      if (clickMarker) {
+        clickMarker.setLatLng([lat, lng]);
+      } else {
+        const customIcon = L.icon({
+          iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+        clickMarker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map);
+        clickMarker.on('dragend', function() {
+          const pos = clickMarker.getLatLng();
+          document.getElementById('f-lat').value = parseFloat(pos.lat.toFixed(6));
+          document.getElementById('f-lng').value = parseFloat(pos.lng.toFixed(6));
+          fetchReverseGeocode(pos.lat, pos.lng);
+        });
+      }
+      map.panTo([lat, lng]);
+    }
+
+    async function fetchReverseGeocode(lat, lng) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`, {
+          headers: { 'Accept-Language': 'vi' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.display_name) {
+            document.getElementById('f-address').value = data.display_name;
+            logConsole('GIS', `Tự động tìm thấy địa chỉ: ${data.display_name}`, 'info');
+          }
+        }
+      } catch (err) {}
+    }
+
+    // 2. Logging utility
+    function logConsole(source, message, type = 'log', data = null) {
+      const consoleEl = document.getElementById('rest-console');
+      const timeStr = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'border-l-2 pl-2.5 py-0.5 flex flex-col space-y-0.5';
+
+      let borderClass = 'border-slate-700';
+      let titleClass = 'text-slate-400';
+      if (type === 'success') { borderClass = 'border-emerald-500'; titleClass = 'text-emerald-400 font-bold'; }
+      else if (type === 'error') { borderClass = 'border-red-500'; titleClass = 'text-red-400 font-bold'; }
+      else if (type === 'warning') { borderClass = 'border-amber-500'; titleClass = 'text-amber-400 font-bold'; }
+      else if (type === 'info') { borderClass = 'border-blue-400'; titleClass = 'text-blue-400'; }
+
+      entry.className += ` ${borderClass}`;
+      entry.innerHTML = `<div class="text-[11px]">[${timeStr}] <span class="${titleClass}">${source}</span>: <span class="text-slate-200">${message}</span></div>`;
+
+      if (data) {
+        const pre = document.createElement('pre');
+        pre.className = 'text-[9px] bg-slate-900/80 p-2 rounded text-slate-400 font-mono overflow-x-auto whitespace-pre';
+        pre.textContent = JSON.stringify(data, null, 2);
+        entry.appendChild(pre);
+      }
+
+      consoleEl.appendChild(entry);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function getCleanBackendUrl() {
+      let url = document.getElementById('cfg-backend-url').value.trim();
+      if (url.endsWith('/')) url = url.slice(0, -1);
+      return url;
+    }
+
+    // 3. Health & Auth
+    async function checkBackendHealth() {
+      const url = getCleanBackendUrl();
+      const badge = document.getElementById('api-status-badge');
+      try {
+        const res = await fetch(`${url}/health`);
+        if (res.status === 200) {
+          badge.className = "px-2 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center space-x-1";
+          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 glow-dot"></span> Kết nối tốt`;
+          return true;
+        }
+      } catch (err) {}
+      badge.className = "px-2 py-0.5 rounded-full font-medium bg-red-500/20 text-red-400 border border-red-500/30 flex items-center space-x-1";
+      badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-red-400 mr-1 glow-dot"></span> Không kết nối`;
+      return false;
+    }
+
+    async function autoLoginAdmin() {
+      const url = getCleanBackendUrl();
+      logConsole('AUTH', 'Đang thực hiện đăng nhập tài khoản admin hệ thống mặc định...', 'info');
+      try {
+        const res = await fetch(`${url}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: 'admin@rescue.gov.vn',
+            password: '123',
+            provinceId: 1
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const token = data.accessToken || data.data?.accessToken;
+          document.getElementById('cfg-jwt-token').value = token;
+          logConsole('AUTH', '🔑 Đăng nhập thành công! Token đã được tự động gắn vào cấu hình.', 'success');
+          handleTokenChange(token);
+          fetchRecentRequests();
+        } else {
+          logConsole('AUTH', `Đăng nhập thất bại: ${data.message || 'Lỗi không xác định'}`, 'error', data);
+        }
+      } catch (err) {
+        logConsole('AUTH', `Lỗi kết nối khi đăng nhập: ${err.message}`, 'error');
+      }
+    }
+
+    // 4. Fill Random data
+    function fillRandomData() {
+      const spot = hcmcSpots[Math.floor(Math.random() * hcmcSpots.length)];
+      const name = names[Math.floor(Math.random() * names.length)];
+      const title = titles[Math.floor(Math.random() * titles.length)] + ` tại ${spot.road}`;
+      
+      const phoneSuffix = Math.floor(10000000 + Math.random() * 90000000);
+      const phone = `090${phoneSuffix}`;
+
+      // Random jitter coordinates
+      const jitterLat = (Math.random() - 0.5) * 0.01;
+      const jitterLng = (Math.random() - 0.5) * 0.01;
+      const finalLat = parseFloat((spot.lat + jitterLat).toFixed(6));
+      const finalLng = parseFloat((spot.lng + jitterLng).toFixed(6));
+
+      document.getElementById('f-name').value = name;
+      document.getElementById('f-phone').value = phone;
+      document.getElementById('f-title').value = title;
+      document.getElementById('f-lat').value = finalLat;
+      document.getElementById('f-lng').value = finalLng;
+      document.getElementById('f-address').value = `${spot.road}, ${spot.label}, TP. Hồ Chí Minh`;
+
+      const depthMin = Math.floor(10 + Math.random() * 40);
+      document.getElementById('f-depth-min').value = depthMin;
+      document.getElementById('f-depth-max').value = depthMin + Math.floor(10 + Math.random() * 30);
+      document.getElementById('f-area').value = (0.5 + Math.random() * 4.5).toFixed(1);
+      document.getElementById('f-weather').value = 'Mưa giông cực lớn';
+      
+      const purposes = ['DECLARE_ONLY', 'REQUEST_SUPPORT'];
+      document.getElementById('f-purpose').value = purposes[Math.floor(Math.random() * purposes.length)];
+
+      const severities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+      document.getElementById('f-severity').value = severities[Math.floor(Math.random() * severities.length)];
+
+      document.getElementById('f-desc').value = `Độ ngập ước tính trên diện rộng tại ${spot.road}. ` + impacts[Math.floor(Math.random() * impacts.length)];
+
+      setClickLocation(finalLat, finalLng);
+      logConsole('MOCK', 'Tạo ngẫu nhiên dữ liệu tin báo thành công!', 'info');
+    }
+
+    // 5. Submit request
+    async function submitFloodRequest(e) {
+      e.preventDefault();
+      const url = getCleanBackendUrl();
+
+      // --- Token-aware submit ---
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+      const headers = { 'Content-Type': 'application/json' };
+      let submitterInfo = '👤 Ẩn danh (không có token)';
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        // Nếu token hợp lệ, thử tự điền name/phone từ JWT claims nếu form đang trống
+        const payload_user = decodeJwt(token);
+        if (payload_user) {
+          const nameInput = document.getElementById('f-name');
+          const phoneInput = document.getElementById('f-phone');
+          if (!nameInput.value && payload_user.fullName) nameInput.value = payload_user.fullName;
+          if (!phoneInput.value && payload_user.phone) phoneInput.value = payload_user.phone;
+          submitterInfo = `🔑 Đã xác thực (userId: ${payload_user.sub}, role: ${payload_user.roleName || payload_user.roleId})`;
+        }
+      }
+
+      const payload = {
+        title: document.getElementById('f-title').value,
+        requesterName: document.getElementById('f-name').value,
+        requesterPhone: document.getElementById('f-phone').value,
+        latitude: parseFloat(document.getElementById('f-lat').value),
+        longitude: parseFloat(document.getElementById('f-lng').value),
+        addressDetail: document.getElementById('f-address').value,
+        purpose: document.getElementById('f-purpose').value,
+        severity: document.getElementById('f-severity').value,
+        floodDepthCmMin: parseInt(document.getElementById('f-depth-min').value) || null,
+        floodDepthCmMax: parseInt(document.getElementById('f-depth-max').value) || null,
+        estimatedAreaHa: parseFloat(document.getElementById('f-area').value) || null,
+        weather: document.getElementById('f-weather').value,
+        description: document.getElementById('f-desc').value,
+        imageUrls: [],
+        source: token ? 'APP' : 'WEB'
+      };
+
+      logConsole('POST /flood-requests', `Đang gửi... | Người gửi: ${submitterInfo}`, 'info');
+
+      try {
+        const res = await fetch(`${url}/flood-requests`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          const resId = data.id || data.data?.id;
+          const requesterId = data.requesterId || data.data?.requesterId;
+
+          // Hiển thị requesterId rõ ràng trong log
+          let requesterLog = '';
+          if (requesterId) {
+            requesterLog = ` | 🔗 Liên kết tài khoản: requesterId = <b style="color:#6ee7b7">#${requesterId}</b>`;
+          } else {
+            requesterLog = ` | 👤 Ẩn danh (requesterName: "${payload.requesterName}", phone: "${payload.requesterPhone}")`;
+          }
+
+          logConsole(
+            'POST /flood-requests',
+            `✅ Ghi nhận thành công! ID: ${resId}${requesterLog}`,
+            'success',
+            data
+          );
+
+          fetchRecentRequests();
+          document.getElementById('track-phone').value = payload.requesterPhone;
+          document.getElementById('track-id').value = resId;
+        } else {
+          logConsole('POST /flood-requests', `❌ Lỗi: ${data.message || 'Gửi thất bại'}`, 'error', data);
+        }
+      } catch (err) {
+        logConsole('POST /flood-requests', `❌ Lỗi kết nối: ${err.message}`, 'error');
+      }
+    }
+
+    // 6. Track Request
+    async function trackRequest() {
+      const url = getCleanBackendUrl();
+      const phone = document.getElementById('track-phone').value.trim();
+      const id = document.getElementById('track-id').value.trim();
+      const resultBox = document.getElementById('track-result-box');
+
+      if (!phone || !id) {
+        alert('Vui lòng điền đủ SĐT và ID để tra cứu!');
+        return;
+      }
+
+      logConsole('GET /flood-requests/track', `Tra cứu ẩn danh cho SĐT: ${phone}, ID: ${id}...`, 'info');
+      resultBox.classList.add('hidden');
+
+      try {
+        const res = await fetch(`${url}/flood-requests/track?phone=${phone}&id=${id}`);
+        const data = await res.json();
+
+        if (res.ok) {
+          logConsole('GET /flood-requests/track', '✅ Khớp dữ liệu công khai!', 'success', data);
+          
+          let item = data.data !== undefined ? data.data : data;
+
+          let statusBadgeColor = 'bg-gray-800 text-slate-400';
+          if (item.status === 'PENDING') statusBadgeColor = 'bg-red-500/20 text-red-400';
+          else if (item.status === 'VERIFYING') statusBadgeColor = 'bg-amber-500/20 text-amber-400';
+          else if (item.status === 'APPROVED') statusBadgeColor = 'bg-emerald-500/20 text-emerald-400';
+          else if (item.status === 'DISPATCHED') statusBadgeColor = 'bg-blue-500/20 text-blue-400';
+          else if (item.status === 'REJECTED') statusBadgeColor = 'bg-slate-700/30 text-slate-500';
+
+          resultBox.innerHTML = `
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span class="text-[10px] text-slate-400">Yêu Cầu #${item.id}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${statusBadgeColor}">${item.status}</span>
+            </div>
+            <div class="text-[11px] space-y-1 text-slate-300">
+              <div>• Tiêu đề: <b>${item.title}</b></div>
+              <div>• Mục đích: <b>${item.purpose === 'REQUEST_SUPPORT' ? 'Cứu hộ khẩn cấp' : 'Khai báo điểm ngập'}</b></div>
+              <div>• Người báo: <b>${item.requesterName}</b></div>
+              <div>• Địa chỉ: <span>${item.addressDetail}</span></div>
+              <div>• Cập nhật cuối: <span class="text-slate-400 font-mono">${new Date(item.updatedAt).toLocaleString()}</span></div>
+              ${item.linkedSosId ? `<div class="text-emerald-400">• Đã lập SOS liên kết ID: <b>#${item.linkedSosId}</b></div>` : ''}
+            </div>
+          `;
+          resultBox.classList.remove('hidden');
+        } else {
+          logConsole('GET /flood-requests/track', `❌ Thất bại: ${data.message || 'Không tìm thấy thông tin'}`, 'error', data);
+          alert(`Lỗi: ${data.message || 'Không tìm thấy thông tin phù hợp!'}`);
+        }
+      } catch (err) {
+        logConsole('GET /flood-requests/track', `❌ Lỗi kết nối: ${err.message}`, 'error');
+      }
+    }
+
+    // 7. Get Recent requests
+    async function fetchRecentRequests() {
+      const url = getCleanBackendUrl();
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+      const tbody = document.getElementById('requests-tbody');
+
+      let headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      logConsole('GET /flood-requests', 'Đang tải danh sách báo ngập mới nhất...', 'info');
+
+      try {
+        const res = await fetch(`${url}/flood-requests?limit=10`, { headers });
+        const resData = await res.json();
+        
+        if (res.ok) {
+          // Handle all possible response shapes from the API
+          let items;
+          if (Array.isArray(resData)) {
+            // Direct array
+            items = resData;
+          } else if (resData.items && Array.isArray(resData.items)) {
+            // { items: [], total: N }
+            items = resData.items;
+          } else if (resData.data) {
+            if (Array.isArray(resData.data)) {
+              // { data: [] }
+              items = resData.data;
+            } else if (resData.data.items && Array.isArray(resData.data.items)) {
+              // { data: { items: [], total: N } }
+              items = resData.data.items;
+            } else {
+              items = [];
+            }
+          } else {
+            items = [];
+          }
+          logConsole('GET /flood-requests', `✅ Đã tải ${items.length} tin báo ngập.`, 'success');
+          
+          tbody.innerHTML = '';
+          
+          // Clear old map markers
+          requestMarkers.forEach(m => map.removeLayer(m));
+          requestMarkers = [];
+
+          if (items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-500 italic">Không có tin báo ngập lụt nào trong hệ thống!</td></tr>`;
+            return;
+          }
+
+          items.forEach(item => {
+            // Plot on Leaflet
+            let markerColor = 'blue';
+            if (item.status === 'PENDING') markerColor = 'red';
+            else if (item.status === 'VERIFYING') markerColor = 'orange';
+            else if (item.status === 'APPROVED') markerColor = 'green';
+            else if (item.status === 'DISPATCHED') markerColor = 'violet';
+            else if (item.status === 'REJECTED') markerColor = 'grey';
+
+            const itemIcon = L.icon({
+              iconUrl: `https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${markerColor}.png`,
+              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41]
+            });
+
+            if (item.lat && item.lng) {
+              const marker = L.marker([item.lat, item.lng], { icon: itemIcon })
+                .addTo(map)
+                .bindPopup(`
+                  <div class="text-xs text-slate-900 font-semibold space-y-1">
+                    <div class="font-bold border-b pb-1">Báo ngập #${item.id}</div>
+                    <div>Tiêu đề: ${item.title}</div>
+                    <div>Trạng thái: <b>${item.status}</b></div>
+                    <div>SĐT: ${item.requesterPhone}</div>
+                  </div>
+                `);
+              requestMarkers.push(marker);
+            }
+
+            // Append row
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-800/40 border-b border-slate-800/40 transition';
+            
+            let statusBadge = '';
+            if (item.status === 'PENDING') statusBadge = '<span class="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">PENDING</span>';
+            else if (item.status === 'VERIFYING') statusBadge = '<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">VERIFYING</span>';
+            else if (item.status === 'APPROVED') statusBadge = '<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">APPROVED</span>';
+            else if (item.status === 'DISPATCHED') statusBadge = '<span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold">DISPATCHED</span>';
+            else if (item.status === 'REJECTED') statusBadge = '<span class="px-1.5 py-0.5 rounded bg-slate-700/30 text-slate-500">REJECTED</span>';
+
+            tr.innerHTML = `
+              <td class="py-2.5 font-bold text-slate-400">${item.id}</td>
+              <td class="py-2.5 font-semibold text-slate-200 truncate max-w-[120px]" title="${item.title}">${item.title}</td>
+              <td class="py-2.5 text-[11px] text-slate-400">${item.purpose}</td>
+              <td class="py-2.5">${statusBadge}</td>
+              <td class="py-2.5">${item.isApprovedForMap ? '✅' : '❌'}</td>
+              <td class="py-2.5 text-right flex items-center justify-end gap-1.5">
+                <!-- Dropdown update status -->
+                <select onchange="updateRequestStatus(${item.id}, this.value)" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none">
+                  <option value="" disabled selected>Đổi status</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="VERIFYING">VERIFYING</option>
+                  <option value="REJECTED">REJECTED</option>
+                </select>
+
+                <!-- Approve for map -->
+                ${item.purpose === 'DECLARE_ONLY' && !item.isApprovedForMap ? `
+                  <button onclick="approveMap(${item.id})" class="px-1.5 py-0.5 bg-emerald-600/30 text-emerald-400 border border-emerald-500/20 rounded hover:bg-emerald-600/40 text-[10px] font-bold">Approve Map</button>
+                ` : ''}
+
+                <!-- Dispatch action -->
+                ${item.purpose === 'REQUEST_SUPPORT' && item.status !== 'DISPATCHED' ? `
+                  <button onclick="dispatchRequest(${item.id}, 'AUTO')" class="px-1.5 py-0.5 bg-blue-600/30 text-blue-400 border border-blue-500/20 rounded hover:bg-blue-600/40 text-[10px] font-bold">Auto-Dispatch</button>
+                  <button onclick="dispatchManualPrompt(${item.id})" class="px-1.5 py-0.5 bg-indigo-600/30 text-indigo-400 border border-indigo-500/20 rounded hover:bg-indigo-600/40 text-[10px] font-bold">Manual-Dispatch</button>
+                  <button onclick="triggerRaceConditionTest(${item.id})" class="px-1.5 py-0.5 bg-red-600/30 text-red-400 border border-red-500/20 rounded hover:bg-red-600/40 text-[10px] font-black uppercase flex items-center gap-0.5" title="Gửi đồng thời 2 request điều phối để test lock tránh tạo 2 SOS">
+                    <i data-lucide="zap" class="w-2.5 h-2.5 text-red-400"></i> Double-Click Test
+                  </button>
+                ` : ''}
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+          lucide.createIcons();
+        } else {
+          logConsole('GET /flood-requests', `❌ Thất bại: ${resData.message || 'Lỗi lấy danh sách'}`, 'error', resData);
+        }
+      } catch (err) {
+        logConsole('GET /flood-requests', `❌ Lỗi kết nối: ${err.message}`, 'error');
+      }
+    }
+
+    // 8. Administrative Transitions
+    async function updateRequestStatus(id, status) {
+      const url = getCleanBackendUrl();
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+
+      if (!token) {
+        alert('Cần có token Admin để cập nhật trạng thái!');
+        return;
+      }
+
+      logConsole(`PATCH /flood-requests/${id}/status`, `Đang cập nhật trạng thái yêu cầu sang: ${status}...`, 'info');
+
+      try {
+        const res = await fetch(`${url}/flood-requests/${id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status, reviewNotes: 'Được cập nhật thông qua Flood Request Simulator' })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+          logConsole(`PATCH /flood-requests/${id}/status`, `✅ Cập nhật trạng thái thành công!`, 'success', data);
+          fetchRecentRequests();
+        } else {
+          logConsole(`PATCH /flood-requests/${id}/status`, `❌ Lỗi: ${data.message || 'Cập nhật thất bại'}`, 'error', data);
+          alert(`Lỗi: ${data.message}`);
+        }
+      } catch (err) {
+        logConsole(`PATCH /flood-requests/${id}/status`, `❌ Lỗi kết nối: ${err.message}`, 'error');
+      }
+    }
+
+    async function approveMap(id) {
+      const url = getCleanBackendUrl();
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+
+      if (!token) {
+        alert('Cần có token Admin để duyệt lên bản đồ!');
+        return;
+      }
+
+      logConsole(`POST /flood-requests/${id}/approve-map`, `Đang phê duyệt hiển thị lên bản đồ...`, 'info');
+
+      try {
+        const res = await fetch(`${url}/flood-requests/${id}/approve-map`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          logConsole(`POST /flood-requests/${id}/approve-map`, `✅ Phê duyệt hiển thị bản đồ thành công!`, 'success', data);
+          fetchRecentRequests();
+        } else {
+          logConsole(`POST /flood-requests/${id}/approve-map`, `❌ Lỗi: ${data.message || 'Phê duyệt thất bại'}`, 'error', data);
+          alert(`Lỗi: ${data.message}`);
+        }
+      } catch (err) {
+        logConsole(`POST /flood-requests/${id}/approve-map`, `❌ Lỗi kết nối: ${err.message}`, 'error');
+      }
+    }
+
+    async function dispatchRequest(id, method, teamId = null) {
+      const url = getCleanBackendUrl();
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+
+      if (!token) {
+        alert('Cần có token Admin để thực hiện điều phối!');
+        return;
+      }
+
+      const payload = { method };
+      if (teamId) payload.teamId = parseInt(teamId, 10);
+
+      logConsole(`POST /flood-requests/${id}/dispatch`, `Đang gửi lệnh điều phối (${method})...`, 'info');
+
+      try {
+        const res = await fetch(`${url}/flood-requests/${id}/dispatch`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          logConsole(`POST /flood-requests/${id}/dispatch`, `✅ Điều phối thành công! Trực ban đã lập SOS liên kết.`, 'success', data);
+          fetchRecentRequests();
+        } else {
+          logConsole(`POST /flood-requests/${id}/dispatch`, `❌ Thất bại: ${data.message || 'Lỗi điều phối'}`, 'error', data);
+          alert(`Lỗi: ${data.message}`);
+        }
+      } catch (err) {
+        logConsole(`POST /flood-requests/${id}/dispatch`, `❌ Lỗi kết nối: ${err.message}`, 'error');
+      }
+    }
+
+    function dispatchManualPrompt(id) {
+      const teamId = prompt('Nhập ID đội cứu hộ mục tiêu để điều phối thủ công:');
+      if (teamId) {
+        dispatchRequest(id, 'MANUAL', teamId);
+      }
+    }
+
+    // 9. Stress Tester: Double-Click Race Condition Lock verification
+    async function triggerRaceConditionTest(id) {
+      const url = getCleanBackendUrl();
+      const token = document.getElementById('cfg-jwt-token').value.trim();
+
+      if (!token) {
+        alert('Cần có token Admin để test race condition!');
+        return;
+      }
+
+      logConsole('STRESS TEST', `🔥 Đang kiểm tra Race Condition (Double-Click Dispatch) song song cho yêu cầu ID #${id}...`, 'warning');
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      // Construct 2 requests immediately
+      const req1 = fetch(`${url}/flood-requests/${id}/dispatch`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ method: 'AUTO' })
+      });
+
+      const req2 = fetch(`${url}/flood-requests/${id}/dispatch`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ method: 'AUTO' })
+      });
+
+      logConsole('STRESS TEST', '⚡ Đang gửi đồng thời 2 request post trùng khớp tại cùng 1 thời điểm...', 'info');
+
+      try {
+        const [res1, res2] = await Promise.all([req1, req2]);
+        const data1 = await res1.json();
+        const data2 = await res2.json();
+
+        logConsole('Stress Test: Request 1', `HTTP Status: ${res1.status}`, res1.ok ? 'success' : 'error', data1);
+        logConsole('Stress Test: Request 2', `HTTP Status: ${res2.status}`, res2.ok ? 'success' : 'error', data2);
+
+        if (res1.ok && res2.ok) {
+          logConsole('RACE CONDITION RESULT', '🚨 THẤT BẠI! Cả hai yêu cầu điều phối đều thành công. Pessimistic Lock không hoạt động (đã tạo 2 SOS cho cùng một điểm ngập!).', 'error');
+        } else if ((res1.ok && !res2.ok) || (!res1.ok && res2.ok)) {
+          logConsole('RACE CONDITION RESULT', '✅ THÀNH CÔNG! Khoá Pessimistic Write Lock (SELECT FOR UPDATE) đã hoạt động xuất sắc! Chỉ có 1 request điều phối thành công, request còn lại bị chặn đứng với mã lỗi 400/409 (Conflict).', 'success');
+        } else {
+          logConsole('RACE CONDITION RESULT', '⚠️ Cả hai request điều phối đều lỗi. Hãy chắc chắn rằng trạng thái yêu cầu đang ở VERIFYING trước khi bấm Stress Test!', 'warning');
+        }
+        
+        fetchRecentRequests();
+      } catch (err) {
+        logConsole('STRESS TEST', `❌ Lỗi kết nối trong stress test: ${err.message}`, 'error');
+      }
+    }
+
+    // JWT Decoding & Info mapping
+    function decodeJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function handleTokenChange(token) {
+      const infoBadge = document.getElementById('token-info-badge');
+      if (!token) {
+        infoBadge.classList.add('hidden');
+        return;
+      }
+
+      const payload = decodeJwt(token);
+      if (payload) {
+        const roleId = payload.roleId;
+        const userId = payload.sub;
+        const email = payload.email || 'Ẩn danh';
+        const provinceId = payload.provinceId || 1;
+
+        let roleName = 'USER';
+        if (roleId === 1) roleName = 'SYSTEM_ADMIN (Admin hệ thống)';
+        else if (roleId === 2) roleName = 'PROVINCE_ADMIN (Admin cấp tỉnh)';
+        else if (roleId === 3) roleName = 'RESCUE_TEAM_LEADER (Đội trưởng / Thành viên)';
+        else if (roleId === 4) roleName = 'USER (Người dân / Trình báo)';
+        else if (roleId === 5) roleName = 'VOLUNTEER (Tình nguyện viên)';
+
+        infoBadge.innerHTML = `
+          <div class="flex items-center space-x-2 text-blue-400 font-semibold mb-1 text-[11px]">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 flex-shrink-0"></i>
+            <span>DỮ LIỆU ĐÃ GIẢI MÃ TỪ TOKEN:</span>
+          </div>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-slate-350">
+            <div>• ID người dùng: <b class="text-blue-300">${userId}</b></div>
+            <div>• Cấp quyền: <b class="text-blue-300">${roleName}</b></div>
+            <div>• Tỉnh thành ID: <b class="text-blue-300">${provinceId}</b></div>
+            <div class="truncate">• Email: <b class="text-blue-300" title="${email}">${email}</b></div>
+          </div>
+        `;
+        infoBadge.classList.remove('hidden');
+        lucide.createIcons();
+      } else {
+        infoBadge.classList.add('hidden');
+      }
+    }
+
+    // On Load Initializations
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      checkBackendHealth();
+      
+      const tokenInput = document.getElementById('cfg-jwt-token');
+      tokenInput.addEventListener('input', (e) => handleTokenChange(e.target.value));
+      tokenInput.addEventListener('change', (e) => handleTokenChange(e.target.value));
+
+      // Auto ping health check every 15s
+      setInterval(checkBackendHealth, 15000);
+    });
+  </script>
+</body>
+</html>

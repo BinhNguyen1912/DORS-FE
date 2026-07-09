@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Info, Clock, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { SosRequest } from '../../../types';
@@ -23,6 +23,32 @@ function StatCol({ label, value, valueClass }: { label: string; value: React.Rea
 export default function SosDispatchPanel({ sos, handleCallPhone }: SosDispatchPanelProps) {
   const hasTeam = !!sos.assignedTeamId;
   const distanceKm = (sos as any).distance_km;
+
+  const calculatedDistance = useMemo(() => {
+    if (distanceKm !== undefined && distanceKm !== null) return distanceKm;
+    if (!sos.location?.coordinates || !sos.assignedTeam) return null;
+
+    const teamLoc = sos.assignedTeam.currentLocation || sos.assignedTeam.baseLocation || sos.assignedTeam.location;
+    if (!teamLoc?.coordinates) return null;
+
+    const [sosLng, sosLat] = sos.location.coordinates;
+    const [teamLng, teamLat] = teamLoc.coordinates;
+
+    if (!sosLat || !sosLng || !teamLat || !teamLng) return null;
+
+    const R = 6371; // km
+    const dLat = (teamLat - sosLat) * (Math.PI / 180);
+    const dLon = (teamLng - sosLng) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(sosLat * (Math.PI / 180)) *
+        Math.cos(teamLat * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }, [sos.location, sos.assignedTeam, distanceKm]);
+
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   useEffect(() => {
@@ -98,11 +124,11 @@ export default function SosDispatchPanel({ sos, handleCallPhone }: SosDispatchPa
         />
         <StatCol
           label="Khoảng cách"
-          value={distanceKm ? `${distanceKm.toFixed(1)} km` : '—'}
+          value={calculatedDistance ? `${calculatedDistance.toFixed(1)} km` : '—'}
         />
         <StatCol
           label="Thời gian dự kiến"
-          value={distanceKm ? `~ ${Math.round(distanceKm * 3)} phút` : '—'}
+          value={calculatedDistance ? `~ ${Math.round(calculatedDistance * 3)} phút` : '—'}
         />
         <StatCol
           label="Trạng thái điều phối"

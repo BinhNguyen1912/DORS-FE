@@ -65,6 +65,7 @@ const injectStyles = `
   /* Fullscreen map helper styles */
   .has-fullscreen-map aside,
   .has-fullscreen-map header,
+  .has-fullscreen-map .layout-global-header,
   .has-fullscreen-map .layout-mobile-topbar {
     display: none !important;
   }
@@ -150,7 +151,7 @@ export default function DisasterListPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
-  const [showUserLocation, setShowUserLocation] = useState(true);
+  const [showUserLocation, setShowUserLocation] = useState(false);
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   useEffect(() => {
@@ -245,7 +246,7 @@ export default function DisasterListPage() {
       });
 
       // Show notification to user
-      toast.warning(`🚨 SOS MỚI: Yêu cầu từ ${sos.requesterName || 'Người dân'} (SĐT: ${sos.requesterPhone || 'Chưa cập nhật'}) tại ${sos.addressDetail || sos.adminUnit?.name || 'Vị trí hiện trường'}`);
+      toast.warning(`SOS MỚI: Yêu cầu từ ${sos.requesterName || 'Người dân'} (SĐT: ${sos.requesterPhone || 'Chưa cập nhật'}) tại ${sos.addressDetail || sos.adminUnit?.name || 'Vị trí hiện trường'}`);
     };
 
     const handleSosStatusUpdated = (payload: { sosId: number; status: string; assignedTeamId?: number; distanceMeters?: number }) => {
@@ -280,17 +281,17 @@ export default function DisasterListPage() {
       const label = statusLabels[payload.status] || payload.status;
 
       if (payload.status === 'RESOLVED') {
-        toast.success(`✓ SOS-2024-${payload.sosId} đã được xử lý thành công!`);
+        toast.success(`SOS-2026-${payload.sosId} đã được xử lý thành công!`);
       } else if (payload.status === 'CANCELLED') {
-        toast.info(`✕ SOS-2024-${payload.sosId} đã bị hủy.`);
+        toast.info(`SOS-2026-${payload.sosId} đã bị hủy.`);
       } else {
-        toast.info(`🔔 Trạng thái SOS-2024-${payload.sosId} cập nhật thành: ${label}`);
+        toast.info(`Trạng thái SOS-2026-${payload.sosId} cập nhật thành: ${label}`);
       }
     };
 
     const handleNoTeam = (payload: { sosId: number; message: string }) => {
       console.log('📡 [WS] No team available:', payload);
-      toast.error(`⚠️ BÁO ĐỘNG: SOS-2024-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
+      toast.error(`BÁO ĐỘNG: SOS-2026-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
     };
 
     dispatchSocket.on(DISPATCH_EVENTS.SOS_CREATED, handleNewSos);
@@ -311,6 +312,7 @@ export default function DisasterListPage() {
         (position) => {
           const { latitude, longitude } = position.coords;
           setUserLocation([latitude, longitude]);
+          setShowUserLocation(true);
           if (mapRef.current) {
             mapRef.current.setView([latitude, longitude], 14, { animate: true });
           }
@@ -327,8 +329,10 @@ export default function DisasterListPage() {
   };
 
   useEffect(() => {
-    requestUserLocation();
-  }, []);
+    if (showUserLocation && !userLocation) {
+      requestUserLocation();
+    }
+  }, [showUserLocation, userLocation]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -378,7 +382,7 @@ export default function DisasterListPage() {
 
         return {
           id: sos.id,
-          code: `SOS-2024-${sos.id}`,
+          code: `SOS-2026-${sos.id}`,
           severity: (sos.severity || 'MEDIUM') as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW',
           lat,
           lng,
@@ -404,6 +408,29 @@ export default function DisasterListPage() {
   // Parse Teams from API
   const parsedTeams = useMemo(() => {
     if (!dbTeamsList?.data || !Array.isArray(dbTeamsList.data)) return [];
+
+    const selectedSos = selectedSosId
+      ? parsedSosRequests.find((s) => s.id === selectedSosId)
+      : null;
+
+    const sosLoc = selectedSos?.location?.coordinates;
+    const sosLng = sosLoc?.[0];
+    const sosLat = sosLoc?.[1];
+
+    const calculateHaversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 6371; // km
+      const dLat = (lat2 - lat1) * (Math.PI / 180);
+      const dLon = (lon2 - lon1) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) *
+          Math.cos(lat2 * (Math.PI / 180)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
     return dbTeamsList.data.map((team: any) => {
       let lat = defaultCenter[0];
       let lng = defaultCenter[1];
@@ -411,6 +438,15 @@ export default function DisasterListPage() {
       if (loc?.coordinates && Array.isArray(loc.coordinates)) {
         lng = loc.coordinates[0];
         lat = loc.coordinates[1];
+      }
+
+      let distanceText = '—';
+      if (sosLat && sosLng && lat && lng) {
+        const dist = calculateHaversineDistance(sosLat, sosLng, lat, lng);
+        distanceText = `Cách ${dist.toFixed(1)} km`;
+      } else {
+        const dist = calculateHaversineDistance(defaultCenter[0], defaultCenter[1], lat, lng);
+        distanceText = `Cách ${dist.toFixed(1)} km (từ trung tâm)`;
       }
 
       return {
@@ -424,10 +460,10 @@ export default function DisasterListPage() {
         phone: team.leader?.phone || team.leaderPhone || team.phone || 'Chưa có SĐT',
         leaderName: team.leader?.fullName || team.leaderCitizenName || 'Chưa cập nhật',
         address: team.adminUnit?.name ? `${team.adminUnit.name}, ${provinceName}` : (team.address || provinceName),
-        distanceText: `Cách ${Math.min(25, Math.max(2, (team.id % 10) * 2.3 + 1.2)).toFixed(1)} km`,
+        distanceText,
       };
     });
-  }, [dbTeamsList, defaultCenter, provinceName]);
+  }, [dbTeamsList, defaultCenter, provinceName, selectedSosId, parsedSosRequests]);
 
   // Lists for bottom monitoring dashboard
   const availableTeams = useMemo(() => {
@@ -518,7 +554,7 @@ export default function DisasterListPage() {
     },
     onSuccess: (newSos) => {
       queryClient.invalidateQueries({ queryKey: ['db-sos-requests'] });
-      toast.success(`Đã tạo yêu cầu SOS khẩn cấp thành công! Mã: SOS-2024-${newSos.id}`);
+      toast.success(`Đã tạo yêu cầu SOS khẩn cấp thành công! Mã: SOS-2026-${newSos.id}`);
       setIsCreateModalOpen(false);
       resetCreateForm();
     },
@@ -863,7 +899,7 @@ export default function DisasterListPage() {
     };
 
     // Draw Flood Zones (polygons drawn on Canvas)
-    if (showFloodZones) {
+    if (false && showFloodZones) {
       const geojsonLayer = L.geoJSON(floodZonesGeoJSON as any, {
         interactive: false,
         style: (feature) => {
@@ -1163,10 +1199,10 @@ export default function DisasterListPage() {
   const activeMissions = useMemo(() => {
     const busyTeams = parsedTeams.filter(t => t.status === 'BUSY' || t.status === 'ON_DUTY');
     return busyTeams.map((team, idx) => ({
-      id: `NV-2024-${team.id}`,
+      id: `NV-${team.id}`,
       status: 'Đang thực hiện',
       teamName: team.name,
-      sosCode: `SOS-2024-${idx + 100}`,
+      sosCode: `SOS-2026-${idx + 100}`,
       progress: Math.min(95, Math.max(30, (team.id % 7) * 11 + 27)),
     }));
   }, [parsedTeams]);
@@ -1851,7 +1887,7 @@ export default function DisasterListPage() {
                             <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100/30 dark:border-slate-800/30">
                               <div className="flex items-center gap-2.5">
                                 <span className="text-[11px] font-black text-blue-600 dark:text-blue-400">{team.distanceText.replace('Cách ', '')}</span>
-                                <span className="text-[9px] font-extrabold text-red-500 truncate max-w-[80px]">{activeSos?.code || 'SOS-2024'}</span>
+                                <span className="text-[9px] font-extrabold text-red-500 truncate max-w-[80px]">{activeSos?.code || 'SOS-2026'}</span>
                               </div>
                               <button
                                 onClick={() => navigate(ROUTES.RESCUE_TEAM_DETAIL.replace(':id', String(team.id)))}
@@ -2285,7 +2321,7 @@ export default function DisasterListPage() {
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2 mb-3 flex-shrink-0">
             <h3 className="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wider">Thống kê nhanh hôm nay</h3>
           </div>
-          <div className="grid grid-cols-2 gap-2 flex-1">
+          <div className="flex flex-col gap-2 flex-1 justify-center">
             <div className="bg-slate-50/50 dark:bg-[#0d1527] border border-[#ef4444]/15 p-2.5 rounded-xl flex flex-col justify-center text-left">
               <p className="text-[9px] text-gray-400 font-bold uppercase leading-none mb-1">SOS 24h qua</p>
               <p className="text-base font-black text-red-500 leading-none">{quickStats.newSos}</p>
@@ -2302,12 +2338,6 @@ export default function DisasterListPage() {
               <p className="text-[9px] text-gray-400 font-bold uppercase leading-none mb-1">Người được cứu</p>
               <p className="text-base font-black text-blue-600 dark:text-blue-450 leading-none">{quickStats.rescuedPeople}</p>
               <p className="text-[8px] text-gray-400 dark:text-gray-500 font-bold mt-1.5 leading-none">Trong các vụ SOS</p>
-            </div>
-
-            <div className="bg-slate-50/50 dark:bg-[#0d1527] border border-indigo-500/15 p-2.5 rounded-xl flex flex-col justify-center text-left">
-              <p className="text-[9px] text-gray-400 font-bold uppercase leading-none mb-1">Vùng ngập dự tính</p>
-              <p className="text-base font-black text-indigo-600 dark:text-indigo-400 leading-none">{quickStats.floodArea}</p>
-              <p className="text-[8px] text-gray-400 dark:text-gray-500 font-bold mt-1.5 leading-none">Tỷ lệ tương đối</p>
             </div>
           </div>
         </div>

@@ -6,8 +6,11 @@ import {
   ChevronsLeft,
   ChevronsRight,
   RefreshCw,
+  ArrowUpDown,
+  Upload,
 } from 'lucide-react';
-import { userApi, locationApi } from '../../apis';
+import ExportMenu from '../../components/common/ExportMenu';
+import { userApi, locationApi, roleApi } from '../../apis';
 import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
 import ConfirmDeleteModal from '../../components/common/ConfirmDeleteModal';
@@ -48,7 +51,8 @@ export default function UserListPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-  const [tabFilter, setTabFilter] = useState<'all' | 'active' | 'pending' | 'inactive'>('all');
+  const [sortBy, setSortBy] = useState<string>('createdAt_desc');
+  const [isSortOpen, setIsSortOpen] = useState(false);
   
   // Form Modal state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -91,6 +95,53 @@ export default function UserListPage() {
   });
 
   const users = dbData?.data || [];
+
+  // Fetch roles dynamically from database
+  const { data: rolesData } = useQuery({
+    queryKey: ['system-roles'],
+    queryFn: () => roleApi.getAll({ limit: 100 }),
+  });
+
+  const roles = rolesData?.data || [];
+
+  // Update user role mutation
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, roleId }: { userId: number; roleId: number }) => {
+      return userApi.update(userId, { roleId } as any);
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.invalidateQueries({ queryKey: ['system-users'] });
+      setSelectedUser(updatedUser);
+      toast.success('Cập nhật vai trò thành công!');
+    },
+    onError: (err: any) => {
+      toast.api(err, 'Lỗi khi cập nhật vai trò');
+    },
+  });
+
+  const handleUpdateRole = (userId: number, roleId: number) => {
+    updateRoleMutation.mutate({ userId, roleId });
+  };
+
+  const getUserActiveRoleName = (u: User) => {
+    if (u.userRoles && u.userRoles.length > 0) {
+      const activeRoleMap = u.userRoles.find(ur => ur.isActive) || u.userRoles[0];
+      if (activeRoleMap && activeRoleMap.role) {
+        return activeRoleMap.role.name;
+      }
+    }
+    return u.role;
+  };
+
+  const getUserRoleId = (u: User) => {
+    if (u.userRoles && u.userRoles.length > 0) {
+      const activeRoleMap = u.userRoles.find(ur => ur.isActive) || u.userRoles[0];
+      if (activeRoleMap) {
+        return activeRoleMap.roleId;
+      }
+    }
+    return 4; // Default to USER (4)
+  };
 
   // Toggle user active status mutation
   const toggleStatusMutation = useMutation({
@@ -142,19 +193,10 @@ export default function UserListPage() {
     setSearchQuery('');
     setRoleFilter('');
     setStatusFilter('');
-    setTabFilter('all');
+    setSortBy('createdAt_desc');
     setCurrentPage(1);
     setSelectedUserIds([]);
   };
-
-  // Stats for filter badges
-  const stats = useMemo(() => {
-    const total = users.length;
-    const active = users.filter(u => u.isActive).length;
-    const pending = users.filter(u => !u.isVerified).length;
-    const inactive = users.filter(u => !u.isActive).length;
-    return { total, active, pending, inactive };
-  }, [users]);
 
   // Client side search and filters
   const filteredUsers = useMemo(() => {
@@ -171,7 +213,7 @@ export default function UserListPage() {
         nationalId.toLowerCase().includes(searchQuery.toLowerCase());
 
       // 2. Role filter match
-      const matchesRole = !roleFilter || u.role === roleFilter;
+      const matchesRole = !roleFilter || getUserActiveRoleName(u) === roleFilter;
 
       // 3. Status filter dropdown match
       let matchesStatus = true;
@@ -179,28 +221,41 @@ export default function UserListPage() {
       else if (statusFilter === 'inactive') matchesStatus = !u.isActive;
       else if (statusFilter === 'pending') matchesStatus = !u.isVerified;
 
-      // 4. Tab selection match
-      let matchesTab = true;
-      if (tabFilter === 'active') matchesTab = !!u.isActive;
-      else if (tabFilter === 'inactive') matchesTab = !u.isActive;
-      else if (tabFilter === 'pending') matchesTab = !u.isVerified;
-
-      return matchesSearch && matchesRole && matchesStatus && matchesTab;
+      return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [users, searchQuery, roleFilter, statusFilter, tabFilter]);
+  }, [users, searchQuery, roleFilter, statusFilter]);
+
+  // Client side sorting
+  const sortedUsers = useMemo(() => {
+    const list = [...filteredUsers];
+    if (sortBy === 'createdAt_desc') {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === 'createdAt_asc') {
+      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else if (sortBy === 'fullName_asc') {
+      list.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'vi'));
+    } else if (sortBy === 'fullName_desc') {
+      list.sort((a, b) => (b.fullName || '').localeCompare(a.fullName || '', 'vi'));
+    } else if (sortBy === 'trustScore_desc') {
+      list.sort((a, b) => (b.trustScore ?? 50) - (a.trustScore ?? 50));
+    } else if (sortBy === 'trustScore_asc') {
+      list.sort((a, b) => (a.trustScore ?? 50) - (b.trustScore ?? 50));
+    }
+    return list;
+  }, [filteredUsers, sortBy]);
 
   // Paginated chunk
   const paginatedUsers = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredUsers.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredUsers, currentPage]);
+    return sortedUsers.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedUsers, currentPage]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / itemsPerPage));
 
-  // Reset pagination on filter changes
+  // Reset pagination on filter or sort changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, statusFilter, tabFilter]);
+  }, [searchQuery, roleFilter, statusFilter, sortBy]);
 
   // Selection handlers
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,28 +284,16 @@ export default function UserListPage() {
     });
   };
 
-  const getRoleName = (role?: string) => {
-    if (!role) return 'Chưa có vai trò';
-    const roleMap: Record<string, string> = {
-      SYSTEM_ADMIN: 'Admin hệ thống',
-      PROVINCE_ADMIN: 'Admin tỉnh',
-      RESCUE_TEAM_LEADER: 'Đội trưởng cứu hộ',
-      COORDINATOR: 'Điều phối viên',
-      VOLUNTEER: 'Tình nguyện viên',
-      CITIZEN: 'Công dân',
-      USER: 'Người dùng',
-    };
-    return roleMap[role] || role;
-  };
-
-  const getUserRoleName = (user: User) => {
-    if (user.userRoles && user.userRoles.length > 0) {
-      const activeRoleMap = user.userRoles.find(ur => ur.isActive) || user.userRoles[0];
+  const getUserRoleName = (u: User) => {
+    if (u.userRoles && u.userRoles.length > 0) {
+      const activeRoleMap = u.userRoles.find(ur => ur.isActive) || u.userRoles[0];
       if (activeRoleMap && activeRoleMap.role) {
-        return getRoleName(activeRoleMap.role.name);
+        const dbRole = roles.find(r => r.id === activeRoleMap.roleId);
+        return dbRole ? (dbRole.description || dbRole.name) : activeRoleMap.role.description || activeRoleMap.role.name;
       }
     }
-    return getRoleName(user.role);
+    const dbRole = roles.find(r => r.name === u.role);
+    return dbRole ? (dbRole.description || dbRole.name) : u.role || 'Người dùng thường';
   };
 
   const getRoleBadge = (roleName?: string) => {
@@ -319,97 +362,26 @@ export default function UserListPage() {
       className="space-y-4 text-left z-10 flex-1 flex flex-col relative font-sans" 
       style={{ fontFamily: 'Roboto, sans-serif' }}
     >
-      {/* Top Tabs, Stats count, and Main Actions row */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 select-none">
-        
-        {/* Count Stats Tab Pills */}
-        <div className="flex bg-slate-100/80 dark:bg-gray-900/50 p-1 rounded-xl gap-1 w-fit overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => setTabFilter('all')}
-            className={cn(
-              "flex items-center gap-2 py-1.5 px-4 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer",
-              tabFilter === 'all'
-                ? "bg-amber-500 text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-            )}
-          >
-            Tất cả
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-[9px] font-extrabold",
-              tabFilter === 'all'
-                ? "bg-white/20 text-white"
-                : "bg-slate-200 text-slate-655 dark:bg-gray-800 dark:text-gray-400"
-            )}>
-              {stats.total}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setTabFilter('active')}
-            className={cn(
-              "flex items-center gap-2 py-1.5 px-4 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer",
-              tabFilter === 'active'
-                ? "bg-amber-500 text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-            )}
-          >
-            Đang hoạt động
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-[9px] font-extrabold",
-              tabFilter === 'active'
-                ? "bg-white/20 text-white"
-                : "bg-emerald-500/10 text-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-400"
-            )}>
-              {stats.active}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setTabFilter('pending')}
-            className={cn(
-              "flex items-center gap-2 py-1.5 px-4 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer",
-              tabFilter === 'pending'
-                ? "bg-amber-500 text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-            )}
-          >
-            Chờ xác thực
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-[9px] font-extrabold",
-              tabFilter === 'pending'
-                ? "bg-white/20 text-white"
-                : "bg-blue-500/10 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
-            )}>
-              {stats.pending}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setTabFilter('inactive')}
-            className={cn(
-              "flex items-center gap-2 py-1.5 px-4 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer",
-              tabFilter === 'inactive'
-                ? "bg-amber-500 text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-            )}
-          >
-            Đã vô hiệu hóa
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-[9px] font-extrabold",
-              tabFilter === 'inactive'
-                ? "bg-white/20 text-white"
-                : "bg-red-500/10 text-red-500 dark:bg-red-950/30 dark:text-red-400"
-            )}>
-              {stats.inactive}
-            </span>
-          </button>
-        </div>
-
+      {/* Top Actions row */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-end gap-4 select-none">
         {/* Action icons aligning with user-list.png header style */}
-        <div className="flex items-center gap-2 self-start lg:self-auto">
+        <div className="flex items-center gap-2 self-start lg:self-auto flex-wrap">
+          {/* Import Button */}
           <button 
             type="button"
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+            onClick={() => toast.success('Tính năng Nhập Excel sẽ sớm được phát triển!')}
+          >
+            <Upload size={13} className="text-gray-400" />
+            Nhập Excel
+          </button>
+
+          {/* Export Menu Dropdown */}
+          <ExportMenu />
+
+          <button 
+            type="button"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-650 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
           >
             <i className="fa-solid fa-filter text-[11px]"></i>
             Bộ lọc
@@ -461,11 +433,9 @@ export default function UserListPage() {
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all font-semibold cursor-pointer"
               >
                 <option value="">Tất cả vai trò</option>
-                <option value="SYSTEM_ADMIN">Quản trị viên</option>
-                <option value="PROVINCE_ADMIN">Admin tỉnh</option>
-                <option value="COORDINATOR">Điều phối viên</option>
-                <option value="VOLUNTEER">Tình nguyện viên</option>
-                <option value="CITIZEN">Công dân</option>
+                {roles.map(r => (
+                  <option key={r.id} value={r.name}>{r.description || r.name}</option>
+                ))}
               </select>
             </div>
 
@@ -481,6 +451,94 @@ export default function UserListPage() {
                 <option value="inactive">Vô hiệu hóa</option>
                 <option value="pending">Chờ xác thực</option>
               </select>
+            </div>
+
+            {/* Sort Button and Custom Dropdown Menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsSortOpen(!isSortOpen)}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+                title="Sắp xếp"
+              >
+                <ArrowUpDown size={14} className="text-gray-400" />
+                <span>Sắp xếp</span>
+              </button>
+
+              {isSortOpen && (
+                <>
+                  {/* Backdrop */}
+                  <div className="fixed inset-0 z-10" onClick={() => setIsSortOpen(false)} />
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-20 py-1.5 select-none divide-y divide-slate-100 dark:divide-slate-700/60">
+                    <button
+                      type="button"
+                      onClick={() => { setSortBy('createdAt_desc'); setIsSortOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-center justify-between border-0 bg-transparent",
+                        sortBy === 'createdAt_desc' ? "text-amber-500" : "text-gray-700 dark:text-gray-300"
+                      )}
+                    >
+                      Mới tạo nhất
+                      {sortBy === 'createdAt_desc' && <span className="text-[10px]">✓</span>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSortBy('createdAt_asc'); setIsSortOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-center justify-between border-0 bg-transparent",
+                        sortBy === 'createdAt_asc' ? "text-amber-500" : "text-gray-700 dark:text-gray-300"
+                      )}
+                    >
+                      Cũ nhất
+                      {sortBy === 'createdAt_asc' && <span className="text-[10px]">✓</span>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSortBy('fullName_asc'); setIsSortOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-center justify-between border-0 bg-transparent",
+                        sortBy === 'fullName_asc' ? "text-amber-500" : "text-gray-700 dark:text-gray-300"
+                      )}
+                    >
+                      Tên A-Z
+                      {sortBy === 'fullName_asc' && <span className="text-[10px]">✓</span>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSortBy('fullName_desc'); setIsSortOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-center justify-between border-0 bg-transparent",
+                        sortBy === 'fullName_desc' ? "text-amber-500" : "text-gray-700 dark:text-gray-300"
+                      )}
+                    >
+                      Tên Z-A
+                      {sortBy === 'fullName_desc' && <span className="text-[10px]">✓</span>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSortBy('trustScore_desc'); setIsSortOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-center justify-between border-0 bg-transparent",
+                        sortBy === 'trustScore_desc' ? "text-amber-500" : "text-gray-700 dark:text-gray-300"
+                      )}
+                    >
+                      Điểm tin cậy (Cao - Thấp)
+                      {sortBy === 'trustScore_desc' && <span className="text-[10px]">✓</span>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSortBy('trustScore_asc'); setIsSortOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-center justify-between border-0 bg-transparent",
+                        sortBy === 'trustScore_asc' ? "text-amber-500" : "text-gray-700 dark:text-gray-300"
+                      )}
+                    >
+                      Điểm tin cậy (Thấp - Cao)
+                      {sortBy === 'trustScore_asc' && <span className="text-[10px]">✓</span>}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Clear filters action */}
@@ -1027,12 +1085,32 @@ export default function UserListPage() {
 
               {/* Roles tab view */}
               {detailsTab === 'roles' && (
-                <div className="py-6 text-center text-gray-400">
-                  <i className="fa-solid fa-shield-halved text-[24px] mx-auto mb-2 text-gray-300 dark:text-gray-650"></i>
-                  <p className="font-bold text-[10px] uppercase">Phân quyền chức năng</p>
-                  <p className="text-[9px] text-gray-400 mt-1 max-w-[200px] mx-auto">
-                    Vai trò "{getUserRoleName(selectedUser)}" sở hữu quyền đọc, ghi, cập nhật danh mục thuộc phạm vi {provinceName}.
-                  </p>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-gray-500 font-bold dark:text-gray-400 text-[11px] uppercase tracking-wider block">
+                      Thay đổi vai trò thành viên
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={getUserRoleId(selectedUser)}
+                        onChange={(e) => handleUpdateRole(selectedUser.id, Number(e.target.value))}
+                        disabled={updateRoleMutation.isPending}
+                        className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all cursor-pointer disabled:opacity-60 font-semibold"
+                      >
+                        {roles.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.description || r.name}
+                          </option>
+                        ))}
+                      </select>
+                      {updateRoleMutation.isPending && (
+                        <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-4 border border-slate-100 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-900/30 rounded-xl leading-relaxed text-gray-550">
+                    Vai trò hiện tại <span className="font-bold text-amber-500">"{getUserRoleName(selectedUser)}"</span> sở hữu quyền đọc, ghi, cập nhật danh mục thuộc phạm vi quản trị cấp tỉnh.
+                  </div>
                 </div>
               )}
 

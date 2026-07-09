@@ -14,6 +14,8 @@ export const DISPATCH_EVENTS = {
   SOS_OFFER: 'sos:offer',
   SOS_OFFER_CLAIMED: 'sos:offer-claimed',
   SOS_CLAIM_RESULT: 'sos:claim-result',
+  FLOOD_REQUEST_CREATED: 'flood-request:created',
+  FLOOD_REQUEST_UPDATED: 'flood-request:updated',
 
   // Client -> Server
   JOIN_PROVINCE_ROOM: 'join:province',

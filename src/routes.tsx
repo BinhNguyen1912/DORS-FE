@@ -25,11 +25,13 @@ import RescueTeamDetailPage from './pages/rescue-team/RescueTeamDetailPage';
 import TeamSpecializationListPage from './pages/rescue-team/TeamSpecializationListPage';
 import DisasterListPage from './pages/disaster/DisasterListPage';
 import DisasterDetailPage from './pages/disaster/DisasterDetailPage';
+import SosRequestListPage from './pages/sos-request/SosRequestListPage';
 import DonationListPage from './pages/donation/DonationListPage';
 import DonationCampaignPage from './pages/donation/DonationCampaignPage';
 import UserListPage from './pages/categories/UserListPage';
 import RoleListPage from './pages/categories/RoleListPage';
 import SystemSettingsPage from './pages/settings/SystemSettingsPage';
+import ProfilePage from './pages/profile/ProfilePage';
 
 
 // Protected Route Component
@@ -181,6 +183,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: ROUTES.SOS_REQUEST_LIST,
+        element: (
+          <FeatureGuard route={ROUTES.SOS_REQUEST_LIST}>
+            <SosRequestListPage />
+          </FeatureGuard>
+        ),
+      },
+      {
         path: ROUTES.DONATION_LIST,
         element: (
           <FeatureGuard route={ROUTES.DONATION_LIST}>
@@ -211,6 +221,10 @@ export const router = createBrowserRouter([
             <SystemSettingsPage />
           </FeatureGuard>
         ),
+      },
+      {
+        path: ROUTES.PROFILE,
+        element: <ProfilePage />,
       },
     ],
   },
