@@ -819,16 +819,13 @@ export default function UserListPage() {
                                 value={getUserRoleId(item)}
                                 onChange={(e) => handleUpdateRole(item.id, Number(e.target.value))}
                                 disabled={updateRoleMutation.isPending}
-                                className={cn(
-                                  'px-2 py-0.5 text-[9.5px] font-bold rounded-lg uppercase tracking-wider cursor-pointer border-0 outline-none focus:ring-1 focus:ring-amber-500 max-w-[160px] bg-transparent',
-                                  getRoleBadge(getUserRoleName(item))
-                                )}
+                                className="px-2.5 py-1 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer min-w-[130px]"
                               >
                                 {roles.map(r => (
                                   <option 
                                     key={r.id} 
                                     value={r.id}
-                                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs font-semibold normal-case"
+                                    className="bg-white dark:bg-gray-800 text-gray-950 dark:text-white text-xs font-semibold normal-case"
                                   >
                                     {r.description || r.name}
                                   </option>
