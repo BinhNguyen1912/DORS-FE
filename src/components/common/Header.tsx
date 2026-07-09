@@ -122,43 +122,43 @@ export default function Header({
     rightValue: string | null;
     action: () => void;
   }[] = [
-    {
-      icon: User,
-      label: 'Thông tin cá nhân',
-      rightValue: null,
-      action: () => goTo(ROUTES.PROFILE),
-    },
-    {
-      icon: KeyRound,
-      label: 'Đổi mật khẩu',
-      rightValue: null,
-      action: () => goTo(ROUTES.SETTINGS),
-    },
-    {
-      icon: UserCog,
-      label: 'Thiết lập tài khoản',
-      rightValue: null,
-      action: () => goTo(ROUTES.SETTINGS),
-    },
-    {
-      icon: BellRing,
-      label: 'Thiết lập thông báo',
-      rightValue: null,
-      action: () => goTo(ROUTES.SETTINGS),
-    },
-    {
-      icon: Globe,
-      label: 'Ngôn ngữ',
-      rightValue: 'Tiếng Việt',
-      action: () => {},
-    },
-    {
-      icon: Sun,
-      label: 'Chế độ',
-      rightValue: isDark ? 'Tối' : 'Sáng',
-      action: () => toggleDark(),
-    },
-  ];
+      {
+        icon: User,
+        label: 'Thông tin cá nhân',
+        rightValue: null,
+        action: () => goTo(ROUTES.PROFILE),
+      },
+      {
+        icon: KeyRound,
+        label: 'Đổi mật khẩu',
+        rightValue: null,
+        action: () => goTo(ROUTES.PROFILE),
+      },
+      {
+        icon: UserCog,
+        label: 'Thiết lập ứng dụng',
+        rightValue: null,
+        action: () => goTo(ROUTES.SETTINGS),
+      },
+      {
+        icon: BellRing,
+        label: 'Thiết lập thông báo',
+        rightValue: null,
+        action: () => goTo(ROUTES.SETTINGS),
+      },
+      {
+        icon: Globe,
+        label: 'Ngôn ngữ',
+        rightValue: 'Tiếng Việt',
+        action: () => { },
+      },
+      {
+        icon: Sun,
+        label: 'Chế độ',
+        rightValue: isDark ? 'Tối' : 'Sáng',
+        action: () => toggleDark(),
+      },
+    ];
 
   return (
     <div className="layout-global-header relative h-16 flex items-center justify-between bg-white dark:bg-gray-800 px-6 border-b border-slate-100 dark:border-slate-800 shadow-sm z-30 select-none flex-shrink-0 overflow-visible">
