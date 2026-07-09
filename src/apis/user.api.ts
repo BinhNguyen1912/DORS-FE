@@ -82,4 +82,9 @@ export const userApi = {
   revokeAllSessions: async (): Promise<void> => {
     await api.delete('/devices/all');
   },
+
+  bulkUpdate: async (ids: number[], data: { roleId?: number; isActive?: boolean }): Promise<{ updated: number }> => {
+    const response = await api.patch<any>('/users/bulk-update', { ids, ...data });
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
 };
