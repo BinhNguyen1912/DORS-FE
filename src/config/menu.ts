@@ -58,7 +58,7 @@ export const menuItems: MenuItem[] = [
     roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN']
   },
   {
-    label: 'Nhân lực & Tình nguyện',
+    label: 'Người dân',
     href: '#/volunteer',
     icon: UserCheck,
     roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN']
