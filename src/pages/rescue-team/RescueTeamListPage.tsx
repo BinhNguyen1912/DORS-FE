@@ -139,6 +139,7 @@ export default function RescueTeamListPage() {
         OFF_DUTY: 'OFF_DUTY',
         STANDBY: 'STANDBY',
         DISPATCHED: 'DISPATCHED',
+        // Legacy values from older BE versions
         ACTIVE: 'AVAILABLE',
         ON_DUTY: 'BUSY',
         INACTIVE: 'OFF_DUTY',
@@ -169,6 +170,12 @@ export default function RescueTeamListPage() {
       const teamTypeCode = typeMap[team.teamType] || 'TH';
       const code = `${teamTypeCode}-${String(team.id).padStart(4, '0')}`;
 
+      // Tính số thành viên thực tế
+      const activeMembers = (team as any).members
+        ? (team as any).members.filter((m: any) => m.isActive).length
+        : (team as any).memberCount ?? (team as any).activeMemberCount ?? 0;
+      const maxCap = team.maxCapacity || 20;
+
       return {
         id: team.id,
         code,
@@ -178,9 +185,7 @@ export default function RescueTeamListPage() {
         teamType: typeMap[team.teamType] || 'TONG_HOP',
         status: (statusMap[team.status] || 'AVAILABLE') as any,
         address,
-        memberCount: `${
-          (team as any).members ? (team as any).members.filter((m: any) => m.isActive).length : 0
-        }/${team.maxCapacity || 20}`,
+        memberCount: `${activeMembers}/${maxCap}`,
         activeMissions: team.missionsCount || 0,
         logoUrl: team.logoUrl,
       };
@@ -247,11 +252,15 @@ export default function RescueTeamListPage() {
 
   const bulkUpdateStatusMutation = useMutation({
     mutationFn: ({ ids, status }: { ids: number[]; status: string }) =>
-      Promise.all(ids.map(id => rescueTeamApi.update(id, { status } as any))),
-    onSuccess: () => {
+      rescueTeamApi.bulkUpdateStatus(ids, status),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['rescue-teams'] });
       setSelectedIds([]);
-      toast.success('Cập nhật trạng thái hàng loạt thành công!');
+      if (result?.failed?.length > 0) {
+        toast.warning(`Cập nhật ${result.updated} đội thành công. ${result.failed.length} đội thất bại.`);
+      } else {
+        toast.success(`Cập nhật trạng thái ${result?.updated ?? selectedIds.length} đội cứu hộ thành công!`);
+      }
     },
     onError: (err: any) => {
       toast.api(err, 'Lỗi khi cập nhật trạng thái hàng loạt');

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ClipboardList,
   Search,
@@ -8,17 +8,61 @@ import {
   FileText,
   SlidersHorizontal,
   X,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from '../../stores';
 import { cn } from '../../lib/utils';
 import RequestList from './components/RequestList';
 import RequestDetail from './components/RequestDetail';
-import { MOCK_REQUESTS, type SosRequestItem } from './components/mockData';
+import { floodRequestApi } from '../../apis';
+import { useSocket } from '../../providers/SocketProvider';
+import { DISPATCH_EVENTS } from '../../constants/websocket.constant';
+import type { SosRequestItem } from './components/mockData';
 
 export default function SosRequestListPage() {
-  // Flood requests (citizen declarations) — completely separate from sos_request table
-  // Will be replaced by useQuery(() => floodRequestApi.getAll()) once BE is ready
-  const [localMockRequests, setLocalMockRequests] = useState<SosRequestItem[]>(MOCK_REQUESTS);
+  const queryClient = useQueryClient();
+  const { dispatchSocket } = useSocket();
+
+  const { data: rawResponse, isLoading: isLoadingRequests, isError, error, refetch } = useQuery({
+    queryKey: ['floodRequests'],
+    queryFn: () => floodRequestApi.getAll({ limit: 100 }),
+    retry: 1,
+    staleTime: 30_000,
+  });
+
+  const requests = useMemo<SosRequestItem[]>(() => {
+    const items = rawResponse?.data || [];
+    return items.map((item: any) => ({
+      id: item.id,
+      code: `REQ-2026-${String(item.id).padStart(4, '0')}`,
+      title: item.title,
+      requesterName: item.requesterName,
+      requesterPhone: item.requesterPhone,
+      createdAt: new Date(item.createdAt),
+      locationName: item.locationName || '',
+      addressDetail: item.addressDetail || '',
+      severity: item.severity,
+      status: item.status,
+      description: item.description || '',
+      lat: item.lat || 10.7989,
+      lng: item.lng || 106.6804,
+      floodDepth: item.floodDepthCmMin !== null && item.floodDepthCmMin !== undefined 
+        ? (item.floodDepthCmMax ? `${item.floodDepthCmMin} - ${item.floodDepthCmMax} cm` : `${item.floodDepthCmMin} cm`) 
+        : '0 cm',
+      estimatedArea: item.estimatedAreaHa !== null && item.estimatedAreaHa !== undefined 
+        ? `~ ${item.estimatedAreaHa} ha` 
+        : '0 ha',
+      impact: item.impact || 'Không rõ',
+      roadType: item.roadType || 'Không rõ',
+      source: item.source === 'APP' ? 'Ứng dụng di động' : item.source === 'WEB' ? 'Cổng thông tin Web' : item.source,
+      device: item.deviceInfo || 'Không rõ',
+      weather: item.weather || 'Không rõ',
+      notes: item.notes || '',
+      imageUrls: item.imageUrls || [],
+      purpose: item.purpose,
+      isApprovedForMap: item.isApprovedForMap,
+    }));
+  }, [rawResponse]);
 
   // Selected sub-tab
   const [activeSubTab, setActiveSubTab] = useState<'NGAP_LUT' | 'HO_SO'>('NGAP_LUT');
@@ -38,8 +82,6 @@ export default function SosRequestListPage() {
   // Selection state
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
 
-  const requests: SosRequestItem[] = localMockRequests;
-
   // Close filter dropdown when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -50,6 +92,37 @@ export default function SosRequestListPage() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Show error in console so it's visible during development
+  useEffect(() => {
+    if (isError) {
+      console.error('[SosRequestListPage] Lỗi tải danh sách flood requests:', error);
+      toast.error('Không thể tải danh sách yêu cầu — kiểm tra token/kết nối backend.');
+    }
+  }, [isError, error]);
+
+  // Socket: auto-refetch khi có flood request mới / cập nhật
+  useEffect(() => {
+    if (!dispatchSocket) return;
+
+    const handleNewFloodRequest = (req: any) => {
+      console.log('📡 [WS] flood-request:created ->', req);
+      queryClient.invalidateQueries({ queryKey: ['floodRequests'] });
+      toast.info(`🚨 Yêu cầu ngập lụt mới: ${req?.title || 'Không rõ tiêu đề'}`);
+    };
+
+    const handleFloodRequestUpdated = () => {
+      queryClient.invalidateQueries({ queryKey: ['floodRequests'] });
+    };
+
+    dispatchSocket.on(DISPATCH_EVENTS.FLOOD_REQUEST_CREATED, handleNewFloodRequest);
+    dispatchSocket.on(DISPATCH_EVENTS.FLOOD_REQUEST_UPDATED, handleFloodRequestUpdated);
+
+    return () => {
+      dispatchSocket.off(DISPATCH_EVENTS.FLOOD_REQUEST_CREATED, handleNewFloodRequest);
+      dispatchSocket.off(DISPATCH_EVENTS.FLOOD_REQUEST_UPDATED, handleFloodRequestUpdated);
+    };
+  }, [dispatchSocket, queryClient]);
 
   // Set default selected request on load
   useEffect(() => {
@@ -141,27 +214,21 @@ export default function SosRequestListPage() {
       );
   }, [requests, activeSubTab, statusFilter, severityFilter, searchQuery, sortBy, dateFrom, dateTo]);
 
-  // Dispatch mutation (mock)
+  // Dispatch mutation
   const assignTeamMutation = useMutation({
     mutationFn: async (id: number) => ({ success: true, id }),
-    onSuccess: (_res, id) => {
-      setLocalMockRequests(prev =>
-        prev.map(item => (item.id === id ? { ...item, status: 'DISPATCHED' } : item))
-      );
-      toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối & Đã tạo 1 SOS mới.');
-    },
-    onError: (err: any) => {
-      toast.api(err, 'Lỗi phê duyệt yêu cầu');
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['floodRequests'] });
     },
   });
 
-  // Update status mutation (mock)
+  // Update status mutation
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => ({ success: true, id, status }),
-    onSuccess: (_res, { id, status }) => {
-      setLocalMockRequests(prev =>
-        prev.map(item => (item.id === id ? { ...item, status } : item))
-      );
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      return floodRequestApi.updateStatus(id, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['floodRequests'] });
       toast.success('Đã cập nhật trạng thái yêu cầu thành công!');
     },
     onError: (err: any) => {
@@ -169,12 +236,23 @@ export default function SosRequestListPage() {
     },
   });
 
+  // Approve for Map mutation
+  const approveForMapMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return floodRequestApi.approveMap(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['floodRequests'] });
+      toast.success('Đã duyệt hiển thị điểm ngập lụt này lên bản đồ cứu hộ thành công!');
+    },
+    onError: (err: any) => {
+      toast.api(err, 'Lỗi duyệt lên bản đồ');
+    },
+  });
+
   // Approve for Map
   const handleApproveForMap = (id: number) => {
-    setLocalMockRequests(prev =>
-      prev.map(item => (item.id === id ? { ...item, isApprovedForMap: true } : item))
-    );
-    toast.success('Đã duyệt hiển thị điểm ngập lụt này lên bản đồ cứu hộ thành công!');
+    approveForMapMutation.mutate(id);
   };
 
   return (
@@ -362,6 +440,16 @@ export default function SosRequestListPage() {
             Xóa lọc
           </button>
         )}
+
+        {/* Refresh */}
+        <button
+          onClick={() => refetch()}
+          title="Làm mới danh sách"
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-50 hover:bg-blue-50 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-655 dark:text-gray-300 hover:text-blue-600 rounded-xl text-xs font-bold shadow-xs transition border-0"
+        >
+          <RefreshCw size={14} className={isLoadingRequests ? 'animate-spin' : ''} />
+          <span>Làm mới</span>
+        </button>
 
         {/* Export */}
         <button className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-655 dark:text-gray-300 rounded-xl text-xs font-bold shadow-xs transition border-0">

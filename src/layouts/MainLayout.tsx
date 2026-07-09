@@ -261,18 +261,19 @@ export default function MainLayout() {
     USER: 'Người dùng',
     VOLUNTEER: 'Tình nguyện viên',
   };
-  const userRoleText = user?.role ? (roleTranslations[user.role] || user.role) : 'Điều phối viên';
+  const userRole = user?.role || (user as any)?.userRoles?.[0]?.role?.name;
+  const userRoleText = userRole ? (roleTranslations[userRole] || userRole) : 'Điều phối viên';
 
   // Lọc danh sách menu theo quyền của vai trò (RBAC)
   const filteredMenuItems = menuItems
     .map((item) => {
-      if (item.roles && (!user?.role || !item.roles.includes(user.role))) {
+      if (item.roles && (!userRole || !item.roles.includes(userRole))) {
         return null;
       }
 
       if (item.children) {
         const filteredChildren = item.children.filter((child) => {
-          if (child.roles && (!user?.role || !child.roles.includes(user.role))) {
+          if (child.roles && (!userRole || !child.roles.includes(userRole))) {
             return false;
           }
           return true;

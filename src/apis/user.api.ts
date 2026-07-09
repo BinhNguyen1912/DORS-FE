@@ -61,4 +61,21 @@ export const userApi = {
   delete: async (id: number): Promise<void> => {
     await api.delete(`/users/${id}`);
   },
+
+  changePassword: async (data: { currentPassword?: string; newPassword: string }): Promise<void> => {
+    await api.patch('/users/profile/password', data);
+  },
+
+  getDevices: async (): Promise<any[]> => {
+    const response = await api.get<any>('/devices');
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
+
+  deleteDevice: async (id: number): Promise<void> => {
+    await api.delete(`/devices/${id}`);
+  },
+
+  revokeSession: async (id: number): Promise<void> => {
+    await api.delete(`/devices/session/${id}`);
+  },
 };

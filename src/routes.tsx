@@ -31,6 +31,7 @@ import DonationCampaignPage from './pages/donation/DonationCampaignPage';
 import UserListPage from './pages/categories/UserListPage';
 import RoleListPage from './pages/categories/RoleListPage';
 import SystemSettingsPage from './pages/settings/SystemSettingsPage';
+import ProfilePage from './pages/profile/ProfilePage';
 
 
 // Protected Route Component
@@ -220,6 +221,10 @@ export const router = createBrowserRouter([
             <SystemSettingsPage />
           </FeatureGuard>
         ),
+      },
+      {
+        path: ROUTES.PROFILE,
+        element: <ProfilePage />,
       },
     ],
   },

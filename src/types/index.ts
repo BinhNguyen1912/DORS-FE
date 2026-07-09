@@ -267,3 +267,43 @@ export interface RescueTeamMember {
   user?: User | null;
 }
 
+export interface FloodRequest {
+  id: number;
+  title: string;
+  description?: string;
+  requesterId?: number | null;
+  requesterName: string;
+  requesterPhone: string;
+  location: {
+    type: 'Point';
+    coordinates: [number, number];
+  };
+  provinceId: number;
+  adminUnitId: number;
+  locationName?: string;
+  addressDetail?: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  floodDepthCmMin?: number | null;
+  floodDepthCmMax?: number | null;
+  estimatedAreaHa?: number | null;
+  roadType?: string;
+  impact?: string;
+  weather?: string;
+  notes?: string;
+  imageUrls: string[];
+  purpose: 'DECLARE_ONLY' | 'REQUEST_SUPPORT';
+  status: 'PENDING' | 'VERIFYING' | 'APPROVED' | 'DISPATCHED' | 'REJECTED';
+  isApprovedForMap: boolean;
+  reviewedBy?: number | null;
+  reviewedAt?: string | null;
+  reviewNotes?: string | null;
+  linkedSosId?: number | null;
+  dispatchMethod?: 'AUTO' | 'MANUAL' | null;
+  source: 'APP' | 'WEB' | 'IOT_SMS' | 'IOT_MQTT';
+  deviceInfo?: string;
+  createdAt: string;
+  updatedAt: string;
+  province?: Province;
+  adminUnit?: AdministrativeUnit;
+}
+

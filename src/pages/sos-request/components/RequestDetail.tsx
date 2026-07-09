@@ -19,6 +19,7 @@ import { cn } from '../../../lib/utils';
 import { toast } from '../../../stores';
 import { sosApi } from '../../../apis/sos.api';
 import { rescueTeamApi } from '../../../apis/rescue-team.api';
+import { floodRequestApi } from '../../../apis/flood-request.api';
 import RequestStepper from './RequestStepper';
 import RequestHistory from './RequestHistory';
 import type { SosRequestItem } from './mockData';
@@ -127,36 +128,35 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
     toast.success('Đã sao chép tọa độ vào bộ nhớ tạm!');
   };
 
-  // ── AUTO DISPATCH: call sosApi.assignTeam (BE auto-picks optimal team)
+  // ── AUTO DISPATCH: call floodRequestApi.dispatch
   const handleAutoDispatch = async () => {
     setIsAutoDispatching(true);
     try {
-      await sosApi.assignTeam(request.id); // no teamId → BE handles algorithm
+      await floodRequestApi.dispatch(request.id, { method: 'AUTO' });
       onVerify(request.id);
       toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối. SOS mới đã được tạo.');
-    } catch {
-      // Mock success for demo (when request.id >= 9900 = mock data)
-      onVerify(request.id);
-      toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối. SOS mới đã được tạo.');
+    } catch (err: any) {
+      toast.api(err, 'Lỗi điều phối tự động');
     } finally {
       setIsAutoDispatching(false);
       setIsDispatchOpen(false);
     }
   };
 
-  // ── MANUAL DISPATCH: pass teamId to sosApi.assignTeam
+  // ── MANUAL DISPATCH: pass teamId to floodRequestApi.dispatch
   const handleManualDispatch = async () => {
     if (!selectedTeamId) return;
     setIsManualDispatching(true);
     const team = availableTeams.find(t => t.id === selectedTeamId);
     try {
-      await sosApi.assignTeam(request.id, { teamId: selectedTeamId });
+      await floodRequestApi.dispatch(request.id, {
+        method: 'MANUAL',
+        teamId: selectedTeamId,
+      });
       onVerify(request.id);
       toast.success(`Đã điều phối thủ công đội "${team?.name || selectedTeamId}" đến hiện trường. SOS mới đã được tạo.`);
-    } catch {
-      // Mock success for demo
-      onVerify(request.id);
-      toast.success(`Đã điều phối thủ công đội "${team?.name || selectedTeamId}" đến hiện trường. SOS mới đã được tạo.`);
+    } catch (err: any) {
+      toast.api(err, 'Lỗi điều phối thủ công');
     } finally {
       setIsManualDispatching(false);
       setIsDispatchOpen(false);

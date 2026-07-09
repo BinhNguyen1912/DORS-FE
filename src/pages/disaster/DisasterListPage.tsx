@@ -65,6 +65,7 @@ const injectStyles = `
   /* Fullscreen map helper styles */
   .has-fullscreen-map aside,
   .has-fullscreen-map header,
+  .has-fullscreen-map .layout-global-header,
   .has-fullscreen-map .layout-mobile-topbar {
     display: none !important;
   }

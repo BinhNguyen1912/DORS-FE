@@ -26,6 +26,7 @@ export const ROUTES = {
   USER_LIST: '/categories/users',
   ROLE_LIST: '/categories/roles',
   SETTINGS: '/settings',
+  PROFILE: '/profile',
 } as const;
 
 export * from './provinceCenters';

@@ -111,6 +111,11 @@ export const rescueTeamApi = {
     return response.data?.data !== undefined ? response.data.data : response.data;
   },
 
+  bulkUpdateStatus: async (ids: number[], status: string): Promise<{ updated: number; failed: number[] }> => {
+    const response = await api.patch<any>('/rescue-teams/bulk-status', { ids, status });
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
+
   delete: async (id: number): Promise<void> => {
     await api.delete(`/rescue-teams/${id}`);
   },
