@@ -446,6 +446,9 @@
     function getCleanBackendUrl() {
       let url = document.getElementById('cfg-backend-url').value.trim();
       if (url.endsWith('/')) url = url.slice(0, -1);
+      if (!url.includes('/api/v1')) {
+        url = url + '/api/v1';
+      }
       return url;
     }
 
