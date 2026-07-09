@@ -78,4 +78,8 @@ export const userApi = {
   revokeSession: async (id: number): Promise<void> => {
     await api.delete(`/devices/session/${id}`);
   },
+
+  revokeAllSessions: async (): Promise<void> => {
+    await api.delete('/devices/all');
+  },
 };

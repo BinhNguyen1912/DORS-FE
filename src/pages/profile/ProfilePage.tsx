@@ -47,6 +47,7 @@ export default function ProfilePage() {
   const [editBasic, setEditBasic] = useState(false);
   const [editContact, setEditContact] = useState(false);
   const [showConfirmLogoutCurrent, setShowConfirmLogoutCurrent] = useState<number | null>(null);
+  const [showConfirmLogoutAll, setShowConfirmLogoutAll] = useState(false);
 
   // Form state — basic
   const [formBasic, setFormBasic] = useState({
@@ -145,6 +146,16 @@ export default function ProfilePage() {
       }
     },
     onError: (err: any) => toast.api(err, 'Lỗi khi đăng xuất thiết bị'),
+  });
+
+  // Mutation — revoke all sessions
+  const revokeAllSessionsMutation = useMutation({
+    mutationFn: () => userApi.revokeAllSessions(),
+    onSuccess: () => {
+      toast.success('Đã đăng xuất khỏi tất cả thiết bị thành công!');
+      logout();
+    },
+    onError: (err: any) => toast.api(err, 'Lỗi khi đăng xuất các thiết bị'),
   });
 
   const handleOpenBasic = () => {
@@ -395,13 +406,26 @@ export default function ProfilePage() {
 
           {activeSection === 'devices' && (
             <section className="bg-white dark:bg-gray-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden text-left">
-              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center gap-4">
                 <div>
                   <h2 className="text-sm font-bold text-gray-900 dark:text-white">Thiết bị đăng nhập</h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     Quản lý danh sách các thiết bị di động và các phiên trình duyệt web đã đăng nhập tài khoản của bạn.
                   </p>
                 </div>
+                {devicesList && devicesList.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={revokeAllSessionsMutation.isPending}
+                    onClick={() => {
+                      setShowConfirmLogoutAll(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-white border border-rose-250 hover:bg-rose-600 rounded-lg transition-colors cursor-pointer bg-transparent disabled:opacity-50 flex-shrink-0"
+                  >
+                    <LogOut size={12} />
+                    <span>Đăng xuất tất cả</span>
+                  </button>
+                )}
               </div>
               
               <div className="px-6 py-4 space-y-4">
@@ -1006,6 +1030,58 @@ export default function ProfilePage() {
                 className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors cursor-pointer border-0"
               >
                 Đăng xuất ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          Modal — Xác nhận đăng xuất TẤT CẢ thiết bị
+      ══════════════════════════════════════════ */}
+      {showConfirmLogoutAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" onClick={() => setShowConfirmLogoutAll(false)}>
+          <div
+            className="w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-slate-150 dark:border-slate-700 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+            style={{ animation: 'slideInUp 0.2s cubic-bezier(0.16,1,0.3,1) both' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Xác nhận đăng xuất tất cả</h3>
+              <button type="button" onClick={() => setShowConfirmLogoutAll(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-gray-400 transition-colors border-0 bg-transparent cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 text-left">
+              <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-semibold">
+                Bạn đang yêu cầu đăng xuất khỏi TẤT CẢ các thiết bị di động và phiên trình duyệt web.
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-455 mt-2 leading-relaxed">
+                Hành động này sẽ hủy tất cả các phiên đăng nhập đang hoạt động của tài khoản này ngay lập tức. Thiết bị hiện tại của bạn cũng sẽ bị đăng xuất và bạn sẽ được chuyển hướng về trang đăng nhập. Bạn có chắc chắn muốn tiếp tục?
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2.5 px-6 py-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-gray-800/50">
+              <button
+                type="button"
+                onClick={() => setShowConfirmLogoutAll(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 border border-slate-200 dark:border-slate-755 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors bg-transparent cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  revokeAllSessionsMutation.mutate();
+                  setShowConfirmLogoutAll(false);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors cursor-pointer border-0"
+              >
+                Đăng xuất tất cả
               </button>
             </div>
           </div>
