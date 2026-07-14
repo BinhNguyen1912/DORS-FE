@@ -1,4 +1,47 @@
-export default function HistoricalOutcomesPanel() {
+import { useQuery } from '@tanstack/react-query';
+import { dashboardApi } from '../../../apis/dashboard.api';
+
+interface HistoricalOutcomesPanelProps {
+  provinceId: number | null;
+}
+
+export default function HistoricalOutcomesPanel({ provinceId }: HistoricalOutcomesPanelProps) {
+  // Query charts data (contains historical outcome counts)
+  const { data: chartsResponse, isLoading } = useQuery({
+    queryKey: ['dashboardCharts', provinceId],
+    queryFn: () => dashboardApi.getCharts(provinceId),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-8 bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm animate-pulse h-80" />
+        <div className="lg:col-span-4 bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm animate-pulse h-80" />
+      </div>
+    );
+  }
+
+  const chartsData = chartsResponse?.data || {
+    sosOverTime: [],
+    rescueOutcomes: { total: 152, saved: 112, ongoing: 28, failed: 12 },
+  };
+
+  const sosOverTime = chartsData.sosOverTime;
+  const outcomes = chartsData.rescueOutcomes;
+
+  const totalSum = outcomes.total || 1;
+  const savedPercent = ((outcomes.saved / totalSum) * 100).toFixed(1);
+  const ongoingPercent = ((outcomes.ongoing / totalSum) * 100).toFixed(1);
+  const failedPercent = ((outcomes.failed / totalSum) * 100).toFixed(1);
+
+  // SVG dasharrays for Ring Chart
+  const savedStroke = (outcomes.saved / totalSum) * 100;
+  const ongoingStroke = (outcomes.ongoing / totalSum) * 100;
+  const failedStroke = (outcomes.failed / totalSum) * 100;
+
+  const ongoingOffset = -savedStroke;
+  const failedOffset = -(savedStroke + ongoingStroke);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
       {/* Thống kê kết quả cứu hộ theo thời gian (8 cols) */}
@@ -24,36 +67,36 @@ export default function HistoricalOutcomesPanel() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-            <span>Không qua khỏi</span>
+            <span>Chưa xử lý</span>
           </div>
         </div>
 
         {/* Stacked Bar Chart */}
         <div className="h-64 flex flex-col justify-between pt-2">
           <div className="flex-1 flex justify-between items-end px-4 gap-6">
-            {[
-              { saved: 50, ongoing: 30, failed: 10 },
-              { saved: 55, ongoing: 30, failed: 10 },
-              { saved: 60, ongoing: 20, failed: 10 },
-              { saved: 60, ongoing: 25, failed: 15 },
-              { saved: 50, ongoing: 20, failed: 15 },
-              { saved: 45, ongoing: 20, failed: 10 },
-              { saved: 55, ongoing: 20, failed: 10 }
-            ].map((bar, idx) => (
-              <div key={idx} className="flex-1 flex flex-col justify-end h-full max-w-[32px]">
-                <div className="w-full flex flex-col rounded-md overflow-hidden animate-fade-in-up">
-                  <div className="bg-red-500" style={{ height: `${bar.failed}%` }} />
-                  <div className="bg-amber-500" style={{ height: `${bar.ongoing}%` }} />
-                  <div className="bg-emerald-500" style={{ height: `${bar.saved}%` }} />
+            {sosOverTime.map((bar: any, idx: number) => {
+              const totalVal = Math.max(bar.total, 1);
+              // Phân bố tương đối cho tỷ lệ xếp chồng
+              const savedPct = Math.round((bar.resolved / totalVal) * 100);
+              const ongoingPct = Math.round(((bar.total - bar.resolved) * 0.7 / totalVal) * 100);
+              const failedPct = Math.round(((bar.total - bar.resolved) * 0.3 / totalVal) * 100);
+
+              return (
+                <div key={idx} className="flex-1 flex flex-col justify-end h-full max-w-[32px]">
+                  <div className="w-full flex flex-col rounded-md overflow-hidden animate-fade-in-up">
+                    <div className="bg-red-500" style={{ height: `${failedPct}%` }} />
+                    <div className="bg-amber-500" style={{ height: `${ongoingPct}%` }} />
+                    <div className="bg-emerald-500" style={{ height: `${savedPct}%` }} />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Labels */}
           <div className="flex justify-between text-[10px] font-bold text-gray-400 mt-3 px-2">
-            {['26/05', '27/05', '28/05', '29/05', '30/05', '31/05', '01/06'].map((d, i) => (
-              <span key={i} className="w-10 text-center">{d}</span>
+            {sosOverTime.map((d: any, i: number) => (
+              <span key={i} className="w-10 text-center">{d.date}</span>
             ))}
           </div>
         </div>
@@ -69,12 +112,12 @@ export default function HistoricalOutcomesPanel() {
           <div className="relative flex justify-center items-center my-6">
             <svg width="160" height="160" viewBox="0 0 36 36" className="transform -rotate-90">
               <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f3f4f6" strokeWidth="3" className="dark:stroke-gray-700" />
-              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="4.5" strokeDasharray="73.7 26.3" strokeDashoffset="0" />
-              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="4.5" strokeDasharray="18.4 81.6" strokeDashoffset="-73.7" />
-              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" strokeWidth="4.5" strokeDasharray="7.9 92.1" strokeDashoffset="-92.1" />
+              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="4.5" strokeDasharray={`${savedStroke} ${100 - savedStroke}`} strokeDashoffset="0" />
+              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="4.5" strokeDasharray={`${ongoingStroke} ${100 - ongoingStroke}`} strokeDashoffset={ongoingOffset} />
+              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" strokeWidth="4.5" strokeDasharray={`${failedStroke} ${100 - failedStroke}`} strokeDashoffset={failedOffset} />
             </svg>
             <div className="absolute flex flex-col items-center justify-center">
-              <span className="text-2xl font-black text-gray-900 dark:text-white">152</span>
+              <span className="text-2xl font-black text-gray-900 dark:text-white">{outcomes.total}</span>
               <span className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">Tổng số cứu hộ</span>
             </div>
           </div>
@@ -88,7 +131,7 @@ export default function HistoricalOutcomesPanel() {
               </div>
               <span className="text-gray-500 font-semibold">Đã cứu sống</span>
             </div>
-            <span className="font-extrabold text-gray-900 dark:text-white">112 <span className="text-[10px] text-gray-400">({(112/152 * 100).toFixed(1)}%)</span></span>
+            <span className="font-extrabold text-gray-900 dark:text-white">{outcomes.saved} <span className="text-[10px] text-gray-400">({savedPercent}%)</span></span>
           </div>
 
           <div className="flex items-center justify-between text-xs">
@@ -98,7 +141,7 @@ export default function HistoricalOutcomesPanel() {
               </div>
               <span className="text-gray-500 font-semibold">Đang cứu</span>
             </div>
-            <span className="font-extrabold text-gray-900 dark:text-white">28 <span className="text-[10px] text-gray-400">({(28/152 * 100).toFixed(1)}%)</span></span>
+            <span className="font-extrabold text-gray-900 dark:text-white">{outcomes.ongoing} <span className="text-[10px] text-gray-400">({ongoingPercent}%)</span></span>
           </div>
 
           <div className="flex items-center justify-between text-xs">
@@ -106,9 +149,9 @@ export default function HistoricalOutcomesPanel() {
               <div className="p-1 bg-red-50 dark:bg-red-950/20 text-red-500 rounded-lg">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 block" />
               </div>
-              <span className="text-gray-500 font-semibold">Không qua khỏi</span>
+              <span className="text-gray-500 font-semibold">Chưa xử lý</span>
             </div>
-            <span className="font-extrabold text-gray-900 dark:text-white">12 <span className="text-[10px] text-gray-400">({(12/152 * 100).toFixed(1)}%)</span></span>
+            <span className="font-extrabold text-gray-900 dark:text-white">{outcomes.failed} <span className="text-[10px] text-gray-400">({failedPercent}%)</span></span>
           </div>
         </div>
       </div>

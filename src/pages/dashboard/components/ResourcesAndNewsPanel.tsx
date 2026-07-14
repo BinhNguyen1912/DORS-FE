@@ -1,19 +1,6 @@
-import { Package, BookOpen, Calendar } from 'lucide-react';
-
-const inventoryResources = [
-  { name: 'Nước uống (chai)', current: '12.500', target: '20.000', percent: 62.5, color: 'bg-blue-500' },
-  { name: 'Lương thực (kg)', current: '8.200', target: '15.000', percent: 54.7, color: 'bg-amber-500' },
-  { name: 'Áo phao (cái)', current: '1.150', target: '3.000', percent: 38.3, color: 'bg-orange-500' },
-  { name: 'Thuốc men (bộ)', current: '680', target: '1.500', percent: 45.3, color: 'bg-emerald-500' },
-  { name: 'Chăn mền (cái)', current: '2.300', target: '5.000', percent: 46.0, color: 'bg-red-500' },
-  { name: 'Đèn pin (cái)', current: '450', target: '1.000', percent: 45.0, color: 'bg-blue-500' }
-];
-
-const newsFeed = [
-  { date: '01/06/2026', title: 'Cập nhật tình hình mưa lũ tại Hòa Bình', desc: 'Mực nước sông Đà tiếp tục dâng cao, người dân...' },
-  { date: '01/06/2026', title: 'Hướng dẫn an toàn khi có lũ quét', desc: 'Các biện pháp bảo vệ bản thân và gia đình...' },
-  { date: '31/05/2026', title: 'Cảm ơn các nhà hảo tâm', desc: 'Tổng hợp danh sách các tổ chức, cá nhân đóng góp...' }
-];
+import { Package, RefreshCw } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { dashboardApi } from '../../../apis/dashboard.api';
 
 // Thuật toán Catmull-Rom Spline để tính đường cong Bézier trơn tru tự nhiên nhất
 function getBezierPath(points: [number, number][]) {
@@ -59,16 +46,51 @@ function getBezierPath(points: [number, number][]) {
   return d;
 }
 
-export default function ResourcesAndNewsPanel() {
-  const donationTrend: number[] = [10, 18, 17, 27, 30, 47, 34, 27, 28, 18, 13, 18, 26, 23, 25, 33];
-  
-  // Map points for the area chart
-  const maxVal = 50;
+interface ResourcesAndNewsPanelProps {
+  provinceId: number | null;
+}
+
+export default function ResourcesAndNewsPanel({ provinceId }: ResourcesAndNewsPanelProps) {
+  // Query dữ liệu vật tư và tài chính từ Backend
+  const { data: resourcesResponse, isLoading: isResourcesLoading } = useQuery({
+    queryKey: ['dashboardResources', provinceId],
+    queryFn: () => dashboardApi.getResources(provinceId),
+  });
+
+  // Query dữ liệu tin tức (sử dụng alerts thiên tai để tạo feed tin tức)
+  const { data: alertsResponse, isLoading: isAlertsLoading } = useQuery({
+    queryKey: ['dashboardAlerts', provinceId],
+    queryFn: () => dashboardApi.getAlerts(provinceId),
+  });
+
+  if (isResourcesLoading || isAlertsLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm animate-pulse h-60" />
+        ))}
+      </div>
+    );
+  }
+
+  const resourcesData = resourcesResponse?.data || {
+    inventory: [],
+    donations: { totalAmount: 1245000000, trendPercent: 18, sparkline: [10, 20, 15, 30] },
+  };
+
+  const alertsData = alertsResponse?.data || { disasters: [] };
+
+  const inventory = resourcesData.inventory;
+  const donations = resourcesData.donations;
+
+  // Lập sơ đồ biểu đồ đóng góp tài chính
+  const donationTrend = donations.sparkline;
+  const maxVal = Math.max(...donationTrend, 10);
   const chartHeight = 50;
   const chartWidth = 200;
-  const points = donationTrend.map((val, i) => {
+  const points = donationTrend.map((val: number, i: number) => {
     const x = (i / (donationTrend.length - 1)) * chartWidth;
-    const y = chartHeight - (val / maxVal) * 40; // Keep padding
+    const y = chartHeight - (val / maxVal) * 40;
     return [x, y] as [number, number];
   });
 
@@ -77,12 +99,24 @@ export default function ResourcesAndNewsPanel() {
     ? `${linePath} L ${points[points.length - 1][0]} ${chartHeight} L ${points[0][0]} ${chartHeight} Z`
     : '';
 
+  // Tin tức từ bản ghi thiên tai
+  const latestNews = alertsData.disasters.length > 0 
+    ? alertsData.disasters.map((d: any) => ({
+        date: d.time,
+        title: d.title,
+        desc: d.desc,
+      }))
+    : [
+        { date: '01/06/2026', title: 'Phát động quyên góp đợt 2', desc: 'Ủy ban MTTQ Việt Nam phát động đợt quyên góp hỗ trợ...' },
+        { date: '31/05/2026', title: 'Cảm ơn các nhà hảo tâm', desc: 'Tổng hợp danh sách các tổ chức, cá nhân đóng góp...' },
+      ];
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
       {/* Tình hình vật tư cứu trợ */}
       <div className="bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+          <h2 className="text-sm font-bold text-black dark:text-white flex items-center gap-1.5">
             <Package size={16} className="text-blue-500" />
             <span>Tình hình vật tư cứu trợ</span>
           </h2>
@@ -92,7 +126,7 @@ export default function ResourcesAndNewsPanel() {
         </div>
 
         <div className="space-y-3">
-          {inventoryResources.map((item, idx) => (
+          {inventory.slice(0, 4).map((item: any, idx: number) => (
             <div key={idx} className="space-y-1">
               <div className="flex justify-between text-[11px] font-bold">
                 <span className="text-gray-500 truncate max-w-[60%]">{item.name}</span>
@@ -111,7 +145,7 @@ export default function ResourcesAndNewsPanel() {
       {/* Tổng đóng góp (Area chart) */}
       <div className="bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">
+          <h2 className="text-sm font-bold text-black dark:text-white">
             Tổng đóng góp
           </h2>
           <button className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
@@ -121,44 +155,50 @@ export default function ResourcesAndNewsPanel() {
 
         <div>
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Số tiền</span>
-          <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">1.245.000.000 đ</p>
+          <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">
+            {donations.totalAmount.toLocaleString('vi-VN')} đ
+          </p>
           <p className="text-[11px] text-emerald-500 font-bold mt-1">
-            ↑ 18% <span className="text-gray-400 font-medium">so với 7 ngày trước</span>
+            ↑ {donations.trendPercent}% <span className="text-gray-400 font-medium">so với 7 ngày trước</span>
           </p>
         </div>
 
         {/* Area chart representation using SVG */}
         <div className="h-20 w-full mt-4">
-          <svg className="w-full h-full" viewBox="0 0 200 60" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.30" />
-                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.00" />
-              </linearGradient>
-            </defs>
-            <path
-              d={areaPath}
-              fill="url(#purpleGrad)"
-            />
-            <path
-              d={linePath}
-              fill="none"
-              stroke="#8b5cf6"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-            {points.length > 0 && (
-              <circle cx={points[points.length - 1][0]} cy={points[points.length - 1][1]} r="2.5" fill="#8b5cf6" stroke="#fff" strokeWidth="1" />
-            )}
-          </svg>
+          {points.length > 0 ? (
+            <svg className="w-full h-full" viewBox="0 0 200 60" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.30" />
+                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.00" />
+                </linearGradient>
+              </defs>
+              <path
+                d={areaPath}
+                fill="url(#purpleGrad)"
+              />
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#8b5cf6"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+              {points.length > 0 && (
+                <circle cx={points[points.length - 1][0]} cy={points[points.length - 1][1]} r="2.5" fill="#8b5cf6" stroke="#fff" strokeWidth="1" />
+              )}
+            </svg>
+          ) : (
+            <div className="h-full flex items-center justify-center text-xs text-gray-400">Không có dữ liệu đóng góp</div>
+          )}
         </div>
       </div>
 
       {/* Tin tức & thông báo */}
       <div className="bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-            <BookOpen size={16} className="text-purple-500" />
+          <h2 className="text-sm font-bold text-black dark:text-white flex items-center gap-1.5">
+            <RefreshCw size={16} className="text-emerald-500" />
             <span>Tin tức & thông báo</span>
           </h2>
           <button className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
@@ -166,21 +206,16 @@ export default function ResourcesAndNewsPanel() {
           </button>
         </div>
 
-        <div className="space-y-3.5 flex-1">
-          {newsFeed.map((news, idx) => (
-            <div key={idx} className="flex gap-3 items-start text-xs">
-              <div className="p-2 bg-slate-50 dark:bg-gray-700/40 text-gray-400 dark:text-gray-300 rounded-xl">
-                <Calendar size={14} />
-              </div>
-              <div className="space-y-0.5 flex-1 min-w-0">
-                <p className="text-[10px] text-gray-400 font-bold">{news.date}</p>
-                <p className="font-bold text-gray-900 dark:text-white truncate">
-                  {news.title}
-                </p>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                  {news.desc}
-                </p>
-              </div>
+        <div className="space-y-4 overflow-y-auto max-h-[180px] pr-1">
+          {latestNews.slice(0, 3).map((news: any, idx: number) => (
+            <div key={idx} className="space-y-1">
+              <span className="text-[9px] font-extrabold text-gray-400">{news.date}</span>
+              <p className="text-xs font-bold text-gray-900 dark:text-white leading-snug hover:text-indigo-600 cursor-pointer truncate">
+                {news.title}
+              </p>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed truncate">
+                {news.desc}
+              </p>
             </div>
           ))}
         </div>

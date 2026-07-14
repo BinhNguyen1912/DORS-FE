@@ -15,7 +15,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12 font-sans bg-[#f8fafc] dark:bg-gray-950 min-h-screen text-gray-800 dark:text-gray-150 p-1 md:p-2">
+    <div className="space-y-6 pb-12 font-sans text-gray-800 dark:text-gray-150 p-1 md:p-2">
       
       {/* HEADER SECTION (Welcome, update time, filters) */}
       <DashboardHeader 
@@ -25,23 +25,22 @@ export default function DashboardPage() {
       />
 
       {/* ROW 1: 5 STATS CARDS WITH SPARKLINES */}
-      {/* Trong tương lai, TopStatsGrid sẽ nhận provinceId và gọi API thực tế */}
-      <TopStatsGrid />
+      <TopStatsGrid provinceId={provinceId} />
 
       {/* ROW 2: MAIN CHARTS PANEL */}
-      <MainChartsPanel />
+      <MainChartsPanel provinceId={provinceId} />
 
       {/* ROW 3: FOUR SMALL PANELS (Regional breakdown, mission status, progress, latest SOS) */}
-      <RegionalStatsPanel />
+      <RegionalStatsPanel provinceId={provinceId} />
 
       {/* ROW 4: HISTORICAL OUTCOMES PANEL (Stacked bar, ratios) */}
-      <HistoricalOutcomesPanel />
+      <HistoricalOutcomesPanel provinceId={provinceId} />
 
       {/* ROW 5: MAP AND ACTIVE MISSIONS */}
-      <MapAndMissionsPanel />
+      <MapAndMissionsPanel provinceId={provinceId} />
 
       {/* ROW 6: THREE SMALL GRID CARDS (Materials, donations, news) */}
-      <ResourcesAndNewsPanel />
+      <ResourcesAndNewsPanel provinceId={provinceId} />
 
     </div>
   );

@@ -1,41 +1,6 @@
 import { AlertTriangle, ArrowRight } from 'lucide-react';
-
-const sosOverTime = [
-  { date: '26/05', total: 32, resolved: 12, pending: 20 },
-  { date: '27/05', total: 60, resolved: 28, pending: 32 },
-  { date: '28/05', total: 86, resolved: 35, pending: 51 },
-  { date: '29/05', total: 70, resolved: 30, pending: 40 },
-  { date: '30/05', total: 56, resolved: 26, pending: 30 },
-  { date: '31/05', total: 71, resolved: 41, pending: 30 },
-  { date: '01/06', total: 88, resolved: 58, pending: 30 }
-];
-
-const emergencyAlerts = [
-  {
-    title: 'Lũ quét tại Hòa Bình',
-    badge: 'NGUY HIỂM',
-    badgeColor: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    desc: 'Mưa lớn gây lũ quét trên diện rộng',
-    time: '10 phút trước',
-    statusDot: 'bg-red-500'
-  },
-  {
-    title: 'Ngập lụt tại Quảng Trị',
-    badge: 'CẢNH BÁO',
-    badgeColor: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    desc: 'Mực nước dâng cao, nguy cơ ngập sâu',
-    time: '30 phút trước',
-    statusDot: 'bg-amber-500'
-  },
-  {
-    title: 'Sạt lở tại Lào Cai',
-    badge: 'CẢNH BÁO',
-    badgeColor: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    desc: 'Nguy cơ sạt lở đất tại khu vực đồi núi',
-    time: '1 giờ trước',
-    statusDot: 'bg-amber-500'
-  }
-];
+import { useQuery } from '@tanstack/react-query';
+import { dashboardApi } from '../../../apis/dashboard.api';
 
 // Thuật toán Catmull-Rom Spline để tính đường cong Bézier trơn tru tự nhiên nhất
 function getBezierPath(points: [number, number][]) {
@@ -81,27 +46,56 @@ function getBezierPath(points: [number, number][]) {
   return d;
 }
 
-export default function MainChartsPanel() {
+interface MainChartsPanelProps {
+  provinceId: number | null;
+}
+
+export default function MainChartsPanel({ provinceId }: MainChartsPanelProps) {
+  // Query dữ liệu biểu đồ từ Backend API
+  const { data: chartsResponse, isLoading: isChartsLoading } = useQuery({
+    queryKey: ['dashboardCharts', provinceId],
+    queryFn: () => dashboardApi.getCharts(provinceId),
+  });
+
+  // Query dữ liệu cảnh báo từ Backend API
+  const { data: alertsResponse, isLoading: isAlertsLoading } = useQuery({
+    queryKey: ['dashboardAlerts', provinceId],
+    queryFn: () => dashboardApi.getAlerts(provinceId),
+  });
+
+  const chartsData = chartsResponse?.data || {
+    sosOverTime: [],
+    rescueOutcomes: { total: 152, saved: 112, ongoing: 28, failed: 12 },
+  };
+
+  const alertsData = alertsResponse?.data || {
+    disasters: [],
+    latestSos: [],
+  };
+
+  const sosOverTime = chartsData.sosOverTime;
+  const outcomes = chartsData.rescueOutcomes;
+
   // Map points dynamically
-  const maxVal = 100;
+  const maxVal = Math.max(...sosOverTime.map((d: any) => d.total), 10);
   const chartHeight = 180;
   const chartWidth = 450;
   const startX = 30;
   const startY = 20;
 
-  const totalPoints = sosOverTime.map((d, i) => {
+  const totalPoints = sosOverTime.map((d: any, i: number) => {
     const x = startX + (i / (sosOverTime.length - 1)) * chartWidth;
     const y = chartHeight - (d.total / maxVal) * (chartHeight - startY);
     return [x, y] as [number, number];
   });
 
-  const resolvedPoints = sosOverTime.map((d, i) => {
+  const resolvedPoints = sosOverTime.map((d: any, i: number) => {
     const x = startX + (i / (sosOverTime.length - 1)) * chartWidth;
     const y = chartHeight - (d.resolved / maxVal) * (chartHeight - startY);
     return [x, y] as [number, number];
   });
 
-  const pendingPoints = sosOverTime.map((d, i) => {
+  const pendingPoints = sosOverTime.map((d: any, i: number) => {
     const x = startX + (i / (sosOverTime.length - 1)) * chartWidth;
     const y = chartHeight - (d.pending / maxVal) * (chartHeight - startY);
     return [x, y] as [number, number];
@@ -121,6 +115,31 @@ export default function MainChartsPanel() {
   const pendingArea = pendingPoints.length > 0
     ? `${pendingPath} L ${pendingPoints[pendingPoints.length - 1][0]} ${chartHeight} L ${pendingPoints[0][0]} ${chartHeight} Z`
     : '';
+
+  if (isChartsLoading || isAlertsLoading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-6 bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm animate-pulse h-80" />
+        <div className="lg:col-span-3 bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm animate-pulse h-80" />
+        <div className="lg:col-span-3 bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm animate-pulse h-80" />
+      </div>
+    );
+  }
+
+  // Cận tính phần trăm kết quả
+  const totalSum = outcomes.total || 1;
+  const savedPercent = ((outcomes.saved / totalSum) * 100).toFixed(1);
+  const ongoingPercent = ((outcomes.ongoing / totalSum) * 100).toFixed(1);
+  const failedPercent = ((outcomes.failed / totalSum) * 100).toFixed(1);
+
+  // SVG dasharrays for the Outcomes Ring
+  // total circumference = 2 * PI * 15.915 = 100
+  const savedStroke = (outcomes.saved / totalSum) * 100;
+  const ongoingStroke = (outcomes.ongoing / totalSum) * 100;
+  const failedStroke = (outcomes.failed / totalSum) * 100;
+
+  const ongoingOffset = -savedStroke;
+  const failedOffset = -(savedStroke + ongoingStroke);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -154,70 +173,74 @@ export default function MainChartsPanel() {
 
         {/* SVG Line Chart */}
         <div className="h-64 relative w-full pt-2">
-          <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.00" />
-              </linearGradient>
-              <linearGradient id="resolvedGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.10" />
-                <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
-              </linearGradient>
-              <linearGradient id="pendingGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity="0.08" />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity="0.00" />
-              </linearGradient>
-            </defs>
+          {sosOverTime.length > 0 ? (
+            <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.00" />
+                </linearGradient>
+                <linearGradient id="resolvedGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.10" />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
+                </linearGradient>
+                <linearGradient id="pendingGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#ef4444" stopOpacity="0.08" />
+                  <stop offset="100%" stopColor="#ef4444" stopOpacity="0.00" />
+                </linearGradient>
+              </defs>
 
-            {/* Grid Lines */}
-            {[0, 45, 90, 135, 180].map((y, idx) => (
-              <line key={idx} x1="30" y1={y} x2="480" y2={y} stroke="#e2e8f0" strokeDasharray="3,3" className="dark:stroke-gray-700" />
-            ))}
-            
-            {/* Areas */}
-            <path d={totalArea} fill="url(#totalGrad)" />
-            <path d={resolvedArea} fill="url(#resolvedGrad)" />
-            <path d={pendingArea} fill="url(#pendingGrad)" />
+              {/* Grid Lines */}
+              {[0, 45, 90, 135, 180].map((y, idx) => (
+                <line key={idx} x1="30" y1={y} x2="480" y2={y} stroke="#e2e8f0" strokeDasharray="3,3" className="dark:stroke-gray-700" />
+              ))}
+              
+              {/* Areas */}
+              <path d={totalArea} fill="url(#totalGrad)" />
+              <path d={resolvedArea} fill="url(#resolvedGrad)" />
+              <path d={pendingArea} fill="url(#pendingGrad)" />
 
-            {/* Lines */}
-            <path
-              d={totalPath}
-              fill="none"
-              stroke="#3b82f6"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-            <path
-              d={resolvedPath}
-              fill="none"
-              stroke="#10b981"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-            />
-            <path
-              d={pendingPath}
-              fill="none"
-              stroke="#ef4444"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-            />
+              {/* Lines */}
+              <path
+                d={totalPath}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d={resolvedPath}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
+              <path
+                d={pendingPath}
+                fill="none"
+                stroke="#ef4444"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
 
-            {/* Data Dots for the latest date */}
-            {totalPoints.length > 0 && (
-              <circle cx={totalPoints[totalPoints.length - 1][0]} cy={totalPoints[totalPoints.length - 1][1]} r="3" fill="#3b82f6" stroke="#fff" strokeWidth="1" />
-            )}
-            {resolvedPoints.length > 0 && (
-              <circle cx={resolvedPoints[resolvedPoints.length - 1][0]} cy={resolvedPoints[resolvedPoints.length - 1][1]} r="3" fill="#10b981" stroke="#fff" strokeWidth="1" />
-            )}
-            {pendingPoints.length > 0 && (
-              <circle cx={pendingPoints[pendingPoints.length - 1][0]} cy={pendingPoints[pendingPoints.length - 1][1]} r="3" fill="#ef4444" stroke="#fff" strokeWidth="1" />
-            )}
-          </svg>
+              {/* Data Dots for the latest date */}
+              {totalPoints.length > 0 && (
+                <circle cx={totalPoints[totalPoints.length - 1][0]} cy={totalPoints[totalPoints.length - 1][1]} r="3" fill="#3b82f6" stroke="#fff" strokeWidth="1" />
+              )}
+              {resolvedPoints.length > 0 && (
+                <circle cx={resolvedPoints[resolvedPoints.length - 1][0]} cy={resolvedPoints[resolvedPoints.length - 1][1]} r="3" fill="#10b981" stroke="#fff" strokeWidth="1" />
+              )}
+              {pendingPoints.length > 0 && (
+                <circle cx={pendingPoints[pendingPoints.length - 1][0]} cy={pendingPoints[pendingPoints.length - 1][1]} r="3" fill="#ef4444" stroke="#fff" strokeWidth="1" />
+              )}
+            </svg>
+          ) : (
+            <div className="h-full flex items-center justify-center text-xs text-gray-400">Không có dữ liệu đồ thị</div>
+          )}
 
           {/* X Axis Labels */}
           <div className="flex justify-between text-[10px] font-bold text-gray-400 mt-2 px-6">
-            {sosOverTime.map((d, i) => (
+            {sosOverTime.map((d: any, i: number) => (
               <span key={i}>{d.date}</span>
             ))}
           </div>
@@ -233,13 +256,13 @@ export default function MainChartsPanel() {
         <div className="relative flex justify-center items-center my-6">
           <svg width="150" height="150" viewBox="0 0 36 36" className="transform -rotate-90">
             <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f3f4f6" strokeWidth="3" className="dark:stroke-gray-700" />
-            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="3.5" strokeDasharray="73.7 26.3" strokeDashoffset="0" />
-            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="3.5" strokeDasharray="18.4 81.6" strokeDashoffset="-73.7" />
-            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" strokeWidth="3.5" strokeDasharray="7.9 92.1" strokeDashoffset="-92.1" />
+            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="3.5" strokeDasharray={`${savedStroke} ${100 - savedStroke}`} strokeDashoffset="0" />
+            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="3.5" strokeDasharray={`${ongoingStroke} ${100 - ongoingStroke}`} strokeDashoffset={ongoingOffset} />
+            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" strokeWidth="3.5" strokeDasharray={`${failedStroke} ${100 - failedStroke}`} strokeDashoffset={failedOffset} />
           </svg>
           <div className="absolute flex flex-col items-center justify-center">
             <span className="text-[10px] font-bold text-gray-400 uppercase leading-none">Tổng</span>
-            <span className="text-xl font-black text-gray-900 dark:text-white mt-1">152</span>
+            <span className="text-xl font-black text-gray-900 dark:text-white mt-1">{outcomes.total}</span>
           </div>
         </div>
 
@@ -249,21 +272,21 @@ export default function MainChartsPanel() {
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
               <span className="text-gray-500 font-semibold">Đã cứu sống</span>
             </div>
-            <span className="font-extrabold">112 <span className="text-[10px] text-gray-400">(73.7%)</span></span>
+            <span className="font-extrabold">{outcomes.saved} <span className="text-[10px] text-gray-400">({savedPercent}%)</span></span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
               <span className="text-gray-500 font-semibold">Đang cứu</span>
             </div>
-            <span className="font-extrabold">28 <span className="text-[10px] text-gray-400">(18.4%)</span></span>
+            <span className="font-extrabold">{outcomes.ongoing} <span className="text-[10px] text-gray-400">({ongoingPercent}%)</span></span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-              <span className="text-gray-500 font-semibold">Không qua khỏi</span>
+              <span className="text-gray-500 font-semibold">Chưa xử lý</span>
             </div>
-            <span className="font-extrabold">12 <span className="text-[10px] text-gray-400">(7.9%)</span></span>
+            <span className="font-extrabold">{outcomes.failed} <span className="text-[10px] text-gray-400">({failedPercent}%)</span></span>
           </div>
         </div>
       </div>
@@ -279,8 +302,8 @@ export default function MainChartsPanel() {
           </button>
         </div>
 
-        <div className="space-y-3.5 flex-1">
-          {emergencyAlerts.map((alert, idx) => (
+        <div className="space-y-3.5 flex-1 overflow-y-auto max-h-[220px]">
+          {alertsData.disasters.map((alert: any, idx: number) => (
             <div key={idx} className="flex gap-3 items-start">
               <div className="p-2 bg-red-50 dark:bg-red-950/30 text-red-500 rounded-xl mt-0.5">
                 <AlertTriangle size={15} />

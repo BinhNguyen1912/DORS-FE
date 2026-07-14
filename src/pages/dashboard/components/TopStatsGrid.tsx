@@ -1,62 +1,6 @@
 import { Home, Users, AlertTriangle, Shield, Heart } from 'lucide-react';
-
-const topStats = [
-  {
-    title: 'Hộ dân trong hệ thống',
-    value: '2.458',
-    subText: '12.5%',
-    subTextDesc: 'so với 7 ngày trước',
-    trend: 'up',
-    color: '#3b82f6',
-    sparkline: [20, 25, 15, 30, 22, 35, 28],
-    icon: Home,
-    iconBg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'
-  },
-  {
-    title: 'Đội cứu hộ',
-    value: '11',
-    subText: '8 đội',
-    subTextDesc: 'đang hoạt động',
-    trend: 'up',
-    color: '#10b981',
-    sparkline: [5, 6, 8, 7, 8, 9, 8],
-    icon: Users,
-    iconBg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-  },
-  {
-    title: 'SOS đang hoạt động',
-    value: '27',
-    subText: '5',
-    subTextDesc: 'so với 7 ngày trước',
-    trend: 'up',
-    color: '#f59e0b',
-    sparkline: [15, 20, 18, 25, 22, 27, 24],
-    icon: AlertTriangle,
-    iconBg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
-  },
-  {
-    title: 'Thiên tai đang diễn ra',
-    value: '3',
-    subText: '2 khu vực',
-    subTextDesc: 'ảnh hưởng',
-    trend: 'down',
-    color: '#ef4444',
-    sparkline: [4, 5, 4, 3, 3, 2, 3],
-    icon: Shield,
-    iconBg: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400'
-  },
-  {
-    title: 'Tổng đóng góp',
-    value: '1.245.000.000 đ',
-    subText: '18%',
-    subTextDesc: 'so với 7 ngày trước',
-    trend: 'up',
-    color: '#8b5cf6',
-    sparkline: [800, 950, 1100, 1050, 1150, 1200, 1245],
-    icon: Heart,
-    iconBg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400'
-  }
-];
+import { useQuery } from '@tanstack/react-query';
+import { dashboardApi } from '../../../apis/dashboard.api';
 
 // Thuật toán Catmull-Rom Spline để tính đường cong Bézier trơn tru tự nhiên nhất
 function getBezierPath(points: [number, number][]) {
@@ -102,7 +46,93 @@ function getBezierPath(points: [number, number][]) {
   return d;
 }
 
-export default function TopStatsGrid() {
+interface TopStatsGridProps {
+  provinceId: number | null;
+}
+
+export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
+  // Query stats thực tế từ Backend
+  const { data: statsResponse, isLoading } = useQuery({
+    queryKey: ['dashboardStats', provinceId],
+    queryFn: () => dashboardApi.getStats(provinceId),
+  });
+
+  const statsData = statsResponse?.data || {
+    totalHouseholds: { value: 0, trend: 0, sparkline: [0, 0, 0, 0, 0, 0, 0] },
+    activeRescueTeams: { value: 0, trend: 0, sparkline: [0, 0, 0, 0, 0, 0, 0] },
+    activeSosRequests: { value: 0, trend: 0, sparkline: [0, 0, 0, 0, 0, 0, 0] },
+    ongoingDisasters: { value: 0, trend: 0, sparkline: [0, 0, 0, 0, 0, 0, 0] },
+    totalDonations: { value: 0, trend: 0, sparkline: [0, 0, 0, 0, 0, 0, 0] },
+  };
+
+  const topStats = [
+    {
+      title: 'Hộ dân trong hệ thống',
+      value: statsData.totalHouseholds.value.toLocaleString('vi-VN'),
+      subText: `${statsData.totalHouseholds.trend}%`,
+      subTextDesc: 'so với 7 ngày trước',
+      trend: statsData.totalHouseholds.trend >= 0 ? 'up' : 'down',
+      color: '#3b82f6',
+      sparkline: statsData.totalHouseholds.sparkline,
+      icon: Home,
+      iconBg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'
+    },
+    {
+      title: 'Đội cứu hộ hoạt động',
+      value: statsData.activeRescueTeams.value.toLocaleString('vi-VN'),
+      subText: `+${statsData.activeRescueTeams.trend}`,
+      subTextDesc: 'đội mới thành lập',
+      trend: 'up',
+      color: '#10b981',
+      sparkline: statsData.activeRescueTeams.sparkline,
+      icon: Users,
+      iconBg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+    },
+    {
+      title: 'SOS đang hoạt động',
+      value: statsData.activeSosRequests.value.toLocaleString('vi-VN'),
+      subText: `${Math.abs(statsData.activeSosRequests.trend)} ca`,
+      subTextDesc: statsData.activeSosRequests.trend >= 0 ? 'tăng so với hôm qua' : 'giảm so với hôm qua',
+      trend: statsData.activeSosRequests.trend >= 0 ? 'up' : 'down',
+      color: '#f59e0b',
+      sparkline: statsData.activeSosRequests.sparkline,
+      icon: AlertTriangle,
+      iconBg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+    },
+    {
+      title: 'Thiên tai đang diễn ra',
+      value: statsData.ongoingDisasters.value.toLocaleString('vi-VN'),
+      subText: `${statsData.ongoingDisasters.trend} điểm nóng`,
+      subTextDesc: 'cần lưu ý đặc biệt',
+      trend: 'up',
+      color: '#ef4444',
+      sparkline: statsData.ongoingDisasters.sparkline,
+      icon: Shield,
+      iconBg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
+    },
+    {
+      title: 'Tổng đóng góp tài chính',
+      value: `${(statsData.totalDonations.value / 1000000).toLocaleString('vi-VN')} tr đ`,
+      subText: `${statsData.totalDonations.trend}%`,
+      subTextDesc: 'tăng trưởng tài trợ',
+      trend: 'up',
+      color: '#8b5cf6',
+      sparkline: statsData.totalDonations.sparkline,
+      icon: Heart,
+      iconBg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400'
+    }
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-4 shadow-sm animate-pulse h-28" />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       {topStats.map((stat, idx) => {
@@ -110,7 +140,7 @@ export default function TopStatsGrid() {
         
         // Calculate points coordinates
         const maxVal = Math.max(...stat.sparkline);
-        const points = stat.sparkline.map((val, i) => {
+        const points = stat.sparkline.map((val: number, i: number) => {
           const x = (i / (stat.sparkline.length - 1)) * 100;
           const y = 30 - (val / (maxVal || 1)) * 22; // Keep padding from top/bottom
           return [x, y] as [number, number];
