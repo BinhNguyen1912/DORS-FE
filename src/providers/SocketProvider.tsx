@@ -31,7 +31,18 @@ export const useNamespaceSocket = (namespace: string): Socket | null => {
   return getSocket(namespace);
 };
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const getSocketBaseUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (!apiUrl) return 'http://localhost:8585';
+  try {
+    const url = new URL(apiUrl);
+    return url.origin;
+  } catch (e) {
+    return 'http://localhost:8585';
+  }
+};
+
+const BACKEND_URL = getSocketBaseUrl();
 
 interface NamespaceConfig {
   namespace: string;

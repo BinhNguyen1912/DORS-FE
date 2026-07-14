@@ -3,13 +3,13 @@ import {
   Map,
   Users,
   Briefcase,
-  AlertTriangle,
   UserCheck,
   Truck,
   BarChart2,
   Settings,
   FolderOpen,
   ClipboardList,
+  Bell,
 } from 'lucide-react';
 import { ROUTES } from '../constants';
 
@@ -29,8 +29,22 @@ export const menuItems: MenuItem[] = [
     icon: FolderOpen,
     roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'],
     children: [
-      { label: 'Thành Viên', href: ROUTES.USER_LIST, roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
-      { label: 'Chức danh', href: ROUTES.ROLE_LIST, roles: ['SYSTEM_ADMIN'] },
+      { label: 'Người dùng', href: ROUTES.USER_LIST, roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
+      { label: 'Vai trò & quyền', href: ROUTES.ROLE_LIST, roles: ['SYSTEM_ADMIN'] },
+    ],
+  },
+  {
+    label: 'Thông báo',
+    href: '#/notifications',
+    icon: Bell,
+    roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'],
+    children: [
+      { label: 'Sự kiện', href: '/categories/notifications?tab=1', roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
+      { label: 'Mẫu thông báo', href: '/categories/notifications?tab=2', roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
+      { label: 'Thông báo đã gửi', href: '/categories/notifications?tab=3', roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
+      { label: 'Gửi thông báo hàng loạt', href: '/categories/notifications?tab=4', roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
+      { label: 'Lịch sử gửi', href: '/categories/notifications?tab=5', roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
+      { label: 'Kênh gửi & cấu hình', href: '/categories/notifications?tab=6', roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
     ],
   },
   {
@@ -59,7 +73,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     label: 'Người dân',
-    href: '#/volunteer',
+    href: ROUTES.RESIDENT,
     icon: UserCheck,
     roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN']
   },

@@ -25,8 +25,12 @@ export const ROUTES = {
   DONATION_CAMPAIGN: '/donation/campaign',
   USER_LIST: '/categories/users',
   ROLE_LIST: '/categories/roles',
+  NOTIFICATION_LIST: '/categories/notifications',
+  NOTIFICATION_CENTER: '/notifications',
+  RESIDENT: '/resident',
   SETTINGS: '/settings',
   PROFILE: '/profile',
 } as const;
+
 
 export * from './provinceCenters';

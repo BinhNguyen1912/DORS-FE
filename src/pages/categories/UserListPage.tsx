@@ -114,7 +114,9 @@ export default function UserListPage() {
     },
     onSuccess: (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ['system-users'] });
-      setSelectedUser(updatedUser);
+      if (selectedUser?.id === updatedUser.id) {
+        setSelectedUser(updatedUser);
+      }
       toast.success('Cập nhật vai trò thành công!');
     },
     onError: (err: any) => {
@@ -742,9 +744,8 @@ export default function UserListPage() {
                       return (
                         <tr
                           key={item.id}
-                          onClick={() => setSelectedUser(item)}
                           className={cn(
-                            "group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors cursor-pointer select-none",
+                            "group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors select-none",
                             isRowSelected && "bg-amber-500/5 dark:bg-amber-500/5 hover:bg-amber-500/10 dark:hover:bg-amber-500/10 border-l-2 border-amber-500"
                           )}
                         >
@@ -775,14 +776,6 @@ export default function UserListPage() {
                                 <div className="text-left leading-tight">
                                   <p className="font-normal text-black dark:text-white flex items-center gap-1.5">
                                     {item.fullName}
-                                    {item.isVerified && (
-                                      <span 
-                                        className="w-3.5 h-3.5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[8px]" 
-                                        title="Đã xác thực"
-                                      >
-                                        ✓
-                                      </span>
-                                    )}
                                   </p>
                                   <p className="text-[10px] text-black dark:text-white font-normal mt-0.5">ID: {item.id}</p>
                                 </div>

@@ -7,7 +7,14 @@ export const userApi = {
     limit?: number;
     search?: string;
     provinceId?: number;
+    roleId?: number;
+    isActive?: boolean;
+    isVerified?: boolean;
+    isVolunteer?: boolean;
+    needsHelp?: boolean;
+    adminUnitId?: number;
   }): Promise<PaginatedResponse<User>> => {
+
     const response = await api.get<any>('/users', { params });
     const resData = response.data?.data !== undefined ? response.data.data : response.data;
 
@@ -87,4 +94,24 @@ export const userApi = {
     const response = await api.patch<any>('/users/bulk-update', { ids, ...data });
     return response.data?.data !== undefined ? response.data.data : response.data;
   },
+
+  getStats: async (params?: { provinceId?: number }): Promise<{
+    total: number;
+    verified: number;
+    unverified: number;
+    volunteers: number;
+    needsHelp: number;
+  }> => {
+    const response = await api.get<any>('/users/stats', { params });
+    return response.data?.data !== undefined ? response.data.data : response.data;
+  },
+
+  resetPassword: async (id: number, newPassword: string): Promise<void> => {
+    await api.patch(`/users/${id}/password`, { newPassword });
+  },
+
+  notify: async (id: number, data: { title: string; body: string; type: string }): Promise<void> => {
+    await api.post(`/users/${id}/notify`, data);
+  },
 };
+

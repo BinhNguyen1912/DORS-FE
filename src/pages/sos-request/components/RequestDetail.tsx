@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { toast } from '../../../stores';
-import { sosApi } from '../../../apis/sos.api';
 import { rescueTeamApi } from '../../../apis/rescue-team.api';
 import { floodRequestApi } from '../../../apis/flood-request.api';
 import RequestStepper from './RequestStepper';
@@ -33,11 +32,16 @@ interface RequestDetailProps {
 }
 
 const statusBadges: Record<string, { label: string; style: string }> = {
-  PENDING: { label: 'MỚI', style: 'text-red-650 dark:text-red-400 font-extrabold' },
-  DISPATCHED: { label: 'ĐANG XÁC MINH', style: 'text-orange-600 dark:text-orange-450 font-extrabold' },
+  // Flood request statuses
+  PENDING: { label: 'CHƯA XÁC MINH', style: 'text-red-600 dark:text-red-400 font-extrabold' },
+  VERIFYING: { label: 'ĐANG XÁC MINH', style: 'text-amber-600 dark:text-amber-400 font-extrabold' },
+  APPROVED: { label: 'ĐÃ DUYỆT', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
+  DISPATCHED: { label: 'ĐÃ ĐIỀU PHỐI', style: 'text-blue-600 dark:text-blue-400 font-extrabold' },
+  REJECTED: { label: 'ĐÃ TỪ CHỐI', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
+  CANCELLED: { label: 'ĐÃ HỦY', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
+  // SOS statuses
   ON_SITE: { label: 'ĐÃ XÁC NHẬN', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
   RESOLVED: { label: 'HOÀN THÀNH', style: 'text-blue-600 dark:text-blue-450 font-extrabold' },
-  CANCELLED: { label: 'ĐÃ TỪ CHỐI', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
 };
 
 const purposeLabels = {
@@ -187,9 +191,9 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
           </h2>
         </div>
 
+        {/* ══ REQUEST_SUPPORT: Dispatch dropdown ══ (stays in header) ══ */}
         <div className="flex items-center gap-2 relative">
-          {/* ══ REQUEST_SUPPORT: Dispatch dropdown ══ */}
-          {request.purpose === 'REQUEST_SUPPORT' ? (
+          {request.purpose === 'REQUEST_SUPPORT' && request.status === 'VERIFYING' && (
             <div ref={dispatchRef} className="relative">
               {/* Main dispatch toggle button */}
               <button
@@ -320,30 +324,6 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
                 </div>
               )}
             </div>
-          ) : (
-            /* ══ DECLARE_ONLY: Approve for map / Reject ══ */
-            <div className="flex items-center gap-2">
-              {request.isApprovedForMap ? (
-                <span className="px-3.5 py-2 bg-emerald-50 text-emerald-650 dark:bg-emerald-950/20 dark:text-emerald-450 rounded-xl text-[11px] font-extrabold select-none">
-                  Đã hiển thị trên bản đồ
-                </span>
-              ) : (
-                <>
-                  <button
-                    onClick={() => onApproveForMap?.(request.id)}
-                    className="px-3.5 py-2 bg-emerald-650 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider transition duration-150 shadow-xs select-none cursor-pointer"
-                  >
-                    Duyệt lên bản đồ
-                  </button>
-                  <button
-                    onClick={() => onUpdateStatus(request.id, 'CANCELLED')}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-slate-700 dark:text-slate-350 rounded-xl text-[11px] font-bold uppercase tracking-wider transition duration-150 shadow-xs select-none cursor-pointer"
-                  >
-                    Từ chối
-                  </button>
-                </>
-              )}
-            </div>
           )}
 
           <button className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-xl transition">
@@ -393,6 +373,119 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
           </p>
         </div>
       </div>
+
+      {(() => {
+        const s = request.status;
+
+        if (s === 'APPROVED' || request.isApprovedForMap) return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✓ Đã duyệt hiển thị trên bản đồ
+            </span>
+          </div>
+        );
+
+        if (s === 'DISPATCHED') return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-blue-50 text-blue-750 dark:bg-blue-950/20 dark:text-blue-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✓ Đã điều phối đội cứu trợ
+            </span>
+          </div>
+        );
+
+        if (s === 'ON_SITE') return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-indigo-50 text-indigo-750 dark:bg-indigo-950/20 dark:text-indigo-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✓ Đội cứu hộ đã tiếp cận hiện trường
+            </span>
+          </div>
+        );
+
+        if (s === 'RESOLVED') return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-emerald-50 text-emerald-750 dark:bg-emerald-950/20 dark:text-emerald-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✓ Đã hoàn thành cứu hộ
+            </span>
+          </div>
+        );
+
+        // Terminal: đã từ chối
+        if (s === 'REJECTED' || s === 'CANCELLED') return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✗ Yêu cầu đã bị từ chối hoặc hủy
+            </span>
+          </div>
+        );
+
+        // Bước 1 — PENDING: xác thực thông tin
+        if (s === 'PENDING') return (
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-gray-800">
+            <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-black text-[9px] flex-shrink-0">1</span>
+              Bước 1 / 2 — Xác minh thông tin báo cáo
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onUpdateStatus(request.id, 'VERIFYING')}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition duration-150 shadow-sm select-none cursor-pointer"
+              >
+                Xác thực
+              </button>
+              <button
+                onClick={() => onUpdateStatus(request.id, 'REJECTED')}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition duration-150 shadow-sm select-none cursor-pointer"
+              >
+                Từ chối
+              </button>
+            </div>
+          </div>
+        );
+
+        // Bước 2 — VERIFYING: đã xác minh, sẵn sàng duyệt hoặc điều phối
+        if (s === 'VERIFYING') {
+          if (request.purpose === 'DECLARE_ONLY') {
+            return (
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-gray-800">
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-[9px] flex-shrink-0">2</span>
+                  Bước 2 / 2 — Duyệt công khai lên bản đồ ngập lụt
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onApproveForMap?.(request.id)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition duration-150 shadow-sm select-none cursor-pointer"
+                  >
+                    Duyệt lên bản đồ
+                  </button>
+                  <button
+                    onClick={() => onUpdateStatus(request.id, 'REJECTED')}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition duration-150 shadow-sm select-none cursor-pointer"
+                  >
+                    Từ chối
+                  </button>
+                </div>
+              </div>
+            );
+          } else {
+            return (
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-gray-800">
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-[9px] flex-shrink-0">2</span>
+                  Bước 2 / 2 — Điều phối đội cứu trợ khẩn cấp
+                </div>
+                <div className="flex gap-2 text-right">
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase animate-pulse">
+                    Vui lòng chọn nút "Điều phối cứu trợ" ở góc trên bên phải để phân công đội.
+                  </span>
+                </div>
+              </div>
+            );
+          }
+        }
+
+        return null;
+      })()}
 
       {/* Sub-tab view buttons */}
       <div className="flex gap-4 text-xs font-bold border-0">

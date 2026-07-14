@@ -30,8 +30,12 @@ import DonationListPage from './pages/donation/DonationListPage';
 import DonationCampaignPage from './pages/donation/DonationCampaignPage';
 import UserListPage from './pages/categories/UserListPage';
 import RoleListPage from './pages/categories/RoleListPage';
+import NotificationListPage from './pages/categories/NotificationListPage';
+import CitizenListPage from './pages/citizen/CitizenListPage';
 import SystemSettingsPage from './pages/settings/SystemSettingsPage';
 import ProfilePage from './pages/profile/ProfilePage';
+import NotificationCenterPage from './pages/notifications/NotificationCenterPage';
+
 
 
 // Protected Route Component
@@ -214,6 +218,19 @@ export const router = createBrowserRouter([
         path: ROUTES.ROLE_LIST,
         element: <RoleListPage />,
       },
+      {
+        path: ROUTES.NOTIFICATION_LIST,
+        element: <NotificationListPage />,
+      },
+      {
+        path: ROUTES.NOTIFICATION_CENTER,
+        element: <NotificationCenterPage />,
+      },
+      {
+        path: ROUTES.RESIDENT,
+        element: <CitizenListPage />,
+      },
+
       {
         path: ROUTES.SETTINGS,
         element: (

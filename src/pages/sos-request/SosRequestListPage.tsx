@@ -164,9 +164,12 @@ export default function SosRequestListPage() {
         if (statusFilter !== 'Tất cả') {
           const statusMap: Record<string, string> = {
             'Mới tiếp nhận': 'PENDING',
-            'Đang xác minh': 'DISPATCHED',
+            'Đang xác minh': 'VERIFYING',
+            'Đã duyệt': 'APPROVED',
+            'Đã điều phối': 'DISPATCHED',
             'Đã tiếp cận': 'ON_SITE',
             'Hoàn thành': 'RESOLVED',
+            'Đã từ chối': 'REJECTED',
             'Đã hủy': 'CANCELLED',
           };
           if (req.status !== statusMap[statusFilter]) return false;
@@ -352,8 +355,11 @@ export default function SosRequestListPage() {
                   <option value="Tất cả">Tất cả trạng thái</option>
                   <option value="Mới tiếp nhận">Mới tiếp nhận</option>
                   <option value="Đang xác minh">Đang xác minh</option>
+                  <option value="Đã duyệt">Đã duyệt</option>
+                  <option value="Đã điều phối">Đã điều phối</option>
                   <option value="Đã tiếp cận">Đã tiếp cận</option>
                   <option value="Hoàn thành">Hoàn thành</option>
+                  <option value="Đã từ chối">Đã từ chối</option>
                   <option value="Đã hủy">Đã hủy</option>
                 </select>
               </div>

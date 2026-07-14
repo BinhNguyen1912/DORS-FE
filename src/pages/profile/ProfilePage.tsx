@@ -136,7 +136,7 @@ export default function ProfilePage() {
   // Mutation — revoke session
   const revokeSessionMutation = useMutation({
     mutationFn: (id: number) => userApi.revokeSession(id),
-    onSuccess: (data, variables) => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['user-devices', user?.id] });
       toast.success('Đã đăng xuất thiết bị thành công!');
       
@@ -793,7 +793,7 @@ export default function ProfilePage() {
                     </label>
                     <select
                       value={formBasic.gender}
-                      onChange={e => setFormBasic(p => ({ ...p, gender: e.target.value }))}
+                      onChange={e => setFormBasic(p => ({ ...p, gender: e.target.value as 'MALE' | 'FEMALE' | 'OTHER' }))}
                       className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-755 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer font-medium text-left"
                     >
                       <option value="MALE">Nam</option>

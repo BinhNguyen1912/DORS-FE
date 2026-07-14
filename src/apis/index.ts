@@ -14,3 +14,4 @@ export type { RescueEquipment } from './rescue-equipment.api';
 export { routingApi } from './routing.api';
 export type { RouteCoordinates, RouteResult } from './routing.api';
 export { floodRequestApi } from './flood-request.api';
+export { notificationApi } from './notification.api';
