@@ -22,7 +22,9 @@ import {
   X,
   Plus,
   Zap,
-  LayoutGrid
+  LayoutGrid,
+  Search,
+  Loader2,
 } from 'lucide-react';
 import { rescueTeamApi, locationApi, sosApi, routingApi } from '../../apis';
 import { cn } from '../../lib/utils';
@@ -185,6 +187,47 @@ export default function DisasterListPage() {
   const [activeTileType, setActiveTileType] = useState<'streets' | 'satellite' | 'terrain'>('streets');
   const [performanceMode, setPerformanceMode] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+
+  // State and geocoding search for address on map
+  const [addressSearch, setAddressSearch] = useState('');
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+
+  const handleAddressSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!addressSearch.trim()) return;
+
+    setIsSearchingAddress(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressSearch)}&limit=1`
+      );
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        const latNum = Number(lat);
+        const lonNum = Number(lon);
+        if (mapRef.current) {
+          mapRef.current.setView([latNum, lonNum], 15, { animate: true });
+          
+          L.popup()
+            .setLatLng([latNum, lonNum])
+            .setContent(
+              `<div style="font-family:inherit; font-size:11px; font-weight:800; color:#1e293b; padding:2px;">📍 ${display_name}</div>`
+            )
+            .openOn(mapRef.current);
+          
+          toast.success(`Đã di chuyển tới: ${display_name.split(',')[0]}`);
+        }
+      } else {
+        toast.warning('Không tìm thấy địa chỉ này trên bản đồ!');
+      }
+    } catch (err) {
+      console.error('Lỗi tìm kiếm địa chỉ:', err);
+      toast.error('Có lỗi xảy ra khi tìm kiếm địa chỉ!');
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  };
 
   // 1. Fetch Provinces to map the user's provinceId to a readable name
   const { data: provinces, error: provincesError } = useQuery({
@@ -1138,18 +1181,18 @@ export default function DisasterListPage() {
                 });
                 group.addLayer(primaryLine);
 
-                // 2. Vẽ đường đối chứng học thuật (Dijkstra) - nét đứt màu cam nếu có (Đã tắt theo yêu cầu)
-                // if (route.dijkstra) {
-                //   const dijkstraLine = L.polyline(route.dijkstra, {
-                //     color: '#f59e0b',
-                //     weight: 2.5,
-                //     dashArray: '5, 8',
-                //     opacity: 0.85,
-                //     lineJoin: 'round',
-                //     interactive: false,
-                //   });
-                //   group.addLayer(dijkstraLine);
-                // }
+                // 2. Vẽ đường đối chứng học thuật (Dijkstra) làm đường phụ - màu xám nhạt, nét đứt mảnh
+                if (route.dijkstra) {
+                  const dijkstraLine = L.polyline(route.dijkstra, {
+                    color: '#94a3b8', // Slate gray nhạt
+                    weight: 2.2,
+                    dashArray: '4, 8',
+                    opacity: 0.6,
+                    lineJoin: 'round',
+                    interactive: false,
+                  });
+                  group.addLayer(dijkstraLine);
+                }
               } else {
                 // Fallback vẽ đường chim bay trong lúc đang tải tuyến đường thực tế
                 const fallbackLine = L.polyline([[team.lat, team.lng], [sos.lat, sos.lng]], {
@@ -1443,6 +1486,34 @@ export default function DisasterListPage() {
               Địa hình
             </button>
           </div>
+
+          {/* Address Search Overlay */}
+          <form
+            onSubmit={handleAddressSearch}
+            className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex items-center bg-white/95 dark:bg-gray-900/95 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 shadow-md w-full max-w-[260px] sm:max-w-xs md:max-w-sm backdrop-blur-sm transition-all select-none"
+          >
+            <Search size={14} className="text-gray-400 dark:text-gray-500 mr-2 flex-shrink-0" />
+            <input
+              type="text"
+              value={addressSearch}
+              onChange={(e) => setAddressSearch(e.target.value)}
+              placeholder="Tìm địa chỉ, khu vực..."
+              className="w-full bg-transparent text-xs font-bold text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none"
+              disabled={isSearchingAddress}
+            />
+            {isSearchingAddress ? (
+              <Loader2 size={14} className="animate-spin text-blue-500 flex-shrink-0 ml-2" />
+            ) : (
+              addressSearch.trim() && (
+                <button
+                  type="submit"
+                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-extrabold uppercase tracking-wide transition flex-shrink-0 ml-2 cursor-pointer"
+                >
+                  Tìm
+                </button>
+              )
+            )}
+          </form>
 
           <div id="leaflet-map-container" ref={mapContainerRef} className="flex-1 rounded-xl z-0" />
 

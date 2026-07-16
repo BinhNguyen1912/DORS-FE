@@ -19,12 +19,17 @@ import {
   Sun,
   LogOut,
   BadgeCheck,
+  Users2,
+  Droplets,
+  Volume2,
+  ClipboardList,
 } from 'lucide-react';
-import { useAuthStore } from '../../stores';
+import { useAuthStore, useNotificationStore } from '../../stores';
 import { authApi } from '../../apis';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../constants';
 import { toast } from '../../stores';
+import { cn } from '../../lib/utils';
 
 interface HeaderProps {
   title: React.ReactNode;
@@ -44,6 +49,11 @@ const roleTranslations: Record<string, string> = {
   VOLUNTEER: 'Tình nguyện viên',
 };
 
+const stripHtml = (htmlString: string) => {
+  if (!htmlString) return '';
+  return htmlString.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ');
+};
+
 export default function Header({
   title,
   sidebarCollapsed = false,
@@ -58,6 +68,76 @@ export default function Header({
   const [avatarError, setAvatarError] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const { notifications, markAsRead, markAllAsRead } = useNotificationStore();
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Listen for simulated bulk notifications to add them to user's real list!
+  useEffect(() => {
+    // Fetch user notifications from backend on app load
+    useNotificationStore.getState().fetchNotifications();
+
+    const handleNewNotif = () => {
+      // Reload actual notifications list from server to get the real content
+      useNotificationStore.getState().fetchNotifications();
+    };
+    window.addEventListener('new-notification', handleNewNotif);
+    return () => window.removeEventListener('new-notification', handleNewNotif);
+  }, []);
+
+  // Dropdown click outside listener for notifications
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifDropdownOpen(false);
+      }
+    }
+    if (notifDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [notifDropdownOpen]);
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'SOS':
+        return (
+          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-655 text-[9px] font-bold shrink-0">
+            SOS
+          </div>
+        );
+      case 'RESCUE':
+        return (
+          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-650 shrink-0">
+            <Users2 size={14} />
+          </div>
+        );
+      case 'FLOOD':
+        return (
+          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-650 shrink-0">
+            <Droplets size={14} />
+          </div>
+        );
+      case 'SYSTEM':
+        return (
+          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+            <Bell size={14} />
+          </div>
+        );
+      case 'HELP':
+        return (
+          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-655 shrink-0">
+            <ClipboardList size={14} />
+          </div>
+        );
+      default:
+        return (
+          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-650 shrink-0">
+            <Bell size={14} />
+          </div>
+        );
+    }
+  };
 
   const userRole = user?.role || (user as any)?.userRoles?.[0]?.role?.name;
   const userRoleText = userRole
@@ -122,43 +202,43 @@ export default function Header({
     rightValue: string | null;
     action: () => void;
   }[] = [
-    {
-      icon: User,
-      label: 'Thông tin cá nhân',
-      rightValue: null,
-      action: () => goTo(ROUTES.PROFILE),
-    },
-    {
-      icon: KeyRound,
-      label: 'Đổi mật khẩu',
-      rightValue: null,
-      action: () => goTo(ROUTES.SETTINGS),
-    },
-    {
-      icon: UserCog,
-      label: 'Thiết lập tài khoản',
-      rightValue: null,
-      action: () => goTo(ROUTES.SETTINGS),
-    },
-    {
-      icon: BellRing,
-      label: 'Thiết lập thông báo',
-      rightValue: null,
-      action: () => goTo(ROUTES.SETTINGS),
-    },
-    {
-      icon: Globe,
-      label: 'Ngôn ngữ',
-      rightValue: 'Tiếng Việt',
-      action: () => {},
-    },
-    {
-      icon: Sun,
-      label: 'Chế độ',
-      rightValue: isDark ? 'Tối' : 'Sáng',
-      action: () => toggleDark(),
-    },
-  ];
+      {
+        icon: User,
+        label: 'Thông tin cá nhân',
+        rightValue: null,
+        action: () => goTo(ROUTES.PROFILE),
+      },
+      {
+        icon: KeyRound,
+        label: 'Đổi mật khẩu',
+        rightValue: null,
+        action: () => goTo(ROUTES.PROFILE),
+      },
+      {
+        icon: UserCog,
+        label: 'Thiết lập ứng dụng',
+        rightValue: null,
+        action: () => goTo(ROUTES.SETTINGS),
+      },
+      {
+        icon: BellRing,
+        label: 'Thiết lập thông báo',
+        rightValue: null,
+        action: () => goTo(ROUTES.SETTINGS),
+      },
+      {
+        icon: Globe,
+        label: 'Ngôn ngữ',
+        rightValue: 'Tiếng Việt',
+        action: () => { },
+      },
+      {
+        icon: Sun,
+        label: 'Chế độ',
+        rightValue: isDark ? 'Tối' : 'Sáng',
+        action: () => toggleDark(),
+      },
+    ];
 
   return (
     <div className="layout-global-header relative h-16 flex items-center justify-between bg-white dark:bg-gray-800 px-6 border-b border-slate-100 dark:border-slate-800 shadow-sm z-30 select-none flex-shrink-0 overflow-visible">
@@ -199,11 +279,117 @@ export default function Header({
 
       {/* ── Right: Action buttons + Profile ── */}
       <div className="flex items-center gap-3.5 flex-shrink-0">
-        {/* Notification Bell */}
-        <button className="relative p-2 text-gray-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer">
-          <Bell size={20} />
-          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">12</span>
-        </button>
+        {/* Notification Bell with Dropdown */}
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setNotifDropdownOpen(prev => !prev)}
+            className="relative p-2 text-gray-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer"
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-[8px] font-bold text-white rounded-full flex items-center justify-center border border-white dark:border-gray-800">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {notifDropdownOpen && (
+            <div
+              className="absolute right-0 mt-2.5 w-[400px] bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-700 shadow-xl z-55 overflow-hidden flex flex-col font-sans"
+              style={{ borderRadius: '12px', animation: 'profileDropIn 0.15s cubic-bezier(0.16,1,0.3,1) both' }}
+            >
+              {/* Dropdown Header */}
+              <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 dark:border-slate-850">
+                <span className="font-bold text-sm text-black dark:text-white">Thông báo</span>
+                <button
+                  onClick={() => {
+                    markAllAsRead();
+                    toast.success('Đã đánh dấu tất cả là đã đọc');
+                  }}
+                  className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-normal"
+                >
+                  Đánh dấu tất cả đã đọc
+                </button>
+              </div>
+
+              {/* Dropdown Body: Notification List */}
+              <div className="max-h-[290px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-black dark:text-gray-400 font-normal">
+                    Không có thông báo nào
+                  </div>
+                ) : (
+                  notifications.slice(0, 5).map((notif) => (
+                    <div
+                      key={notif.id}
+                      onClick={() => {
+                        markAsRead(notif.id);
+                        setNotifDropdownOpen(false);
+                        // Navigate to detail page
+                        navigate(`/notifications?id=${notif.id}`);
+                      }}
+                      className={cn(
+                        "flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors text-left",
+                        !notif.isRead && "bg-blue-50/30 dark:bg-blue-950/10"
+                      )}
+                    >
+                      {/* Left: Dynamic Icon */}
+                      {getNotificationIcon(notif.type)}
+
+                      {/* Middle: Content */}
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <div className="flex items-start justify-between gap-1">
+                          <span className={cn(
+                            "text-xs text-black dark:text-white leading-snug font-normal block truncate",
+                            !notif.isRead && "font-semibold"
+                          )}>
+                            {notif.title}
+                          </span>
+                          <span className="text-[9px] text-black/50 dark:text-gray-400 shrink-0 font-normal mt-0.5">
+                            {notif.time}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-black/70 dark:text-gray-300 leading-normal line-clamp-2 font-normal">
+                          {stripHtml(notif.content)}
+                        </p>
+                      </div>
+
+                      {/* Right: Unread Blue Dot */}
+                      {!notif.isRead && (
+                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full shrink-0 mt-2" />
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Dropdown Footer */}
+              <div className="bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-850 px-4 py-2 flex flex-col gap-1.5 text-[10px] font-normal">
+                <div className="flex justify-between items-center text-black/60 dark:text-gray-450">
+                  <button
+                    onClick={() => {
+                      setNotifDropdownOpen(false);
+                      navigate('/settings');
+                    }}
+                    className="hover:text-blue-600 flex items-center gap-1 cursor-pointer"
+                  >
+                    ⚙️ Cài đặt thông báo
+                  </button>
+                  <span>Bạn có {unreadCount} thông báo chưa đọc</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setNotifDropdownOpen(false);
+                    navigate('/notifications');
+                  }}
+                  className="w-full text-center text-blue-650 hover:underline py-1.5 border-t border-slate-100 dark:border-slate-800 cursor-pointer font-semibold block"
+                >
+                  Xem tất cả thông báo &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Message */}
         <button className="relative p-2 text-gray-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer">

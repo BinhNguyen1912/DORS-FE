@@ -30,9 +30,23 @@ import DonationListPage from './pages/donation/DonationListPage';
 import DonationCampaignPage from './pages/donation/DonationCampaignPage';
 import UserListPage from './pages/categories/UserListPage';
 import RoleListPage from './pages/categories/RoleListPage';
+import NotificationListPage from './pages/categories/NotificationListPage';
+import CitizenListPage from './pages/citizen/CitizenListPage';
 import SystemSettingsPage from './pages/settings/SystemSettingsPage';
 import ProfilePage from './pages/profile/ProfilePage';
+import NotificationCenterPage from './pages/notifications/NotificationCenterPage';
 
+
+
+export function getDefaultRouteForRole(role?: string): string {
+  if (role === 'SYSTEM_ADMIN' || role === 'PROVINCE_ADMIN') {
+    return ROUTES.DASHBOARD;
+  }
+  if (role === 'RESCUE_TEAM_LEADER') {
+    return ROUTES.RESCUE_TEAM_DASHBOARD;
+  }
+  return ROUTES.DISASTER_LIST;
+}
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -45,15 +59,42 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Public Route Component (redirect to dashboard if logged in)
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+// Role Guard Component
+function RoleGuard({ allowedRoles, children }: { allowedRoles: string[]; children: React.ReactNode }) {
+  const user = useAuthStore((state) => state.user);
+  const userRole = user?.role || (user as any)?.userRoles?.[0]?.role?.name;
 
-  if (isAuthenticated) {
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
+  if (!user || !userRole || !allowedRoles.includes(userRole)) {
+    return <Navigate to={getDefaultRouteForRole(userRole)} replace />;
   }
 
   return <>{children}</>;
+}
+
+// Public Route Component (redirect to default route if logged in)
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
+  const userRole = user?.role || (user as any)?.userRoles?.[0]?.role?.name;
+
+  if (isAuthenticated) {
+    return <Navigate to={getDefaultRouteForRole(userRole)} replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Dynamic Home Route Component
+function HomeRoute() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
+  const userRole = user?.role || (user as any)?.userRoles?.[0]?.role?.name;
+
+  if (!isAuthenticated) {
+    return <Navigate to={ROUTES.LOGIN} replace />;
+  }
+
+  return <Navigate to={getDefaultRouteForRole(userRole)} replace />;
 }
 
 // Feature Guard Component (shows under construction page if route is disabled)
@@ -70,7 +111,7 @@ function FeatureGuard({ route, children }: { route: string; children: React.Reac
 export const router = createBrowserRouter([
   {
     path: ROUTES.HOME,
-    element: <Navigate to={ROUTES.DASHBOARD} replace />,
+    element: <HomeRoute />,
   },
   {
     path: ROUTES.AUTH,
@@ -98,7 +139,9 @@ export const router = createBrowserRouter([
         path: ROUTES.DASHBOARD,
         element: (
           <FeatureGuard route={ROUTES.DASHBOARD}>
-            <DashboardPage />
+            <RoleGuard allowedRoles={['SYSTEM_ADMIN', 'PROVINCE_ADMIN']}>
+              <DashboardPage />
+            </RoleGuard>
           </FeatureGuard>
         ),
       },
@@ -214,6 +257,19 @@ export const router = createBrowserRouter([
         path: ROUTES.ROLE_LIST,
         element: <RoleListPage />,
       },
+      {
+        path: ROUTES.NOTIFICATION_LIST,
+        element: <NotificationListPage />,
+      },
+      {
+        path: ROUTES.NOTIFICATION_CENTER,
+        element: <NotificationCenterPage />,
+      },
+      {
+        path: ROUTES.RESIDENT,
+        element: <CitizenListPage />,
+      },
+
       {
         path: ROUTES.SETTINGS,
         element: (

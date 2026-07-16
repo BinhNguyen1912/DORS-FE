@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Map,
   Settings,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuthStore, toast } from '../stores';
 import { ROUTES } from '../constants';
@@ -32,6 +33,9 @@ export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const sidebarRef = useRef<HTMLElement>(null);
+
+  const [noTeamSosId, setNoTeamSosId] = useState<number | null>(null);
+  const [noTeamMessage, setNoTeamMessage] = useState<string>('');
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -61,9 +65,8 @@ export default function MainLayout() {
 
     const handleNoTeam = (payload: { sosId: number; message: string }) => {
       console.log('📡 [WS Global] No team available:', payload);
-      if (location.pathname !== ROUTES.DISASTER_LIST) {
-        toast.error(`⚠️ BÁO ĐỘNG: SOS-2024-${payload.sosId} không có đội cứu hộ phù hợp khả dụng!`);
-      }
+      setNoTeamSosId(payload.sosId);
+      setNoTeamMessage(payload.message || 'Không tìm được đội cứu hộ phù hợp — cần điều phối thủ công');
     };
 
     dispatchSocket.on(DISPATCH_EVENTS.SOS_CREATED, handleNewSos);
@@ -491,7 +494,7 @@ export default function MainLayout() {
                 {!collapsed && (
                   <div className="text-left overflow-hidden flex-1">
                     <p className="text-xs font-bold text-white truncate">
-                      {user?.fullName || 'Nguyễn Văn A'}
+                      {user?.fullName || 'Không xác định'}
                     </p>
                     <p className="text-[9px] text-slate-500 font-semibold truncate mt-0.5">
                       {userRoleText}
@@ -562,6 +565,39 @@ export default function MainLayout() {
           </div>
         </div>
       </main>
+      {noTeamSosId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-gray-900 border border-red-100 dark:border-red-950/45 p-6 rounded-3xl max-w-sm w-full mx-4 shadow-2xl flex flex-col items-center text-center gap-4 animate-scale-up">
+            <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-600 dark:text-red-400">
+              <AlertTriangle size={24} className="animate-bounce" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">Cảnh báo khẩn cấp</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold leading-relaxed">
+                Yêu cầu SOS #{noTeamSosId}: {noTeamMessage}
+              </p>
+            </div>
+            <div className="flex gap-2.5 w-full pt-1">
+              <button
+                onClick={() => setNoTeamSosId(null)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-slate-50 hover:bg-slate-100 dark:bg-gray-800 dark:hover:bg-gray-750 text-gray-655 dark:text-gray-300 transition select-none cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={() => {
+                  const targetId = noTeamSosId;
+                  setNoTeamSosId(null);
+                  navigate(ROUTES.SOS_REQUEST_LIST, { state: { selectedSosId: targetId } });
+                }}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition shadow-sm select-none cursor-pointer"
+              >
+                Đi đến xử lý
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ToastContainer />
     </div>
   );

@@ -113,7 +113,7 @@ export interface RescueTeam {
   leaderName: string;
   leaderPhone: string;
   teamType: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'ON_DUTY' | 'OFF_DUTY';
+  status: 'ACTIVE' | 'INACTIVE' | 'ON_DUTY' | 'OFF_DUTY' | 'AVAILABLE' | 'STANDBY' | 'BUSY' | 'DISPATCHED';
   provinceId?: number;
   adminUnitId?: number;
   maxCapacity?: number;
@@ -307,3 +307,4 @@ export interface FloodRequest {
   adminUnit?: AdministrativeUnit;
 }
 
+export * from './notification';

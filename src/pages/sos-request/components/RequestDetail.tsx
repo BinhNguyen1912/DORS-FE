@@ -17,9 +17,9 @@ import {
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { toast } from '../../../stores';
-import { sosApi } from '../../../apis/sos.api';
 import { rescueTeamApi } from '../../../apis/rescue-team.api';
 import { floodRequestApi } from '../../../apis/flood-request.api';
+import { sosApi } from '../../../apis/sos.api';
 import RequestStepper from './RequestStepper';
 import RequestHistory from './RequestHistory';
 import type { SosRequestItem } from './mockData';
@@ -27,25 +27,32 @@ import type { RescueTeam } from '../../../types';
 
 interface RequestDetailProps {
   request: SosRequestItem;
+  activeTab: 'SOS_KHAN_CAP' | 'NGAP_LUT' | 'HO_SO';
   onVerify: (id: number) => void;
   onUpdateStatus: (id: number, status: string) => void;
   onApproveForMap?: (id: number) => void;
 }
 
-const statusBadges: Record<string, { label: string; style: string }> = {
-  PENDING: { label: 'MỚI', style: 'text-red-650 dark:text-red-400 font-extrabold' },
-  DISPATCHED: { label: 'ĐANG XÁC MINH', style: 'text-orange-600 dark:text-orange-450 font-extrabold' },
-  ON_SITE: { label: 'ĐÃ XÁC NHẬN', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
+const statusBadges: Record<string, any> = {
+  // Flood request statuses
+  PENDING: { label: 'CHƯA XÁC MINH', style: 'text-red-600 dark:text-red-400 font-extrabold' },
+  VERIFYING: { label: 'ĐANG XÁC MINH', style: 'text-amber-600 dark:text-amber-400 font-extrabold' },
+  APPROVED: { label: 'ĐÃ DUYỆT', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
+  DISPATCHED: { label: 'ĐÃ ĐIỀU PHỐI', style: 'text-blue-600 dark:text-blue-400 font-extrabold' },
+  REJECTED: { label: 'ĐÃ TỪ CHỐI', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
+  CANCELLED: { label: 'ĐÃ HỦY', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
+  // SOS statuses
+  PENDING_SPECIALIST: { label: 'CHỜ ĐỘI CHUYÊN MÔN', style: 'text-rose-600 dark:text-rose-455 font-extrabold' },
+  ON_SITE: { label: 'ĐÃ TIẾP CẬN', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
   RESOLVED: { label: 'HOÀN THÀNH', style: 'text-blue-600 dark:text-blue-450 font-extrabold' },
-  CANCELLED: { label: 'ĐÃ TỪ CHỐI', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
 };
 
-const purposeLabels = {
+const purposeLabels: Record<string, any> = {
   DECLARE_ONLY: { label: 'Khai báo ngập lụt', style: 'text-blue-600 dark:text-blue-400 font-extrabold' },
   REQUEST_SUPPORT: { label: 'Yêu cầu cứu trợ', style: 'text-rose-600 dark:text-rose-450 font-extrabold' },
 };
 
-const severityLabels: Record<string, { label: string; color: string }> = {
+const severityLabels: Record<string, any> = {
   CRITICAL: { label: 'Nguy kịch', color: '#dc2626' },
   HIGH: { label: 'Cao', color: '#ea580c' },
   MEDIUM: { label: 'Trung bình', color: '#2563eb' },
@@ -53,13 +60,14 @@ const severityLabels: Record<string, { label: string; color: string }> = {
 };
 
 const teamStatusLabels: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: 'Sẵn sàng', color: 'text-emerald-600 dark:text-emerald-400' },
-  ON_DUTY: { label: 'Đang làm việc', color: 'text-orange-500' },
-  INACTIVE: { label: 'Không hoạt động', color: 'text-gray-400' },
+  AVAILABLE: { label: 'Sẵn sàng', color: 'text-emerald-600 dark:text-emerald-400' },
+  STANDBY: { label: 'Chờ lệnh', color: 'text-blue-500' },
+  DISPATCHED: { label: 'Đang di chuyển', color: 'text-amber-500' },
+  BUSY: { label: 'Đang làm việc', color: 'text-orange-500' },
   OFF_DUTY: { label: 'Nghỉ', color: 'text-gray-400' },
 };
 
-export default function RequestDetail({ request, onVerify, onUpdateStatus, onApproveForMap }: RequestDetailProps) {
+export default function RequestDetail({ request, activeTab, onVerify, onUpdateStatus, onApproveForMap }: RequestDetailProps) {
   const [detailTab, setDetailTab] = useState<'info' | 'images' | 'history'>('info');
   const [isDispatchOpen, setIsDispatchOpen] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false);
@@ -85,12 +93,13 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Fetch available (ACTIVE) rescue teams for manual dispatch
+  // Fetch available rescue teams for manual dispatch
   const { data: availableTeams = [], isFetching: isLoadingTeams } = useQuery<RescueTeam[]>({
     queryKey: ['rescue-teams-active', request.lat, request.lng],
     queryFn: async () => {
-      const res = await rescueTeamApi.getAll({ status: 'ACTIVE', limit: 50 });
-      return res.data || [];
+      const res = await rescueTeamApi.getAll({ limit: 100 });
+      const items = res.data || [];
+      return items.filter(t => t.status === 'AVAILABLE' || t.status === 'STANDBY');
     },
     enabled: isManualMode, // Only fetch when manual mode opens
     staleTime: 30_000,
@@ -128,13 +137,19 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
     toast.success('Đã sao chép tọa độ vào bộ nhớ tạm!');
   };
 
-  // ── AUTO DISPATCH: call floodRequestApi.dispatch
+  // ── AUTO DISPATCH
   const handleAutoDispatch = async () => {
     setIsAutoDispatching(true);
     try {
-      await floodRequestApi.dispatch(request.id, { method: 'AUTO' });
-      onVerify(request.id);
-      toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối. SOS mới đã được tạo.');
+      if (activeTab === 'SOS_KHAN_CAP') {
+        await sosApi.assignTeam(request.id, {});
+        onVerify(request.id);
+        toast.success('Đã tự động điều phối đội cứu hộ tối ưu thành công!');
+      } else {
+        await floodRequestApi.dispatch(request.id, { method: 'AUTO' });
+        onVerify(request.id);
+        toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối. SOS mới đã được tạo.');
+      }
     } catch (err: any) {
       toast.api(err, 'Lỗi điều phối tự động');
     } finally {
@@ -143,18 +158,24 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
     }
   };
 
-  // ── MANUAL DISPATCH: pass teamId to floodRequestApi.dispatch
+  // ── MANUAL DISPATCH
   const handleManualDispatch = async () => {
     if (!selectedTeamId) return;
     setIsManualDispatching(true);
     const team = availableTeams.find(t => t.id === selectedTeamId);
     try {
-      await floodRequestApi.dispatch(request.id, {
-        method: 'MANUAL',
-        teamId: selectedTeamId,
-      });
-      onVerify(request.id);
-      toast.success(`Đã điều phối thủ công đội "${team?.name || selectedTeamId}" đến hiện trường. SOS mới đã được tạo.`);
+      if (activeTab === 'SOS_KHAN_CAP') {
+        await sosApi.assignTeam(request.id, { teamId: selectedTeamId });
+        onVerify(request.id);
+        toast.success(`Đã điều phối thủ công đội "${team?.name || selectedTeamId}" đến hiện trường thành công.`);
+      } else {
+        await floodRequestApi.dispatch(request.id, {
+          method: 'MANUAL',
+          teamId: selectedTeamId,
+        });
+        onVerify(request.id);
+        toast.success(`Đã điều phối thủ công đội "${team?.name || selectedTeamId}" đến hiện trường. SOS mới đã được tạo.`);
+      }
     } catch (err: any) {
       toast.api(err, 'Lỗi điều phối thủ công');
     } finally {
@@ -187,9 +208,9 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
           </h2>
         </div>
 
+        {/* ══ REQUEST_SUPPORT: Dispatch dropdown ══ (stays in header) ══ */}
         <div className="flex items-center gap-2 relative">
-          {/* ══ REQUEST_SUPPORT: Dispatch dropdown ══ */}
-          {request.purpose === 'REQUEST_SUPPORT' ? (
+          {request.purpose === 'REQUEST_SUPPORT' && request.status === 'VERIFYING' && (
             <div ref={dispatchRef} className="relative">
               {/* Main dispatch toggle button */}
               <button
@@ -320,30 +341,6 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
                 </div>
               )}
             </div>
-          ) : (
-            /* ══ DECLARE_ONLY: Approve for map / Reject ══ */
-            <div className="flex items-center gap-2">
-              {request.isApprovedForMap ? (
-                <span className="px-3.5 py-2 bg-emerald-50 text-emerald-650 dark:bg-emerald-950/20 dark:text-emerald-450 rounded-xl text-[11px] font-extrabold select-none">
-                  Đã hiển thị trên bản đồ
-                </span>
-              ) : (
-                <>
-                  <button
-                    onClick={() => onApproveForMap?.(request.id)}
-                    className="px-3.5 py-2 bg-emerald-650 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider transition duration-150 shadow-xs select-none cursor-pointer"
-                  >
-                    Duyệt lên bản đồ
-                  </button>
-                  <button
-                    onClick={() => onUpdateStatus(request.id, 'CANCELLED')}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-slate-700 dark:text-slate-350 rounded-xl text-[11px] font-bold uppercase tracking-wider transition duration-150 shadow-xs select-none cursor-pointer"
-                  >
-                    Từ chối
-                  </button>
-                </>
-              )}
-            </div>
           )}
 
           <button className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-xl transition">
@@ -393,6 +390,119 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
           </p>
         </div>
       </div>
+
+      {(() => {
+        const s = request.status;
+
+        if (s === 'APPROVED' || request.isApprovedForMap) return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✓ Đã duyệt hiển thị trên bản đồ
+            </span>
+          </div>
+        );
+
+        if (s === 'DISPATCHED') return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-blue-50 text-blue-750 dark:bg-blue-950/20 dark:text-blue-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✓ Đã điều phối đội cứu trợ
+            </span>
+          </div>
+        );
+
+        if (s === 'ON_SITE') return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-indigo-50 text-indigo-750 dark:bg-indigo-950/20 dark:text-indigo-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✓ Đội cứu hộ đã tiếp cận hiện trường
+            </span>
+          </div>
+        );
+
+        if (s === 'RESOLVED') return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-emerald-50 text-emerald-750 dark:bg-emerald-950/20 dark:text-emerald-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✓ Đã hoàn thành cứu hộ
+            </span>
+          </div>
+        );
+
+        // Terminal: đã từ chối
+        if (s === 'REJECTED' || s === 'CANCELLED') return (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="px-4 py-2 bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 rounded-xl text-xs font-bold uppercase tracking-wider select-none">
+              ✗ Yêu cầu đã bị từ chối hoặc hủy
+            </span>
+          </div>
+        );
+
+        // Bước 1 — PENDING: xác thực thông tin
+        if (s === 'PENDING') return (
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-gray-800">
+            <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-black text-[9px] flex-shrink-0">1</span>
+              Bước 1 / 2 — Xác minh thông tin báo cáo
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onUpdateStatus(request.id, 'VERIFYING')}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition duration-150 shadow-sm select-none cursor-pointer"
+              >
+                Xác thực
+              </button>
+              <button
+                onClick={() => onUpdateStatus(request.id, 'REJECTED')}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition duration-150 shadow-sm select-none cursor-pointer"
+              >
+                Từ chối
+              </button>
+            </div>
+          </div>
+        );
+
+        // Bước 2 — VERIFYING: đã xác minh, sẵn sàng duyệt hoặc điều phối
+        if (s === 'VERIFYING') {
+          if (request.purpose === 'DECLARE_ONLY') {
+            return (
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-gray-800">
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-[9px] flex-shrink-0">2</span>
+                  Bước 2 / 2 — Duyệt công khai lên bản đồ ngập lụt
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onApproveForMap?.(request.id)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition duration-150 shadow-sm select-none cursor-pointer"
+                  >
+                    Duyệt lên bản đồ
+                  </button>
+                  <button
+                    onClick={() => onUpdateStatus(request.id, 'REJECTED')}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition duration-150 shadow-sm select-none cursor-pointer"
+                  >
+                    Từ chối
+                  </button>
+                </div>
+              </div>
+            );
+          } else {
+            return (
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-gray-800">
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-[9px] flex-shrink-0">2</span>
+                  Bước 2 / 2 — Điều phối đội cứu trợ khẩn cấp
+                </div>
+                <div className="flex gap-2 text-right">
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase animate-pulse">
+                    Vui lòng chọn nút "Điều phối cứu trợ" ở góc trên bên phải để phân công đội.
+                  </span>
+                </div>
+              </div>
+            );
+          }
+        }
+
+        return null;
+      })()}
 
       {/* Sub-tab view buttons */}
       <div className="flex gap-4 text-xs font-bold border-0">

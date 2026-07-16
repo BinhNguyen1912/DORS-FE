@@ -64,6 +64,9 @@ export default function UserListPage() {
 
   // Checked User IDs for bulk operations or visual selection
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [bulkAction, setBulkAction] = useState<string>('');
+  const [bulkRoleId, setBulkRoleId] = useState<number | ''>('');
+  const [bulkStatus, setBulkStatus] = useState<boolean | ''>('');
 
   // Selected User for details pane (right column)
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -111,7 +114,9 @@ export default function UserListPage() {
     },
     onSuccess: (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ['system-users'] });
-      setSelectedUser(updatedUser);
+      if (selectedUser?.id === updatedUser.id) {
+        setSelectedUser(updatedUser);
+      }
       toast.success('Cập nhật vai trò thành công!');
     },
     onError: (err: any) => {
@@ -175,6 +180,24 @@ export default function UserListPage() {
     onError: (err: any) => {
       setDeleteUserId(null);
       toast.api(err, 'Lỗi khi xóa người dùng');
+    },
+  });
+
+  // Bulk update mutation
+  const bulkUpdateMutation = useMutation({
+    mutationFn: async (data: { roleId?: number; isActive?: boolean }) => {
+      return userApi.bulkUpdate(selectedUserIds, data);
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['system-users'] });
+      setSelectedUserIds([]);
+      setBulkAction('');
+      setBulkRoleId('');
+      setBulkStatus('');
+      toast.success(`Cập nhật thành công ${result?.updated || selectedUserIds.length} người dùng!`);
+    },
+    onError: (err: any) => {
+      toast.api(err, 'Lỗi khi cập nhật hàng loạt người dùng');
     },
   });
 
@@ -568,6 +591,91 @@ export default function UserListPage() {
             </div>
           </div>
 
+          {/* Bulk Actions Bar */}
+          {selectedUserIds.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 p-3.5 rounded-2xl shadow-sm transition-all duration-200 select-none">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-xs font-bold text-amber-800 dark:text-amber-400">
+                  Đã chọn {selectedUserIds.length} người dùng
+                </span>
+                <div className="hidden sm:block h-4 w-px bg-amber-200 dark:bg-amber-900" />
+                
+                {/* Action Type Select */}
+                <select
+                  value={bulkAction}
+                  onChange={(e) => {
+                    setBulkAction(e.target.value);
+                    setBulkRoleId('');
+                    setBulkStatus('');
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl border border-amber-200 dark:border-amber-900 bg-white dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Chọn hành động hàng loạt --</option>
+                  <option value="role">Cập nhật Vai trò</option>
+                  <option value="status">Cập nhật Trạng thái</option>
+                </select>
+
+                {/* Sub-action: Role Select */}
+                {bulkAction === 'role' && (
+                  <select
+                    value={bulkRoleId}
+                    onChange={(e) => setBulkRoleId(Number(e.target.value))}
+                    className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">Chọn vai trò...</option>
+                    {roles.map(r => (
+                      <option key={r.id} value={r.id}>{r.description || r.name}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Sub-action: Status Select */}
+                {bulkAction === 'status' && (
+                  <select
+                    value={bulkStatus === '' ? '' : bulkStatus ? 'true' : 'false'}
+                    onChange={(e) => setBulkStatus(e.target.value === 'true')}
+                    className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 text-gray-750 dark:text-gray-300 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">Chọn trạng thái...</option>
+                    <option value="true">Hoạt động</option>
+                    <option value="false">Khóa tài khoản</option>
+                  </select>
+                )}
+
+                {/* Apply Button */}
+                {((bulkAction === 'role' && bulkRoleId !== '') || (bulkAction === 'status' && bulkStatus !== '')) && (
+                  <button
+                    type="button"
+                    disabled={bulkUpdateMutation.isPending}
+                    onClick={() => {
+                      if (bulkAction === 'role' && bulkRoleId !== '') {
+                        bulkUpdateMutation.mutate({ roleId: Number(bulkRoleId) });
+                      } else if (bulkAction === 'status' && bulkStatus !== '') {
+                        bulkUpdateMutation.mutate({ isActive: !!bulkStatus });
+                      }
+                    }}
+                    className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer border-0 disabled:opacity-50"
+                  >
+                    {bulkUpdateMutation.isPending ? 'Đang cập nhật...' : 'Áp dụng'}
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedUserIds([]);
+                  setBulkAction('');
+                  setBulkRoleId('');
+                  setBulkStatus('');
+                }}
+                className="px-3.5 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-750 rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+              >
+                Hủy chọn
+              </button>
+            </div>
+          )}
+
           {/* User Table card */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-slate-100 dark:border-slate-700/60 shadow-sm overflow-hidden flex-1 flex flex-col">
             <div className="overflow-x-auto flex-1">
@@ -636,9 +744,8 @@ export default function UserListPage() {
                       return (
                         <tr
                           key={item.id}
-                          onClick={() => setSelectedUser(item)}
                           className={cn(
-                            "group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors cursor-pointer select-none",
+                            "group hover:bg-slate-50/50 dark:hover:bg-gray-900/30 transition-colors select-none",
                             isRowSelected && "bg-amber-500/5 dark:bg-amber-500/5 hover:bg-amber-500/10 dark:hover:bg-amber-500/10 border-l-2 border-amber-500"
                           )}
                         >
@@ -669,14 +776,6 @@ export default function UserListPage() {
                                 <div className="text-left leading-tight">
                                   <p className="font-normal text-black dark:text-white flex items-center gap-1.5">
                                     {item.fullName}
-                                    {item.isVerified && (
-                                      <span 
-                                        className="w-3.5 h-3.5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[8px]" 
-                                        title="Đã xác thực"
-                                      >
-                                        ✓
-                                      </span>
-                                    )}
                                   </p>
                                   <p className="text-[10px] text-black dark:text-white font-normal mt-0.5">ID: {item.id}</p>
                                 </div>
@@ -706,12 +805,25 @@ export default function UserListPage() {
                             </td>
                           )}
 
-                          {/* Dynamic Roles badges */}
+                          {/* Dynamic Roles badges with inline select update */}
                           {visibleColumns.role !== false && (
-                            <td className="py-3 px-4">
-                              <span className={cn('px-2.5 py-0.5 text-[9px] font-normal rounded-lg uppercase tracking-wider whitespace-nowrap', getRoleBadge(getUserRoleName(item)))}>
-                                {getUserRoleName(item)}
-                              </span>
+                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                              <select
+                                value={getUserRoleId(item)}
+                                onChange={(e) => handleUpdateRole(item.id, Number(e.target.value))}
+                                disabled={updateRoleMutation.isPending}
+                                className="px-2.5 py-1 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer min-w-[130px]"
+                              >
+                                {roles.map(r => (
+                                  <option 
+                                    key={r.id} 
+                                    value={r.id}
+                                    className="bg-white dark:bg-gray-800 text-gray-950 dark:text-white text-xs font-semibold normal-case"
+                                  >
+                                    {r.description || r.name}
+                                  </option>
+                                ))}
+                              </select>
                             </td>
                           )}
 

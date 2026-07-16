@@ -10,10 +10,13 @@ interface RequestCardProps {
 
 const statusBadges: Record<string, { label: string; style: string }> = {
   PENDING: { label: 'MỚI', style: 'text-red-650 dark:text-red-400 font-extrabold' },
-  DISPATCHED: { label: 'ĐANG XÁC MINH', style: 'text-orange-600 dark:text-orange-450 font-extrabold' },
-  ON_SITE: { label: 'ĐÃ XÁC NHẬN', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
-  RESOLVED: { label: 'HOÀN THÀNH', style: 'text-blue-600 dark:text-blue-450 font-extrabold' },
-  CANCELLED: { label: 'ĐÃ TỪ CHỐI', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
+  VERIFYING: { label: 'ĐANG XÁC MINH', style: 'text-amber-600 dark:text-amber-455 font-extrabold' },
+  APPROVED: { label: 'ĐÃ DUYỆT', style: 'text-emerald-600 dark:text-emerald-455 font-extrabold' },
+  DISPATCHED: { label: 'ĐÃ ĐIỀU PHỐI', style: 'text-blue-600 dark:text-blue-400 font-extrabold' },
+  ON_SITE: { label: 'ĐÃ XÁC NHẬN', style: 'text-emerald-600 dark:text-emerald-455 font-extrabold' },
+  RESOLVED: { label: 'HOÀN THÀNH', style: 'text-blue-600 dark:text-blue-455 font-extrabold' },
+  REJECTED: { label: 'ĐÃ TỪ CHỐI', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
+  CANCELLED: { label: 'ĐÃ HỦY', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
 };
 
 export default function RequestCard({ request, isSelected, onClick }: RequestCardProps) {

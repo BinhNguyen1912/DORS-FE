@@ -112,11 +112,19 @@
             <input type="text" id="cfg-backend-url" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-700/80 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-blue-500" value="http://localhost:8585">
           </div>
           <div>
-            <label class="block text-[10px] font-semibold text-slate-400 mb-1">MẬT KHẨU TÀI KHOẢN ADMIN (TEST DUYỆT)</label>
-            <div class="flex gap-2">
-              <button onclick="autoLoginAdmin()" class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 shadow-md">
-                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Login Admin
-              </button>
+            <label class="block text-[10px] font-semibold text-slate-400 mb-1">ĐĂNG NHẬP TÀI KHOẢN ADMIN</label>
+            <div class="space-y-1.5">
+              <input type="text" id="cfg-login-identifier" placeholder="Email / SĐT tài khoản" value="admin@rescue.gov.vn"
+                class="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 placeholder-slate-600">
+              <div class="flex gap-1.5">
+                <input type="password" id="cfg-login-password" placeholder="Mật khẩu" value="123"
+                  class="flex-1 px-3 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 placeholder-slate-600">
+                <input type="number" id="cfg-login-province" placeholder="Tỉnh" value="2" min="1" title="Province ID"
+                  class="w-14 px-2 py-1.5 bg-slate-900/60 border border-slate-700/80 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 text-center">
+                <button onclick="autoLoginAdmin()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-md whitespace-nowrap">
+                  <i data-lucide="log-in" class="w-3.5 h-3.5"></i> Đăng nhập
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -446,6 +454,9 @@
     function getCleanBackendUrl() {
       let url = document.getElementById('cfg-backend-url').value.trim();
       if (url.endsWith('/')) url = url.slice(0, -1);
+      if (!url.includes('/api/v1')) {
+        url = url + '/api/v1';
+      }
       return url;
     }
 
@@ -468,26 +479,32 @@
 
     async function autoLoginAdmin() {
       const url = getCleanBackendUrl();
-      logConsole('AUTH', 'Đang thực hiện đăng nhập tài khoản admin hệ thống mặc định...', 'info');
+      const identifier = document.getElementById('cfg-login-identifier').value.trim();
+      const password = document.getElementById('cfg-login-password').value.trim();
+      const provinceId = parseInt(document.getElementById('cfg-login-province').value.trim()) || 2;
+
+      if (!identifier || !password) {
+        alert('Vui lòng nhập đầy đủ tài khoản và mật khẩu trước khi đăng nhập!');
+        return;
+      }
+
+      logConsole('AUTH', `Đang đăng nhập với tài khoản: ${identifier} (Province ID: ${provinceId})...`, 'info');
       try {
         const res = await fetch(`${url}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identifier: 'admin@rescue.gov.vn',
-            password: '123',
-            provinceId: 1
-          })
+          body: JSON.stringify({ identifier, password, provinceId })
         });
         const data = await res.json();
         if (res.ok) {
           const token = data.accessToken || data.data?.accessToken;
           document.getElementById('cfg-jwt-token').value = token;
-          logConsole('AUTH', '🔑 Đăng nhập thành công! Token đã được tự động gắn vào cấu hình.', 'success');
+          logConsole('AUTH', `🔑 Đăng nhập thành công (${identifier})! Token đã được tự động gắn vào cấu hình.`, 'success');
           handleTokenChange(token);
           fetchRecentRequests();
         } else {
-          logConsole('AUTH', `Đăng nhập thất bại: ${data.message || 'Lỗi không xác định'}`, 'error', data);
+          logConsole('AUTH', `Đăng nhập thất bại: ${data.message || 'Sai tài khoản hoặc mật khẩu'}`, 'error', data);
+          alert(`Đăng nhập thất bại: ${data.message || 'Sai tài khoản hoặc mật khẩu'}`);
         }
       } catch (err) {
         logConsole('AUTH', `Lỗi kết nối khi đăng nhập: ${err.message}`, 'error');
@@ -557,6 +574,8 @@
         }
       }
 
+      const provinceId = parseInt(document.getElementById('cfg-login-province').value.trim()) || 2;
+
       const payload = {
         title: document.getElementById('f-title').value,
         requesterName: document.getElementById('f-name').value,
@@ -572,7 +591,8 @@
         weather: document.getElementById('f-weather').value,
         description: document.getElementById('f-desc').value,
         imageUrls: [],
-        source: token ? 'APP' : 'WEB'
+        source: token ? 'APP' : 'WEB',
+        provinceId,   // ← gửi rõ province, tránh để BE resolve sai từ toạ độ
       };
 
       logConsole('POST /flood-requests', `Đang gửi... | Người gửi: ${submitterInfo}`, 'info');
@@ -676,29 +696,34 @@
       const token = document.getElementById('cfg-jwt-token').value.trim();
       const tbody = document.getElementById('requests-tbody');
 
-      let headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      // Guard: must have token since endpoint requires FLOOD_READ permission
+      if (!token) {
+        logConsole('GET /flood-requests', '⚠️ Chưa có token Admin. Hãy đăng nhập trước để xem danh sách!', 'warning');
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-amber-400 italic font-semibold">⚠️ Chưa đăng nhập Admin — Hãy nhập tài khoản & mật khẩu rồi bấm Đăng nhập ở panel bên trái</td></tr>`;
+        return;
       }
 
-      logConsole('GET /flood-requests', 'Đang tải danh sách báo ngập mới nhất...', 'info');
+      // Decode token to show province being filtered
+      const tokenPayload = decodeJwt(token);
+      const provinceInfo = tokenPayload ? `provinceId=${tokenPayload.provinceId}, roleId=${tokenPayload.roleId}` : 'token không decode được';
+      logConsole('GET /flood-requests', `Đang tải danh sách báo ngập (${provinceInfo})...`, 'info');
+
+      let headers = { 'Authorization': `Bearer ${token}` };
 
       try {
-        const res = await fetch(`${url}/flood-requests?limit=10`, { headers });
+        const res = await fetch(`${url}/flood-requests?limit=20`, { headers });
         const resData = await res.json();
         
         if (res.ok) {
           // Handle all possible response shapes from the API
           let items;
           if (Array.isArray(resData)) {
-            // Direct array
             items = resData;
           } else if (resData.items && Array.isArray(resData.items)) {
-            // { items: [], total: N }
+            // { items: [], total: N } ← shape thực tế của BE
             items = resData.items;
           } else if (resData.data) {
             if (Array.isArray(resData.data)) {
-              // { data: [] }
               items = resData.data;
             } else if (resData.data.items && Array.isArray(resData.data.items)) {
               // { data: { items: [], total: N } }
@@ -799,7 +824,12 @@
           });
           lucide.createIcons();
         } else {
-          logConsole('GET /flood-requests', `❌ Thất bại: ${resData.message || 'Lỗi lấy danh sách'}`, 'error', resData);
+          const errMsg = resData.message || resData.error || 'Lỗi lấy danh sách';
+          logConsole('GET /flood-requests', `❌ HTTP ${res.status} — ${errMsg}`, 'error', resData);
+          tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-400 italic font-semibold">
+            ❌ Lỗi HTTP ${res.status}: ${errMsg}<br>
+            <span class="text-[10px] text-slate-500 font-normal">${res.status === 401 ? 'Token hết hạn hoặc không hợp lệ — hãy đăng nhập lại.' : res.status === 403 ? 'Tài khoản không có quyền FLOOD_READ.' : ''}</span>
+          </td></tr>`;
         }
       } catch (err) {
         logConsole('GET /flood-requests', `❌ Lỗi kết nối: ${err.message}`, 'error');
