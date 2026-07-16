@@ -1,27 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../constants';
 import { dashboardApi } from '../../../apis/dashboard.api';
 
 interface RegionalStatsPanelProps {
   provinceId: number | null;
+  startDate?: string;
+  endDate?: string;
+  adminUnitId?: number | null;
 }
 
-export default function RegionalStatsPanel({ provinceId }: RegionalStatsPanelProps) {
+export default function RegionalStatsPanel({ provinceId, startDate, endDate, adminUnitId }: RegionalStatsPanelProps) {
   // Query dữ liệu Map & Tasks (chứa danh sách tiến độ nhiệm vụ)
   const { data: mapTasksResponse, isLoading: isMapTasksLoading } = useQuery({
-    queryKey: ['dashboardMapTasks', provinceId],
-    queryFn: () => dashboardApi.getMapTasks(provinceId),
+    queryKey: ['dashboardMapTasks', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getMapTasks(provinceId, startDate, endDate, adminUnitId),
   });
 
   // Query dữ liệu Alerts (chứa danh sách SOS mới nhất)
   const { data: alertsResponse, isLoading: isAlertsLoading } = useQuery({
-    queryKey: ['dashboardAlerts', provinceId],
-    queryFn: () => dashboardApi.getAlerts(provinceId),
+    queryKey: ['dashboardAlerts', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getAlerts(provinceId, startDate, endDate, adminUnitId),
   });
 
   // Query dữ liệu Charts (chứa tỷ lệ nhiệm vụ cứu hộ)
   const { data: chartsResponse, isLoading: isChartsLoading } = useQuery({
-    queryKey: ['dashboardCharts', provinceId],
-    queryFn: () => dashboardApi.getCharts(provinceId),
+    queryKey: ['dashboardCharts', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getCharts(provinceId, startDate, endDate, adminUnitId),
   });
 
   if (isMapTasksLoading || isAlertsLoading || isChartsLoading) {
@@ -52,36 +57,10 @@ export default function RegionalStatsPanel({ provinceId }: RegionalStatsPanelPro
   const ongoingOffset = -savedStroke;
   const pendingOffset = -(savedStroke + ongoingStroke);
 
-  // Thống kê SOS theo khu vực (phân rã từ markers của bản đồ)
-  const regionCounts: Record<string, number> = {};
-  mapTasksData.markers
-    .filter((m: any) => m.type === 'sos')
-    .forEach((m: any) => {
-      const region = m.title.split(',').pop()?.trim() || 'Hòa Bình';
-      regionCounts[region] = (regionCounts[region] || 0) + 1;
-    });
+  // Thống kê SOS theo khu vực (lấy từ dữ liệu biểu đồ backend)
+  const sosByRegion = chartsResponse?.data?.sosByRegion || [];
 
-  const sosByRegion = Object.keys(regionCounts).length > 0
-    ? Object.keys(regionCounts).map((region) => ({
-        region,
-        count: regionCounts[region],
-        percent: Math.min((regionCounts[region] / 20) * 100, 100),
-      }))
-    : [
-        { region: 'TP. Hồ Chí Minh', count: 12, percent: 85 },
-        { region: 'Quảng Trị', count: 6, percent: 50 },
-        { region: 'Hòa Bình', count: 4, percent: 35 },
-        { region: 'Lào Cai', count: 3, percent: 25 },
-        { region: 'Thừa Thiên Huế', count: 2, percent: 15 },
-      ];
-
-  const missionProgress = mapTasksData.missions.length > 0
-    ? mapTasksData.missions
-    : [
-        { name: 'Cứu hộ tại xã Hòa Bình', team: 'Đội 1', percent: 75, color: 'bg-emerald-500' },
-        { name: 'Tiếp tế tại Quảng Trị', team: 'Đội 2', percent: 50, color: 'bg-amber-500' },
-        { name: 'Hỗ trợ y tế tại Lào Cai', team: 'Đội 3', percent: 25, color: 'bg-red-500' },
-      ];
+  const missionProgress = mapTasksData.missions;
 
   const latestSos = alertsData.latestSos;
 
@@ -93,26 +72,32 @@ export default function RegionalStatsPanel({ provinceId }: RegionalStatsPanelPro
           <h2 className="text-sm font-bold text-black dark:text-white">
             SOS theo khu vực
           </h2>
-          <button className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+          <Link to={ROUTES.DISASTER_LIST} className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
             Xem trên bản đồ
-          </button>
+          </Link>
         </div>
 
         <div className="space-y-3">
-          {sosByRegion.slice(0, 5).map((region, idx) => (
-            <div key={idx} className="space-y-1">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-gray-500">{region.region}</span>
-                <span className="font-bold">{region.count}</span>
+          {sosByRegion.length > 0 ? (
+            sosByRegion.slice(0, 5).map((region, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-gray-500">{region.region}</span>
+                  <span className="font-bold">{region.count}</span>
+                </div>
+                <div className="h-2 w-full bg-slate-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full"
+                    style={{ width: `${region.percent}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 w-full bg-slate-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full"
-                  style={{ width: `${region.percent}%` }}
-                />
-              </div>
+            ))
+          ) : (
+            <div className="h-32 flex items-center justify-center text-xs text-gray-400">
+              Không có dữ liệu SOS
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -166,9 +151,9 @@ export default function RegionalStatsPanel({ provinceId }: RegionalStatsPanelPro
           <h2 className="text-sm font-bold text-black dark:text-white">
             Tiến độ nhiệm vụ
           </h2>
-          <button className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+          <Link to={ROUTES.SOS_REQUEST_LIST} className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
             Xem tất cả
-          </button>
+          </Link>
         </div>
 
         <div className="space-y-4 overflow-y-auto max-h-[180px]">
@@ -198,9 +183,9 @@ export default function RegionalStatsPanel({ provinceId }: RegionalStatsPanelPro
           <h2 className="text-sm font-bold text-black dark:text-white">
             SOS mới nhất
           </h2>
-          <button className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+          <Link to={ROUTES.SOS_REQUEST_LIST} className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
             Xem tất cả
-          </button>
+          </Link>
         </div>
 
         <div className="space-y-3 flex-1 overflow-y-auto max-h-[180px]">

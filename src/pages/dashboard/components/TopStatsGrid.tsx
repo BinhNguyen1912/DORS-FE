@@ -1,5 +1,7 @@
 import { Home, Users, AlertTriangle, Shield, Heart } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../constants';
 import { dashboardApi } from '../../../apis/dashboard.api';
 
 // Thuật toán Catmull-Rom Spline để tính đường cong Bézier trơn tru tự nhiên nhất
@@ -48,13 +50,16 @@ function getBezierPath(points: [number, number][]) {
 
 interface TopStatsGridProps {
   provinceId: number | null;
+  startDate?: string;
+  endDate?: string;
+  adminUnitId?: number | null;
 }
 
-export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
+export default function TopStatsGrid({ provinceId, startDate, endDate, adminUnitId }: TopStatsGridProps) {
   // Query stats thực tế từ Backend
   const { data: statsResponse, isLoading } = useQuery({
-    queryKey: ['dashboardStats', provinceId],
-    queryFn: () => dashboardApi.getStats(provinceId),
+    queryKey: ['dashboardStats', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getStats(provinceId, startDate, endDate, adminUnitId),
   });
 
   const statsData = statsResponse?.data || {
@@ -75,7 +80,8 @@ export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
       color: '#3b82f6',
       sparkline: statsData.totalHouseholds.sparkline,
       icon: Home,
-      iconBg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'
+      iconBg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400',
+      link: ROUTES.HOUSEHOLD_LIST,
     },
     {
       title: 'Đội cứu hộ hoạt động',
@@ -86,7 +92,8 @@ export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
       color: '#10b981',
       sparkline: statsData.activeRescueTeams.sparkline,
       icon: Users,
-      iconBg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+      iconBg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400',
+      link: ROUTES.RESCUE_TEAM_LIST,
     },
     {
       title: 'SOS đang hoạt động',
@@ -97,7 +104,8 @@ export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
       color: '#f59e0b',
       sparkline: statsData.activeSosRequests.sparkline,
       icon: AlertTriangle,
-      iconBg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+      iconBg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400',
+      link: ROUTES.SOS_REQUEST_LIST,
     },
     {
       title: 'Thiên tai đang diễn ra',
@@ -108,7 +116,8 @@ export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
       color: '#ef4444',
       sparkline: statsData.ongoingDisasters.sparkline,
       icon: Shield,
-      iconBg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
+      iconBg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400',
+      link: ROUTES.DISASTER_LIST,
     },
     {
       title: 'Tổng đóng góp tài chính',
@@ -119,7 +128,8 @@ export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
       color: '#8b5cf6',
       sparkline: statsData.totalDonations.sparkline,
       icon: Heart,
-      iconBg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400'
+      iconBg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400',
+      link: ROUTES.DONATION_LIST,
     }
   ];
 
@@ -154,9 +164,10 @@ export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
         const gradId = `spark-grad-${idx}`;
 
         return (
-          <div
+          <Link
             key={idx}
-            className="bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+            to={stat.link}
+            className="bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between cursor-pointer"
           >
             <div className="flex items-start justify-between">
               <div className="space-y-1">
@@ -205,7 +216,7 @@ export default function TopStatsGrid({ provinceId }: TopStatsGridProps) {
                 <span className="text-gray-400 font-medium">{stat.subTextDesc}</span>
               </div>
             </div>
-          </div>
+          </Link>
         );
       })}
     </div>

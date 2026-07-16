@@ -19,6 +19,7 @@ import { cn } from '../../../lib/utils';
 import { toast } from '../../../stores';
 import { rescueTeamApi } from '../../../apis/rescue-team.api';
 import { floodRequestApi } from '../../../apis/flood-request.api';
+import { sosApi } from '../../../apis/sos.api';
 import RequestStepper from './RequestStepper';
 import RequestHistory from './RequestHistory';
 import type { SosRequestItem } from './mockData';
@@ -26,12 +27,13 @@ import type { RescueTeam } from '../../../types';
 
 interface RequestDetailProps {
   request: SosRequestItem;
+  activeTab: 'SOS_KHAN_CAP' | 'NGAP_LUT' | 'HO_SO';
   onVerify: (id: number) => void;
   onUpdateStatus: (id: number, status: string) => void;
   onApproveForMap?: (id: number) => void;
 }
 
-const statusBadges: Record<string, { label: string; style: string }> = {
+const statusBadges: Record<string, any> = {
   // Flood request statuses
   PENDING: { label: 'CHƯA XÁC MINH', style: 'text-red-600 dark:text-red-400 font-extrabold' },
   VERIFYING: { label: 'ĐANG XÁC MINH', style: 'text-amber-600 dark:text-amber-400 font-extrabold' },
@@ -40,16 +42,17 @@ const statusBadges: Record<string, { label: string; style: string }> = {
   REJECTED: { label: 'ĐÃ TỪ CHỐI', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
   CANCELLED: { label: 'ĐÃ HỦY', style: 'text-slate-500 dark:text-slate-400 font-semibold' },
   // SOS statuses
-  ON_SITE: { label: 'ĐÃ XÁC NHẬN', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
+  PENDING_SPECIALIST: { label: 'CHỜ ĐỘI CHUYÊN MÔN', style: 'text-rose-600 dark:text-rose-455 font-extrabold' },
+  ON_SITE: { label: 'ĐÃ TIẾP CẬN', style: 'text-emerald-600 dark:text-emerald-450 font-extrabold' },
   RESOLVED: { label: 'HOÀN THÀNH', style: 'text-blue-600 dark:text-blue-450 font-extrabold' },
 };
 
-const purposeLabels = {
+const purposeLabels: Record<string, any> = {
   DECLARE_ONLY: { label: 'Khai báo ngập lụt', style: 'text-blue-600 dark:text-blue-400 font-extrabold' },
   REQUEST_SUPPORT: { label: 'Yêu cầu cứu trợ', style: 'text-rose-600 dark:text-rose-450 font-extrabold' },
 };
 
-const severityLabels: Record<string, { label: string; color: string }> = {
+const severityLabels: Record<string, any> = {
   CRITICAL: { label: 'Nguy kịch', color: '#dc2626' },
   HIGH: { label: 'Cao', color: '#ea580c' },
   MEDIUM: { label: 'Trung bình', color: '#2563eb' },
@@ -57,13 +60,14 @@ const severityLabels: Record<string, { label: string; color: string }> = {
 };
 
 const teamStatusLabels: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: 'Sẵn sàng', color: 'text-emerald-600 dark:text-emerald-400' },
-  ON_DUTY: { label: 'Đang làm việc', color: 'text-orange-500' },
-  INACTIVE: { label: 'Không hoạt động', color: 'text-gray-400' },
+  AVAILABLE: { label: 'Sẵn sàng', color: 'text-emerald-600 dark:text-emerald-400' },
+  STANDBY: { label: 'Chờ lệnh', color: 'text-blue-500' },
+  DISPATCHED: { label: 'Đang di chuyển', color: 'text-amber-500' },
+  BUSY: { label: 'Đang làm việc', color: 'text-orange-500' },
   OFF_DUTY: { label: 'Nghỉ', color: 'text-gray-400' },
 };
 
-export default function RequestDetail({ request, onVerify, onUpdateStatus, onApproveForMap }: RequestDetailProps) {
+export default function RequestDetail({ request, activeTab, onVerify, onUpdateStatus, onApproveForMap }: RequestDetailProps) {
   const [detailTab, setDetailTab] = useState<'info' | 'images' | 'history'>('info');
   const [isDispatchOpen, setIsDispatchOpen] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false);
@@ -89,12 +93,13 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Fetch available (ACTIVE) rescue teams for manual dispatch
+  // Fetch available rescue teams for manual dispatch
   const { data: availableTeams = [], isFetching: isLoadingTeams } = useQuery<RescueTeam[]>({
     queryKey: ['rescue-teams-active', request.lat, request.lng],
     queryFn: async () => {
-      const res = await rescueTeamApi.getAll({ status: 'ACTIVE', limit: 50 });
-      return res.data || [];
+      const res = await rescueTeamApi.getAll({ limit: 100 });
+      const items = res.data || [];
+      return items.filter(t => t.status === 'AVAILABLE' || t.status === 'STANDBY');
     },
     enabled: isManualMode, // Only fetch when manual mode opens
     staleTime: 30_000,
@@ -132,13 +137,19 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
     toast.success('Đã sao chép tọa độ vào bộ nhớ tạm!');
   };
 
-  // ── AUTO DISPATCH: call floodRequestApi.dispatch
+  // ── AUTO DISPATCH
   const handleAutoDispatch = async () => {
     setIsAutoDispatching(true);
     try {
-      await floodRequestApi.dispatch(request.id, { method: 'AUTO' });
-      onVerify(request.id);
-      toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối. SOS mới đã được tạo.');
+      if (activeTab === 'SOS_KHAN_CAP') {
+        await sosApi.assignTeam(request.id, {});
+        onVerify(request.id);
+        toast.success('Đã tự động điều phối đội cứu hộ tối ưu thành công!');
+      } else {
+        await floodRequestApi.dispatch(request.id, { method: 'AUTO' });
+        onVerify(request.id);
+        toast.success('Phê duyệt thành công! Đội cứu trợ tối ưu đã được tự động điều phối. SOS mới đã được tạo.');
+      }
     } catch (err: any) {
       toast.api(err, 'Lỗi điều phối tự động');
     } finally {
@@ -147,18 +158,24 @@ export default function RequestDetail({ request, onVerify, onUpdateStatus, onApp
     }
   };
 
-  // ── MANUAL DISPATCH: pass teamId to floodRequestApi.dispatch
+  // ── MANUAL DISPATCH
   const handleManualDispatch = async () => {
     if (!selectedTeamId) return;
     setIsManualDispatching(true);
     const team = availableTeams.find(t => t.id === selectedTeamId);
     try {
-      await floodRequestApi.dispatch(request.id, {
-        method: 'MANUAL',
-        teamId: selectedTeamId,
-      });
-      onVerify(request.id);
-      toast.success(`Đã điều phối thủ công đội "${team?.name || selectedTeamId}" đến hiện trường. SOS mới đã được tạo.`);
+      if (activeTab === 'SOS_KHAN_CAP') {
+        await sosApi.assignTeam(request.id, { teamId: selectedTeamId });
+        onVerify(request.id);
+        toast.success(`Đã điều phối thủ công đội "${team?.name || selectedTeamId}" đến hiện trường thành công.`);
+      } else {
+        await floodRequestApi.dispatch(request.id, {
+          method: 'MANUAL',
+          teamId: selectedTeamId,
+        });
+        onVerify(request.id);
+        toast.success(`Đã điều phối thủ công đội "${team?.name || selectedTeamId}" đến hiện trường. SOS mới đã được tạo.`);
+      }
     } catch (err: any) {
       toast.api(err, 'Lỗi điều phối thủ công');
     } finally {

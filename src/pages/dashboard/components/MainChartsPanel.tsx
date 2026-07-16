@@ -1,5 +1,7 @@
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../constants';
 import { dashboardApi } from '../../../apis/dashboard.api';
 
 // Thuật toán Catmull-Rom Spline để tính đường cong Bézier trơn tru tự nhiên nhất
@@ -25,7 +27,7 @@ function getBezierPath(points: [number, number][]) {
     const n = next || current;
     const o = line(p, n);
     const angle = o.angle + (reverse ? Math.PI : 0);
-    const length = o.length * 0.12; // Hệ số căng nhỏ hơn để đường cong tự nhiên, thanh mảnh
+    const length = o.length * 0.12; // Hệ số căng nhỏ hơn để đường cong thanh mảnh, tự nhiên
     const x = current[0] + Math.cos(angle) * length;
     const y = current[1] + Math.sin(angle) * length;
     return [x, y];
@@ -48,19 +50,22 @@ function getBezierPath(points: [number, number][]) {
 
 interface MainChartsPanelProps {
   provinceId: number | null;
+  startDate?: string;
+  endDate?: string;
+  adminUnitId?: number | null;
 }
 
-export default function MainChartsPanel({ provinceId }: MainChartsPanelProps) {
+export default function MainChartsPanel({ provinceId, startDate, endDate, adminUnitId }: MainChartsPanelProps) {
   // Query dữ liệu biểu đồ từ Backend API
   const { data: chartsResponse, isLoading: isChartsLoading } = useQuery({
-    queryKey: ['dashboardCharts', provinceId],
-    queryFn: () => dashboardApi.getCharts(provinceId),
+    queryKey: ['dashboardCharts', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getCharts(provinceId, startDate, endDate, adminUnitId),
   });
 
   // Query dữ liệu cảnh báo từ Backend API
   const { data: alertsResponse, isLoading: isAlertsLoading } = useQuery({
-    queryKey: ['dashboardAlerts', provinceId],
-    queryFn: () => dashboardApi.getAlerts(provinceId),
+    queryKey: ['dashboardAlerts', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getAlerts(provinceId, startDate, endDate, adminUnitId),
   });
 
   const chartsData = chartsResponse?.data || {
@@ -291,48 +296,60 @@ export default function MainChartsPanel({ provinceId }: MainChartsPanelProps) {
         </div>
       </div>
 
-      {/* Cảnh báo khẩn cấp (3 cols) */}
+      {/* Yêu cầu cứu hộ khẩn cấp (3 cols) */}
       <div className="lg:col-span-3 bg-white dark:bg-gray-800 border border-slate-200/60 dark:border-gray-700/60 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold text-black dark:text-white">
-            Cảnh báo khẩn cấp
+            Yêu cầu cứu hộ khẩn cấp
           </h2>
-          <button className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+          <Link to={ROUTES.SOS_REQUEST_LIST} className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
             Xem tất cả
-          </button>
+          </Link>
         </div>
 
         <div className="space-y-3.5 flex-1 overflow-y-auto max-h-[220px]">
-          {alertsData.disasters.map((alert: any, idx: number) => (
-            <div key={idx} className="flex gap-3 items-start">
-              <div className="p-2 bg-red-50 dark:bg-red-950/30 text-red-500 rounded-xl mt-0.5">
-                <AlertTriangle size={15} />
-              </div>
-              <div className="space-y-0.5 flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1.5">
-                  <p className="font-bold text-xs text-gray-900 dark:text-white truncate">
-                    {alert.title}
-                  </p>
-                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold leading-none ${alert.badgeColor} shrink-0`}>
-                    {alert.badge}
-                  </span>
+          {alertsData.latestSos.length > 0 ? (
+            alertsData.latestSos.map((sos: any, idx: number) => (
+              <div key={idx} className="flex gap-3 items-start">
+                <div className="p-2 bg-red-50 dark:bg-red-950/30 text-red-500 rounded-xl mt-0.5 animate-pulse shrink-0">
+                  <AlertTriangle size={15} />
                 </div>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                  {alert.desc}
-                </p>
-                <p className="text-[10px] text-gray-400 flex items-center gap-1.5 pt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${alert.statusDot}`} />
-                  <span>{alert.time}</span>
-                </p>
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <p className="font-bold text-xs text-gray-900 dark:text-white truncate">
+                      {sos.title}
+                    </p>
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold leading-none shrink-0 ${
+                      sos.status === 'RESOLVED' 
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : sos.status === 'PENDING'
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    }`}>
+                      {sos.status === 'RESOLVED' ? 'Đã xong' : sos.status === 'PENDING' ? 'Chờ xử lý' : 'Đang cứu'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                    {sos.address}
+                  </p>
+                  <p className="text-[10px] text-gray-400 flex items-center gap-1.5 pt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    <span>{sos.time}</span>
+                  </p>
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="h-32 flex items-center justify-center text-xs text-gray-400">
+              Không có yêu cầu SOS nào
             </div>
-          ))}
+          )}
         </div>
 
-        <button className="w-full mt-4 py-2 bg-slate-50 dark:bg-gray-700/40 hover:bg-slate-100/80 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 transition-colors flex items-center justify-center gap-1">
-          <span>Xem tất cả cảnh báo</span>
+        <Link to={ROUTES.SOS_REQUEST_LIST} className="w-full mt-4 py-2 bg-slate-50 dark:bg-gray-700/40 hover:bg-slate-100/80 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 transition-colors flex items-center justify-center gap-1">
+          <span>Xem tất cả yêu cầu</span>
           <ArrowRight size={12} />
-        </button>
+        </Link>
       </div>
     </div>
   );

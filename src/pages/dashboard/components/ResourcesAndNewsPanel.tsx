@@ -48,19 +48,22 @@ function getBezierPath(points: [number, number][]) {
 
 interface ResourcesAndNewsPanelProps {
   provinceId: number | null;
+  startDate?: string;
+  endDate?: string;
+  adminUnitId?: number | null;
 }
 
-export default function ResourcesAndNewsPanel({ provinceId }: ResourcesAndNewsPanelProps) {
+export default function ResourcesAndNewsPanel({ provinceId, startDate, endDate, adminUnitId }: ResourcesAndNewsPanelProps) {
   // Query dữ liệu vật tư và tài chính từ Backend
   const { data: resourcesResponse, isLoading: isResourcesLoading } = useQuery({
-    queryKey: ['dashboardResources', provinceId],
-    queryFn: () => dashboardApi.getResources(provinceId),
+    queryKey: ['dashboardResources', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getResources(provinceId, startDate, endDate, adminUnitId),
   });
 
   // Query dữ liệu tin tức (sử dụng alerts thiên tai để tạo feed tin tức)
   const { data: alertsResponse, isLoading: isAlertsLoading } = useQuery({
-    queryKey: ['dashboardAlerts', provinceId],
-    queryFn: () => dashboardApi.getAlerts(provinceId),
+    queryKey: ['dashboardAlerts', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getAlerts(provinceId, startDate, endDate, adminUnitId),
   });
 
   if (isResourcesLoading || isAlertsLoading) {

@@ -22,7 +22,7 @@ export interface MenuItem {
 }
 
 export const menuItems: MenuItem[] = [
-  { label: 'Tổng quan', href: ROUTES.DASHBOARD, icon: LayoutDashboard },
+  { label: 'Tổng quan', href: ROUTES.DASHBOARD, icon: LayoutDashboard, roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN'] },
   {
     label: 'Danh mục',
     href: '#/categories',

@@ -14,7 +14,7 @@ interface BulkTabProps {
 
 export default function BulkTab({ events, templates }: BulkTabProps) {
   const [selectedEventCode, setSelectedEventCode] = useState(events[0]?.code || 'SOS_CREATED');
-  
+
   // Filter templates matching selected event
   const matchingTemplates = templates.filter(t => t.eventCode === selectedEventCode);
   const [selectedTemplateCode, setSelectedTemplateCode] = useState(matchingTemplates[0]?.code || templates[0]?.code || 'SOS_CREATED_DEFAULT');
@@ -45,7 +45,7 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
 
   // Selected roles
   const [selectedRoles, setSelectedRoles] = useState<string[]>(['leader', 'admin', 'citizen']);
-  
+
   // Selected individual people
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<number[]>([]);
 
@@ -54,9 +54,9 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
 
   // Handle Role checkbox toggle
   const toggleRole = (roleKey: string) => {
-    setSelectedRoles(prev => 
-      prev.includes(roleKey) 
-        ? prev.filter(r => r !== roleKey) 
+    setSelectedRoles(prev =>
+      prev.includes(roleKey)
+        ? prev.filter(r => r !== roleKey)
         : [...prev, roleKey]
     );
   };
@@ -72,9 +72,9 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
 
   // Handle Person checkbox toggle
   const togglePerson = (id: number) => {
-    setSelectedPeopleIds(prev => 
-      prev.includes(id) 
-        ? prev.filter(pId => pId !== id) 
+    setSelectedPeopleIds(prev =>
+      prev.includes(id)
+        ? prev.filter(pId => pId !== id)
         : [...prev, id]
     );
   };
@@ -139,12 +139,11 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
           title: messageTitle,
           content: messageContent,
           message: messageContent, // Matches {{message}} variable in SYSTEM_NOTICE
-          citizenName: 'Nguyễn Văn A',
-          address: 'Quận 1, TP. Hồ Chí Minh',
-          priority: 'Khẩn cấp',
-          sosId: '2026-000123',
-          distance: '2.5',
-          depth: '45'
+          // citizenName: 'Nguyễn Văn A',
+          // address: 'Quận 1, TP. Hồ Chí Minh',
+          // priority: 'Khẩn cấp',
+          // distance: '2.5',
+          // depth: '45'
         },
         recipientUserIds
       });
@@ -159,8 +158,8 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
   };
 
   // Filter people list based on search
-  const filteredPeople = users.filter(u => 
-    u.fullName.toLowerCase().includes(peopleSearch.toLowerCase()) || 
+  const filteredPeople = users.filter(u =>
+    u.fullName.toLowerCase().includes(peopleSearch.toLowerCase()) ||
     (u.phone && u.phone.includes(peopleSearch)) ||
     (u.email && u.email.toLowerCase().includes(peopleSearch.toLowerCase()))
   );
@@ -183,7 +182,7 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="block text-black font-normal">Sự kiện nghiệp vụ</label>
-              <select 
+              <select
                 value={selectedEventCode}
                 onChange={(e) => {
                   setSelectedEventCode(e.target.value);
@@ -199,7 +198,7 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
             </div>
             <div className="space-y-1.5">
               <label className="block text-black font-normal">Mẫu tin nhắn mặc định</label>
-              <select 
+              <select
                 value={selectedTemplateCode}
                 onChange={(e) => setSelectedTemplateCode(e.target.value)}
                 className="w-full border border-slate-300 rounded-xl px-3.5 py-2 bg-white text-black cursor-pointer focus:outline-none"
@@ -218,7 +217,7 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
           {/* Edit message block (Title & Content with formatting tools) */}
           <div className="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
             <span className="text-[11px] text-black font-semibold block">Nội dung gửi đi (Cho phép tinh chỉnh)</span>
-            
+
             {/* Message Title */}
             <div className="space-y-1">
               <label className="text-[10px] text-black font-semibold">Tiêu đề thông báo</label>
@@ -245,7 +244,7 @@ export default function BulkTab({ events, templates }: BulkTabProps) {
           {/* Recipient Configuration */}
           <div className="space-y-3.5">
             <span className="text-[11px] text-black font-semibold block">Đối tượng nhận tin</span>
-            
+
             {/* Toggle Modes */}
             <div className="flex border-b border-slate-200 text-xs font-normal gap-4 pb-2">
               <label className="flex items-center gap-1.5 cursor-pointer">

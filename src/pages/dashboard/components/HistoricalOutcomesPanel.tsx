@@ -3,13 +3,16 @@ import { dashboardApi } from '../../../apis/dashboard.api';
 
 interface HistoricalOutcomesPanelProps {
   provinceId: number | null;
+  startDate?: string;
+  endDate?: string;
+  adminUnitId?: number | null;
 }
 
-export default function HistoricalOutcomesPanel({ provinceId }: HistoricalOutcomesPanelProps) {
+export default function HistoricalOutcomesPanel({ provinceId, startDate, endDate, adminUnitId }: HistoricalOutcomesPanelProps) {
   // Query charts data (contains historical outcome counts)
   const { data: chartsResponse, isLoading } = useQuery({
-    queryKey: ['dashboardCharts', provinceId],
-    queryFn: () => dashboardApi.getCharts(provinceId),
+    queryKey: ['dashboardCharts', provinceId, startDate, endDate, adminUnitId],
+    queryFn: () => dashboardApi.getCharts(provinceId, startDate, endDate, adminUnitId),
   });
 
   if (isLoading) {
@@ -82,22 +85,22 @@ export default function HistoricalOutcomesPanel({ provinceId }: HistoricalOutcom
               const failedPct = Math.round(((bar.total - bar.resolved) * 0.3 / totalVal) * 100);
 
               return (
-                <div key={idx} className="flex-1 flex flex-col justify-end h-full max-w-[32px]">
-                  <div className="w-full flex flex-col rounded-md overflow-hidden animate-fade-in-up">
-                    <div className="bg-red-500" style={{ height: `${failedPct}%` }} />
-                    <div className="bg-amber-500" style={{ height: `${ongoingPct}%` }} />
-                    <div className="bg-emerald-500" style={{ height: `${savedPct}%` }} />
+                <div key={idx} className="flex-1 flex flex-col items-center h-full max-w-[32px]">
+                  {/* Bar Wrapper to keep it 100% height minus label */}
+                  <div className="flex-1 w-full flex flex-col justify-end items-center mb-3">
+                    <div className="w-full flex flex-col rounded-md overflow-hidden animate-fade-in-up">
+                      <div className="bg-red-500" style={{ height: `${failedPct}%` }} />
+                      <div className="bg-amber-500" style={{ height: `${ongoingPct}%` }} />
+                      <div className="bg-emerald-500" style={{ height: `${savedPct}%` }} />
+                    </div>
                   </div>
+                  {/* Label */}
+                  <span className="text-[10px] font-bold text-gray-400 whitespace-nowrap shrink-0">
+                    {bar.date}
+                  </span>
                 </div>
               );
             })}
-          </div>
-
-          {/* Labels */}
-          <div className="flex justify-between text-[10px] font-bold text-gray-400 mt-3 px-2">
-            {sosOverTime.map((d: any, i: number) => (
-              <span key={i} className="w-10 text-center">{d.date}</span>
-            ))}
           </div>
         </div>
       </div>
