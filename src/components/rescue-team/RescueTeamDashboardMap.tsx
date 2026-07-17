@@ -111,7 +111,7 @@ export default function RescueTeamDashboardMap({
 
       const outerRing = isBusy ? 'border-2 border-red-500' : 'border border-white';
       // Performance optimization: Only animate-pulse if the team is busy/on duty
-      const pulseDiv = isBusy 
+      const pulseDiv = isBusy
         ? `<div class="absolute w-7 h-7 ${baseColor} rounded-full opacity-25 animate-pulse"></div>`
         : '';
 
@@ -193,7 +193,7 @@ export default function RescueTeamDashboardMap({
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping" />
-          Vị trí đội cứu hộ (Real-time)
+          Vị trí đội cứu hộ
         </h2>
         <button
           onClick={onNavigateToDisaster}

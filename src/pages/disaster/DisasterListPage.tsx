@@ -26,7 +26,7 @@ import {
   Search,
   Loader2,
 } from 'lucide-react';
-import { rescueTeamApi, locationApi, sosApi, routingApi } from '../../apis';
+import { rescueTeamApi, locationApi, sosApi, routingApi, floodRequestApi } from '../../apis';
 import { cn } from '../../lib/utils';
 import { toast, useAuthStore } from '../../stores';
 import { useSocket } from '../../providers/SocketProvider';
@@ -184,6 +184,7 @@ export default function DisasterListPage() {
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
   const markersMapRef = useRef<Map<string, L.Marker>>(new Map());
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const floodGroupRef = useRef<L.LayerGroup | null>(null);
   const [activeTileType, setActiveTileType] = useState<'streets' | 'satellite' | 'terrain'>('streets');
   const [performanceMode, setPerformanceMode] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -208,14 +209,14 @@ export default function DisasterListPage() {
         const lonNum = Number(lon);
         if (mapRef.current) {
           mapRef.current.setView([latNum, lonNum], 15, { animate: true });
-          
+
           L.popup()
             .setLatLng([latNum, lonNum])
             .setContent(
               `<div style="font-family:inherit; font-size:11px; font-weight:800; color:#1e293b; padding:2px;">📍 ${display_name}</div>`
             )
             .openOn(mapRef.current);
-          
+
           toast.success(`Đã di chuyển tới: ${display_name.split(',')[0]}`);
         }
       } else {
@@ -271,6 +272,17 @@ export default function DisasterListPage() {
     queryKey: ['db-teams-all', user?.provinceId],
     queryFn: () => rescueTeamApi.getAll({ provinceId: user?.provinceId, limit: 100 }),
   });
+
+  const { data: dbFloodRequests, error: floodRequestsError } = useQuery({
+    queryKey: ['db-flood-requests', user?.provinceId],
+    queryFn: () => floodRequestApi.getAll({ provinceId: user?.provinceId, isApprovedForMap: true, limit: 500 }),
+  });
+
+  useEffect(() => {
+    if (floodRequestsError) {
+      toast.error('Lỗi: Không thể tải danh sách vùng ngập lụt từ máy chủ.');
+    }
+  }, [floodRequestsError]);
 
   // 📡 Real-time WebSockets integration for SOS dispatch updates
 
@@ -467,9 +479,9 @@ export default function DisasterListPage() {
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(lat1 * (Math.PI / 180)) *
-          Math.cos(lat2 * (Math.PI / 180)) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     };
@@ -702,6 +714,7 @@ export default function DisasterListPage() {
     mapRef.current = map;
     layersGroupRef.current = L.layerGroup().addTo(map);
     markersGroupRef.current = L.layerGroup().addTo(map);
+    floodGroupRef.current = L.layerGroup();
     setIsMapReady(true);
 
     const mapEl = mapContainerRef.current;
@@ -731,6 +744,10 @@ export default function DisasterListPage() {
 
     return () => {
       mapEl.removeEventListener('click', handlePopupClick);
+      if (floodGroupRef.current) {
+        floodGroupRef.current.clearLayers();
+        floodGroupRef.current = null;
+      }
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -1210,6 +1227,99 @@ export default function DisasterListPage() {
       });
     }
   }, [showFloodZones, showSos, showTeams, filteredSosRequests, filteredTeams, userLocation, showUserLocation, floodZonesGeoJSON, dbSosList, routesCache, performanceMode, isMapReady]);
+
+  // 📡 Render approved flood requests (Markers & Polygons/Circles) on the map
+  // Triggers only when the data updates
+  useEffect(() => {
+    if (!mapRef.current || !floodGroupRef.current || !dbFloodRequests?.data) return;
+    const group = floodGroupRef.current;
+
+    // Clear previous layers to avoid memory leaks or duplicate rendering
+    group.clearLayers();
+
+    // 1. Warn if hard limit is reached
+    if (dbFloodRequests.data.length === 500) {
+      console.warn('[Flood Map] Hard limit of 500 flood requests reached. Some requests may be hidden.');
+    }
+
+    // 2. Iterate and draw approved flood requests
+    dbFloodRequests.data.forEach((req: any) => {
+      let lat = defaultCenter[0];
+      let lng = defaultCenter[1];
+
+      if (req.location?.coordinates && Array.isArray(req.location.coordinates)) {
+        lng = req.location.coordinates[0];
+        lat = req.location.coordinates[1];
+      }
+
+      if (!lat || !lng) return;
+
+      // Draw Marker for the point (warning icon with yellow/amber background)
+      const floodIcon = L.divIcon({
+        html: `
+          <div class="relative flex items-center justify-center">
+            <div class="absolute w-8 h-8 bg-amber-500 rounded-full opacity-35 animate-ping"></div>
+            <div class="w-6.5 h-6.5 bg-amber-500 text-white rounded-full flex items-center justify-center shadow-lg border border-white text-[11px]">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+          </div>
+        `,
+        className: 'custom-div-icon',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      });
+
+      const popupContent = `
+        <div class="p-2 w-48 text-left font-sans text-xs">
+          <h4 class="font-extrabold text-blue-600 mb-1">${req.title}</h4>
+          <p class="text-gray-600 mb-1">${req.description || 'Khai báo ngập lụt'}</p>
+          <div class="text-[10px] text-gray-500">
+            <strong>Độ sâu lớn nhất:</strong> ${req.floodDepthCmMax || 0} cm<br />
+            <strong>Diện tích ước tính:</strong> ${req.estimatedAreaHa || 'N/A'} ha
+          </div>
+        </div>
+      `;
+
+      const marker = L.marker([lat, lng], { icon: floodIcon })
+        .bindPopup(popupContent, { className: 'custom-theme-popup' });
+      group.addLayer(marker);
+
+      // Draw Circle representing the estimated flooded area (Interim solution with yellow/amber styling)
+      const DEFAULT_RADIUS_METERS = 150;
+      const areaHa = req.estimatedAreaHa;
+      const radius = areaHa && areaHa > 0
+        ? Math.sqrt((areaHa * 10000) / Math.PI)
+        : DEFAULT_RADIUS_METERS;
+
+      const circle = L.circle([lat, lng], {
+        color: '#d97706',
+        fillColor: '#f59e0b',
+        fillOpacity: 0.18,
+        weight: 1.5,
+        radius: radius,
+      }).bindPopup(`<b>Diện tích ngập lụt ước lượng:</b> ${areaHa || 'N/A'} ha (Bán kính: ${radius.toFixed(0)}m)`);
+      group.addLayer(circle);
+    });
+  }, [dbFloodRequests?.data]); // Run only when data array reference changes (prevent background-refetch flashes)
+
+  // Toggle layer visibility when showFloodZones changes or map becomes ready (Zero redraws)
+  useEffect(() => {
+    if (!mapRef.current || !floodGroupRef.current || !isMapReady) return;
+    const map = mapRef.current;
+    const group = floodGroupRef.current;
+
+    const hasLayer = map.hasLayer(group);
+
+    if (showFloodZones) {
+      if (!hasLayer) {
+        map.addLayer(group);
+      }
+    } else {
+      if (hasLayer) {
+        map.removeLayer(group);
+      }
+    }
+  }, [showFloodZones, isMapReady]);
 
   // Center/Zoom map on a specific SOS click from side panel
   const handleSelectSos = (sos: any) => {
@@ -1907,7 +2017,7 @@ export default function DisasterListPage() {
                             <span className="font-extrabold text-[10.5px] text-gray-800 dark:text-slate-200 truncate">{team.name}</span>
                             <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900/30 flex-shrink-0">Sẵn sàng</span>
                           </div>
-                          
+
                           {/* Bottom Row */}
                           <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100/30 dark:border-slate-800/30">
                             <div className="flex items-center gap-2.5">
@@ -1953,7 +2063,7 @@ export default function DisasterListPage() {
                                 {activeSos?.status === 'DISPATCHED' ? 'Di chuyển' : activeSos?.status === 'ON_SITE' ? 'Tiếp cận' : 'Đang xử lý'}
                               </span>
                             </div>
-                            
+
                             {/* Bottom Row */}
                             <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-100/30 dark:border-slate-800/30">
                               <div className="flex items-center gap-2.5">
@@ -1994,8 +2104,8 @@ export default function DisasterListPage() {
                             <span className={cn(
                               "px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase border flex-shrink-0",
                               sos.severity === 'CRITICAL' ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/30' :
-                              sos.severity === 'HIGH' ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/30' :
-                              'bg-yellow-50 text-yellow-600 border-yellow-250 dark:bg-yellow-950/40 dark:text-yellow-400 dark:border-yellow-900/30'
+                                sos.severity === 'HIGH' ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/30' :
+                                  'bg-yellow-50 text-yellow-600 border-yellow-250 dark:bg-yellow-950/40 dark:text-yellow-400 dark:border-yellow-900/30'
                             )}>
                               {sos.severity === 'CRITICAL' ? 'Nguy kịch' : sos.severity === 'HIGH' ? 'Khẩn cấp' : 'Trung bình'}
                             </span>

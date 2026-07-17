@@ -361,6 +361,9 @@ export default function SosRequestListPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sosRequests'] });
       queryClient.invalidateQueries({ queryKey: ['floodRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardCharts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardMapTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardAlerts'] });
       toast.success('Đã cập nhật trạng thái yêu cầu thành công!');
     },
     onError: (err: any) => {
@@ -375,6 +378,9 @@ export default function SosRequestListPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['floodRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardCharts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardMapTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardAlerts'] });
       toast.success('Đã duyệt hiển thị điểm ngập lụt này lên bản đồ cứu hộ thành công!');
     },
     onError: (err: any) => {
