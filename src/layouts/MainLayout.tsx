@@ -17,6 +17,7 @@ import {
   Map,
   Settings,
   AlertTriangle,
+  Briefcase,
 } from 'lucide-react';
 import { useAuthStore, toast } from '../stores';
 import { ROUTES } from '../constants';
@@ -236,6 +237,15 @@ export default function MainLayout() {
         icon: <Shield size={20} />,
         showSearch: true,
         searchPlaceholder: 'Tìm kiếm vai trò...',
+      };
+    }
+    if (pathname === ROUTES.MISSION_LIST) {
+      return {
+        title: 'Giám sát nhiệm vụ cứu hộ',
+        subtitle: 'Theo dõi tiến độ di chuyển và cứu nạn của các đội cứu hộ ngoài hiện trường',
+        icon: <Briefcase size={20} />,
+        showSearch: true,
+        searchPlaceholder: 'Tìm kiếm nhiệm vụ...',
       };
     }
     if (pathname === ROUTES.SETTINGS) {

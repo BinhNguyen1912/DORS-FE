@@ -61,7 +61,7 @@ export const menuItems: MenuItem[] = [
   },
   {
     label: 'Nhiệm vụ',
-    href: '#/missions',
+    href: ROUTES.MISSION_LIST,
     icon: Briefcase,
     roles: ['SYSTEM_ADMIN', 'PROVINCE_ADMIN', 'RESCUE_TEAM_LEADER']
   },

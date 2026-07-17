@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../constants';
 import { dashboardApi } from '../../../apis/dashboard.api';
+import { useState, useMemo } from 'react';
 
 // Thuật toán Catmull-Rom Spline để tính đường cong Bézier trơn tru tự nhiên nhất
 function getBezierPath(points: [number, number][]) {
@@ -55,17 +56,39 @@ interface MainChartsPanelProps {
   adminUnitId?: number | null;
 }
 
-export default function MainChartsPanel({ provinceId, startDate, endDate, adminUnitId }: MainChartsPanelProps) {
+export default function MainChartsPanel({ provinceId, adminUnitId }: MainChartsPanelProps) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [hoveredSector, setHoveredSector] = useState<'total' | 'saved' | 'ongoing' | 'failed'>('total');
+  const [daysRange, setDaysRange] = useState(7);
+
+  // Compute effective start date based on daysRange select state
+  const effectiveStartDate = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - (daysRange - 1));
+    const yyyy = start.getFullYear();
+    const mm = String(start.getMonth() + 1).padStart(2, '0');
+    const dd = String(start.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, [daysRange]);
+
+  const effectiveEndDate = useMemo(() => {
+    const end = new Date();
+    const yyyy = end.getFullYear();
+    const mm = String(end.getMonth() + 1).padStart(2, '0');
+    const dd = String(end.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
   // Query dữ liệu biểu đồ từ Backend API
   const { data: chartsResponse, isLoading: isChartsLoading } = useQuery({
-    queryKey: ['dashboardCharts', provinceId, startDate, endDate, adminUnitId],
-    queryFn: () => dashboardApi.getCharts(provinceId, startDate, endDate, adminUnitId),
+    queryKey: ['dashboardCharts', provinceId, effectiveStartDate, effectiveEndDate, adminUnitId],
+    queryFn: () => dashboardApi.getCharts(provinceId, effectiveStartDate, effectiveEndDate, adminUnitId),
   });
 
   // Query dữ liệu cảnh báo từ Backend API
   const { data: alertsResponse, isLoading: isAlertsLoading } = useQuery({
-    queryKey: ['dashboardAlerts', provinceId, startDate, endDate, adminUnitId],
-    queryFn: () => dashboardApi.getAlerts(provinceId, startDate, endDate, adminUnitId),
+    queryKey: ['dashboardAlerts', provinceId, effectiveStartDate, effectiveEndDate, adminUnitId],
+    queryFn: () => dashboardApi.getAlerts(provinceId, effectiveStartDate, effectiveEndDate, adminUnitId),
   });
 
   const chartsData = chartsResponse?.data || {
@@ -154,9 +177,13 @@ export default function MainChartsPanel({ provinceId, startDate, endDate, adminU
           <h2 className="text-sm font-bold text-black dark:text-white">
             SOS theo thời gian
           </h2>
-          <select className="bg-slate-50 dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs font-bold text-gray-600 dark:text-gray-300">
-            <option>7 ngày qua</option>
-            <option>30 ngày qua</option>
+          <select 
+            value={daysRange} 
+            onChange={(e) => setDaysRange(Number(e.target.value))}
+            className="bg-slate-50 dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs font-bold text-gray-650 dark:text-gray-300 cursor-pointer focus:outline-none"
+          >
+            <option value={7}>7 ngày qua</option>
+            <option value={30}>30 ngày qua</option>
           </select>
         </div>
 
@@ -199,6 +226,32 @@ export default function MainChartsPanel({ provinceId, startDate, endDate, adminU
               {[0, 45, 90, 135, 180].map((y, idx) => (
                 <line key={idx} x1="30" y1={y} x2="480" y2={y} stroke="#e2e8f0" strokeDasharray="3,3" className="dark:stroke-gray-700" />
               ))}
+
+              {/* Y-Axis Line */}
+              <line x1="30" y1={startY} x2="30" y2={chartHeight} stroke="#94a3b8" strokeWidth="1" className="dark:stroke-gray-600" />
+
+              {/* Y-Axis Labels */}
+              <text x="24" y="183" textAnchor="end" fontSize="8" fontWeight="bold" fill="#94a3b8">0</text>
+              <text x="24" y="103" textAnchor="end" fontSize="8" fontWeight="bold" fill="#94a3b8">{Math.round(maxVal * 0.5)}</text>
+              <text x="24" y="23" textAnchor="end" fontSize="8" fontWeight="bold" fill="#94a3b8">{maxVal}</text>
+
+              {/* Default Horizontal Projection Lines for latest date (when not hovering) */}
+              {hoveredIndex === null && totalPoints.length > 0 && (
+                <>
+                  <line x1="30" y1={totalPoints[totalPoints.length - 1][1]} x2={totalPoints[totalPoints.length - 1][0]} y2={totalPoints[totalPoints.length - 1][1]} stroke="#3b82f6" strokeWidth="0.6" strokeDasharray="2,2" opacity="0.6" />
+                  <line x1="30" y1={resolvedPoints[resolvedPoints.length - 1][1]} x2={resolvedPoints[resolvedPoints.length - 1][0]} y2={resolvedPoints[resolvedPoints.length - 1][1]} stroke="#10b981" strokeWidth="0.6" strokeDasharray="2,2" opacity="0.6" />
+                  <line x1="30" y1={pendingPoints[pendingPoints.length - 1][1]} x2={pendingPoints[pendingPoints.length - 1][0]} y2={pendingPoints[pendingPoints.length - 1][1]} stroke="#ef4444" strokeWidth="0.6" strokeDasharray="2,2" opacity="0.6" />
+                </>
+              )}
+
+              {/* Dynamic Horizontal Projection Lines on Hover */}
+              {hoveredIndex !== null && (
+                <>
+                  <line x1="30" y1={totalPoints[hoveredIndex][1]} x2={totalPoints[hoveredIndex][0]} y2={totalPoints[hoveredIndex][1]} stroke="#3b82f6" strokeWidth="1.2" strokeDasharray="2,2" />
+                  <line x1="30" y1={resolvedPoints[hoveredIndex][1]} x2={resolvedPoints[hoveredIndex][0]} y2={resolvedPoints[hoveredIndex][1]} stroke="#10b981" strokeWidth="1.2" strokeDasharray="2,2" />
+                  <line x1="30" y1={pendingPoints[hoveredIndex][1]} x2={pendingPoints[hoveredIndex][0]} y2={pendingPoints[hoveredIndex][1]} stroke="#ef4444" strokeWidth="1.2" strokeDasharray="2,2" />
+                </>
+              )}
               
               {/* Areas */}
               <path d={totalArea} fill="url(#totalGrad)" />
@@ -228,26 +281,152 @@ export default function MainChartsPanel({ provinceId, startDate, endDate, adminU
                 strokeLinecap="round"
               />
 
-              {/* Data Dots for the latest date */}
-              {totalPoints.length > 0 && (
-                <circle cx={totalPoints[totalPoints.length - 1][0]} cy={totalPoints[totalPoints.length - 1][1]} r="3" fill="#3b82f6" stroke="#fff" strokeWidth="1" />
+              {/* Active Dotted Hover Line */}
+              {hoveredIndex !== null && totalPoints[hoveredIndex] && (
+                <line
+                  x1={totalPoints[hoveredIndex][0]}
+                  y1={startY}
+                  x2={totalPoints[hoveredIndex][0]}
+                  y2={chartHeight}
+                  stroke="#cbd5e1"
+                  strokeWidth="1.5"
+                  strokeDasharray="4,4"
+                  className="dark:stroke-gray-600"
+                />
               )}
-              {resolvedPoints.length > 0 && (
-                <circle cx={resolvedPoints[resolvedPoints.length - 1][0]} cy={resolvedPoints[resolvedPoints.length - 1][1]} r="3" fill="#10b981" stroke="#fff" strokeWidth="1" />
+
+              {/* Data Dots for the latest date (only visible when not hovering) */}
+              {hoveredIndex === null && (
+                <>
+                  {totalPoints.length > 0 && (
+                    <circle cx={totalPoints[totalPoints.length - 1][0]} cy={totalPoints[totalPoints.length - 1][1]} r="3" fill="#3b82f6" stroke="#fff" strokeWidth="1" />
+                  )}
+                  {resolvedPoints.length > 0 && (
+                    <circle cx={resolvedPoints[resolvedPoints.length - 1][0]} cy={resolvedPoints[resolvedPoints.length - 1][1]} r="3" fill="#10b981" stroke="#fff" strokeWidth="1" />
+                  )}
+                  {pendingPoints.length > 0 && (
+                    <circle cx={pendingPoints[pendingPoints.length - 1][0]} cy={pendingPoints[pendingPoints.length - 1][1]} r="3" fill="#ef4444" stroke="#fff" strokeWidth="1" />
+                  )}
+                </>
               )}
-              {pendingPoints.length > 0 && (
-                <circle cx={pendingPoints[pendingPoints.length - 1][0]} cy={pendingPoints[pendingPoints.length - 1][1]} r="3" fill="#ef4444" stroke="#fff" strokeWidth="1" />
+
+              {/* Hovered points dots */}
+              {hoveredIndex !== null && (
+                <>
+                  <circle
+                    cx={totalPoints[hoveredIndex][0]}
+                    cy={totalPoints[hoveredIndex][1]}
+                    r="4.5"
+                    fill="#3b82f6"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                  />
+                  <circle
+                    cx={resolvedPoints[hoveredIndex][0]}
+                    cy={resolvedPoints[hoveredIndex][1]}
+                    r="4.5"
+                    fill="#10b981"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                  />
+                  <circle
+                    cx={pendingPoints[hoveredIndex][0]}
+                    cy={pendingPoints[hoveredIndex][1]}
+                    r="4.5"
+                    fill="#ef4444"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                  />
+                </>
               )}
+
+              {/* Invisible Hover Rectangles */}
+              {sosOverTime.map((_: any, i: number) => {
+                const x = startX + (i / (sosOverTime.length - 1)) * chartWidth;
+                const colWidth = chartWidth / (sosOverTime.length - 1);
+                const rectX = i === 0 ? 30 : x - colWidth / 2;
+                const rectW = i === 0 || i === sosOverTime.length - 1 ? colWidth / 2 : colWidth;
+                return (
+                  <rect
+                    key={i}
+                    x={rectX}
+                    y={0}
+                    width={rectW}
+                    height={chartHeight}
+                    fill="transparent"
+                    className="cursor-pointer"
+                    onMouseEnter={() => setHoveredIndex(i)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                  />
+                );
+              })}
             </svg>
           ) : (
             <div className="h-full flex items-center justify-center text-xs text-gray-400">Không có dữ liệu đồ thị</div>
           )}
 
+          {/* Tooltip Card */}
+          {hoveredIndex !== null && sosOverTime[hoveredIndex] && (
+            <div
+              className="absolute bg-white/95 dark:bg-gray-950/95 border border-slate-200/80 dark:border-gray-700/80 backdrop-blur-md rounded-xl p-3 shadow-xl pointer-events-none transition-all duration-150 z-25 text-left"
+              style={{
+                left: `${(totalPoints[hoveredIndex][0] / 500) * 100}%`,
+                top: `10px`,
+                transform: `translateX(${hoveredIndex > sosOverTime.length / 2 ? '-105%' : '5%'})`,
+              }}
+            >
+              <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-1.5 uppercase tracking-wider">
+                Ngày {sosOverTime[hoveredIndex].date}
+              </p>
+              <div className="space-y-1 text-xs">
+                <div className="flex items-center justify-between gap-5">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-gray-300">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>Tổng SOS:</span>
+                  </div>
+                  <span className="font-extrabold text-blue-600 dark:text-blue-400">
+                    {sosOverTime[hoveredIndex].total}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-5">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-gray-300">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>Đã xử lý:</span>
+                  </div>
+                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                    {sosOverTime[hoveredIndex].resolved}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-5">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-gray-300">
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    <span>Chưa xử lý:</span>
+                  </div>
+                  <span className="font-extrabold text-red-600 dark:text-red-400">
+                    {sosOverTime[hoveredIndex].pending}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* X Axis Labels */}
-          <div className="flex justify-between text-[10px] font-bold text-gray-400 mt-2 px-6">
-            {sosOverTime.map((d: any, i: number) => (
-              <span key={i}>{d.date}</span>
-            ))}
+          <div className="flex justify-between text-[9px] font-bold text-gray-400 mt-2 px-6">
+            {sosOverTime.map((d: any, i: number) => {
+              if (sosOverTime.length > 10) {
+                const isFirst = i === 0;
+                const isLast = i === sosOverTime.length - 1;
+                const isStep = i % 5 === 0;
+                if (!isFirst && !isLast && !isStep) {
+                  return <span key={i} className="invisible w-0" />;
+                }
+              }
+              return (
+                <span key={i} className="truncate max-w-[35px] text-center">
+                  {d.date}
+                </span>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -261,37 +440,91 @@ export default function MainChartsPanel({ provinceId, startDate, endDate, adminU
         <div className="relative flex justify-center items-center my-6">
           <svg width="150" height="150" viewBox="0 0 36 36" className="transform -rotate-90">
             <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f3f4f6" strokeWidth="3" className="dark:stroke-gray-700" />
-            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="3.5" strokeDasharray={`${savedStroke} ${100 - savedStroke}`} strokeDashoffset="0" />
-            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="3.5" strokeDasharray={`${ongoingStroke} ${100 - ongoingStroke}`} strokeDashoffset={ongoingOffset} />
-            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" strokeWidth="3.5" strokeDasharray={`${failedStroke} ${100 - failedStroke}`} strokeDashoffset={failedOffset} />
+            <circle
+              cx="18"
+              cy="18"
+              r="15.915"
+              fill="none"
+              stroke="#10b981"
+              strokeWidth={hoveredSector === 'saved' ? '4.5' : '3.5'}
+              strokeDasharray={`${savedStroke} ${100 - savedStroke}`}
+              strokeDashoffset="0"
+              className="transition-all duration-200 cursor-pointer"
+              onMouseEnter={() => setHoveredSector('saved')}
+              onMouseLeave={() => setHoveredSector('total')}
+            />
+            <circle
+              cx="18"
+              cy="18"
+              r="15.915"
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth={hoveredSector === 'ongoing' ? '4.5' : '3.5'}
+              strokeDasharray={`${ongoingStroke} ${100 - ongoingStroke}`}
+              strokeDashoffset={ongoingOffset}
+              className="transition-all duration-200 cursor-pointer"
+              onMouseEnter={() => setHoveredSector('ongoing')}
+              onMouseLeave={() => setHoveredSector('total')}
+            />
+            <circle
+              cx="18"
+              cy="18"
+              r="15.915"
+              fill="none"
+              stroke="#ef4444"
+              strokeWidth={hoveredSector === 'failed' ? '4.5' : '3.5'}
+              strokeDasharray={`${failedStroke} ${100 - failedStroke}`}
+              strokeDashoffset={failedOffset}
+              className="transition-all duration-200 cursor-pointer"
+              onMouseEnter={() => setHoveredSector('failed')}
+              onMouseLeave={() => setHoveredSector('total')}
+            />
           </svg>
-          <div className="absolute flex flex-col items-center justify-center">
-            <span className="text-[10px] font-bold text-gray-400 uppercase leading-none">Tổng</span>
-            <span className="text-xl font-black text-gray-900 dark:text-white mt-1">{outcomes.total}</span>
+          <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-[10px] font-bold text-gray-400 uppercase leading-none transition-colors duration-200">
+              {hoveredSector === 'saved' ? 'Đã cứu sống' : hoveredSector === 'ongoing' ? 'Đang cứu' : hoveredSector === 'failed' ? 'Chưa xử lý' : 'Tổng cộng'}
+            </span>
+            <span className={`text-xl font-black mt-1 transition-colors duration-200 ${
+              hoveredSector === 'saved' ? 'text-emerald-500' : hoveredSector === 'ongoing' ? 'text-amber-500' : hoveredSector === 'failed' ? 'text-red-500' : 'text-gray-900 dark:text-white'
+            }`}>
+              {hoveredSector === 'saved' ? outcomes.saved : hoveredSector === 'ongoing' ? outcomes.ongoing : hoveredSector === 'failed' ? outcomes.failed : outcomes.total}
+            </span>
           </div>
         </div>
 
         <div className="space-y-2.5 pt-2">
-          <div className="flex items-center justify-between text-xs">
+          <div
+            className={`flex items-center justify-between text-xs p-1.5 rounded-lg transition-all duration-150 cursor-pointer ${hoveredSector === 'saved' ? 'bg-emerald-50 dark:bg-emerald-950/20 scale-[1.02]' : 'hover:bg-slate-50 dark:hover:bg-gray-700/40'}`}
+            onMouseEnter={() => setHoveredSector('saved')}
+            onMouseLeave={() => setHoveredSector('total')}
+          >
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              <span className="text-gray-500 font-semibold">Đã cứu sống</span>
+              <span className="text-gray-500 font-semibold dark:text-gray-400">Đã cứu sống</span>
             </div>
-            <span className="font-extrabold">{outcomes.saved} <span className="text-[10px] text-gray-400">({savedPercent}%)</span></span>
+            <span className="font-extrabold text-gray-900 dark:text-white">{outcomes.saved} <span className="text-[10px] text-gray-400">({savedPercent}%)</span></span>
           </div>
-          <div className="flex items-center justify-between text-xs">
+          <div
+            className={`flex items-center justify-between text-xs p-1.5 rounded-lg transition-all duration-150 cursor-pointer ${hoveredSector === 'ongoing' ? 'bg-amber-50 dark:bg-amber-950/20 scale-[1.02]' : 'hover:bg-slate-50 dark:hover:bg-gray-700/40'}`}
+            onMouseEnter={() => setHoveredSector('ongoing')}
+            onMouseLeave={() => setHoveredSector('total')}
+          >
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              <span className="text-gray-500 font-semibold">Đang cứu</span>
+              <span className="text-gray-500 font-semibold dark:text-gray-400">Đang cứu</span>
             </div>
-            <span className="font-extrabold">{outcomes.ongoing} <span className="text-[10px] text-gray-400">({ongoingPercent}%)</span></span>
+            <span className="font-extrabold text-gray-900 dark:text-white">{outcomes.ongoing} <span className="text-[10px] text-gray-400">({ongoingPercent}%)</span></span>
           </div>
-          <div className="flex items-center justify-between text-xs">
+          <div
+            className={`flex items-center justify-between text-xs p-1.5 rounded-lg transition-all duration-150 cursor-pointer ${hoveredSector === 'failed' ? 'bg-red-50 dark:bg-red-950/20 scale-[1.02]' : 'hover:bg-slate-50 dark:hover:bg-gray-700/40'}`}
+            onMouseEnter={() => setHoveredSector('failed')}
+            onMouseLeave={() => setHoveredSector('total')}
+          >
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-              <span className="text-gray-500 font-semibold">Chưa xử lý</span>
+              <span className="text-gray-500 font-semibold dark:text-gray-400">Chưa xử lý</span>
             </div>
-            <span className="font-extrabold">{outcomes.failed} <span className="text-[10px] text-gray-400">({failedPercent}%)</span></span>
+            <span className="font-extrabold text-gray-900 dark:text-white">{outcomes.failed} <span className="text-[10px] text-gray-400">({failedPercent}%)</span></span>
           </div>
         </div>
       </div>

@@ -20,6 +20,7 @@ export const ROUTES = {
   DISASTER_LIST: '/disaster/dashboard',
   DISASTER_DETAIL: '/disaster/:id',
   SOS_REQUEST_LIST: '/request',
+  MISSION_LIST: '/missions',
   DONATION: '/donation',
   DONATION_LIST: '/donation/list',
   DONATION_CAMPAIGN: '/donation/campaign',

@@ -1,24 +1,27 @@
-export enum NotificationPriority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  CRITICAL = 'CRITICAL'
-}
+export const NotificationPriority = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL'
+} as const;
+export type NotificationPriority = typeof NotificationPriority[keyof typeof NotificationPriority];
 
-export enum NotificationChannel {
-  APP = 'APP',
-  PUSH = 'PUSH',
-  EMAIL = 'EMAIL',
-  SMS = 'SMS',
-  ZALO = 'ZALO'
-}
+export const NotificationChannel = {
+  APP: 'APP',
+  PUSH: 'PUSH',
+  EMAIL: 'EMAIL',
+  SMS: 'SMS',
+  ZALO: 'ZALO'
+} as const;
+export type NotificationChannel = typeof NotificationChannel[keyof typeof NotificationChannel];
 
-export enum NotificationDeliveryStatus {
-  PENDING = 'PENDING',
-  SENT = 'SENT',
-  FAILED = 'FAILED',
-  READ = 'READ'
-}
+export const NotificationDeliveryStatus = {
+  PENDING: 'PENDING',
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+  READ: 'READ'
+} as const;
+export type NotificationDeliveryStatus = typeof NotificationDeliveryStatus[keyof typeof NotificationDeliveryStatus];
 
 export interface NotificationTemplate {
   id: number;

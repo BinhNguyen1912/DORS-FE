@@ -26,6 +26,7 @@ import TeamSpecializationListPage from './pages/rescue-team/TeamSpecializationLi
 import DisasterListPage from './pages/disaster/DisasterListPage';
 import DisasterDetailPage from './pages/disaster/DisasterDetailPage';
 import SosRequestListPage from './pages/sos-request/SosRequestListPage';
+import MissionsListPage from './pages/mission/MissionsListPage';
 import DonationListPage from './pages/donation/DonationListPage';
 import DonationCampaignPage from './pages/donation/DonationCampaignPage';
 import UserListPage from './pages/categories/UserListPage';
@@ -230,6 +231,14 @@ export const router = createBrowserRouter([
         element: (
           <FeatureGuard route={ROUTES.SOS_REQUEST_LIST}>
             <SosRequestListPage />
+          </FeatureGuard>
+        ),
+      },
+      {
+        path: ROUTES.MISSION_LIST,
+        element: (
+          <FeatureGuard route={ROUTES.SOS_REQUEST_LIST}>
+            <MissionsListPage />
           </FeatureGuard>
         ),
       },
